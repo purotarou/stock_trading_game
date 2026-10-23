@@ -1,0 +1,101 @@
+<title>カブトレ！</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<header class="topbar">
+  <div class="brand"><span class="logo">カブトレ<span class="bang">！</span></span><span class="exch">NTX ネオ東京証券取引所</span></div>
+  <div class="clock">
+    <span class="date" id="h-date">—</span>
+    <span class="t"><span class="time num" id="h-time">8:00</span><span class="phase" id="h-phase">寄り付き前</span></span>
+  </div>
+  <div class="controls">
+    <div class="speed" role="group" aria-label="時間の速さ">
+      <button data-speed="0">停止</button><button data-speed="1">×1</button><button data-speed="2">×2</button><button data-speed="4">×4</button>
+    </div>
+    <button class="ghost" id="skip-btn">9:00まで進める</button>
+  </div>
+  <dl class="stats">
+    <div class="stat"><dt>総資産</dt><dd class="num" id="h-asset">—</dd></div>
+    <div class="stat"><dt>今日の損益</dt><dd class="num" id="h-day">—</dd></div>
+    <div class="stat"><dt><button class="term" data-term="株価指数">NTX225</button></dt><dd class="num" id="h-idx">—</dd></div>
+  </dl>
+  <button class="rank-chip" id="h-rank" aria-label="ランクとミッションを見る"></button>
+  <button class="menu-btn" id="menu-btn" aria-label="メニュー">≡</button>
+</header>
+<div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
+
+<main id="view-trade" class="layout">
+  <section class="panel a-list" aria-label="銘柄リスト">
+    <div class="p-head"><span>銘柄</span><select id="sec-filter" aria-label="業種で絞り込み"></select></div>
+    <div class="list" id="stock-list"></div>
+    <p class="list-foot" id="list-foot"></p>
+  </section>
+  <div class="col-main">
+  <section class="panel a-chart" aria-label="チャート">
+    <div class="chart-head">
+      <div><div class="ch-name" id="c-name"></div><div class="ch-meta" id="c-meta"></div></div>
+      <div class="ch-price"><div class="num big" id="c-price"></div><div class="num" id="c-chg"></div></div>
+    </div>
+    <div class="chart-tools">
+      <div class="seg" role="group" aria-label="チャートの期間"><button data-cm="5m">5分足（今日）</button><button data-cm="1d">日足</button></div>
+      <span class="ohlc num" id="ohlc"></span>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart-wrap"><canvas id="chart" role="img" aria-label="選んだ銘柄のローソク足チャート"></canvas></div>
+    <dl class="facts" id="facts"></dl>
+  </section>
+  <section class="panel a-news" aria-label="ニュース">
+    <div class="p-head"><span>ニュース</span><span class="muted small" id="news-hint"></span></div>
+    <ol class="news" id="news"></ol>
+  </section>
+  </div>
+  <div class="col-side">
+  <section class="panel a-order" aria-label="注文">
+    <div class="p-head"><span>注文</span><span class="muted small num" id="o-avail"></span></div>
+    <div class="order">
+      <div class="o-target"><span id="o-name"></span><span class="num" id="o-cur"></span></div>
+      <div class="seg side" role="group" aria-label="売買"><button data-side="buy" class="buy">買う</button><button data-side="sell" class="sell">売る</button></div>
+      <div class="field"><span class="lab">注文の種類</span><div class="seg" id="o-types" role="group" aria-label="注文の種類"></div></div>
+      <div class="field">
+        <label class="lab" for="o-qty">株数（<button class="term" data-term="単元株">100株単位</button>）</label>
+        <div class="stepper"><button id="q-minus" aria-label="100株減らす">−</button><input id="o-qty" class="num" type="number" inputmode="numeric" min="100" step="100" value="100"><button id="q-plus" aria-label="100株増やす">＋</button></div>
+        <div class="quick" id="o-quick"></div>
+      </div>
+      <div class="field" id="o-price-field" hidden>
+        <label class="lab" for="o-price" id="o-price-lab">指値（円）</label>
+        <input id="o-price" type="number" inputmode="numeric">
+      </div>
+      <dl class="est" id="o-est"></dl>
+      <button class="primary buy" id="o-submit">注文内容を確認</button>
+      <p class="o-msg" id="o-msg" role="status"></p>
+      <div class="o-orders"><h4>注文中（当日限り）</h4><ul id="o-list"></ul></div>
+    </div>
+  </section>
+  <section class="panel a-board" aria-label="板">
+    <div class="p-head"><button class="term" data-term="板">板（気配）</button><span class="muted small">値段をタップで指値に入力</span></div>
+    <div id="board"></div>
+  </section>
+  </div>
+</main>
+<main id="view-hold" class="view" hidden></main>
+<main id="view-cal" class="view" hidden></main>
+<main id="view-mission" class="view" hidden></main>
+<main id="view-dict" class="view" hidden></main>
+
+<nav class="tabbar" aria-label="画面の切り替え">
+  <button data-view="trade" aria-current="page">取引</button>
+  <button data-view="hold">保有株</button>
+  <button data-view="cal">決算・配当</button>
+  <button data-view="mission">ミッション</button>
+  <button data-view="dict">用語辞典</button>
+</nav>
+
+<div id="title" class="overlay"></div>
+<div id="modal" class="overlay" hidden><div class="card" id="modal-card" role="dialog" aria-modal="true"></div></div>
+<div id="pop" class="pop" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="script.js"></script>
