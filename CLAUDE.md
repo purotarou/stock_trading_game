@@ -9,12 +9,14 @@
 
 ## ファイル構成（目印コメント `/* ===== ... ===== */` で検索）
 - `index.html`: `<title>`・フォント読み込み・`<body>` の骨格（パネルの入れ物やボタンなど静的なDOM）のみ。`style.css` と `script.js` を読み込む
+- `Aseet/`: 素材（アイコン = ファビコン、BGM = ゲーム中のみ再生・タイトルでは停止、ボタン効果音）。パスは `Aseet/...` で参照
 - `style.css`: 先頭の `:root` にトークン（`--up` 赤 / `--down` 緑 = 日本式配色、ライト/ダーク両対応）
-- `script.js`: データ表 SECTORS, DEFS（架空30社, 6業種, 架空取引所NTX, 指数NTX225）, DIFF, SCEN, RANKS, MISSIONS, GLOSS
+- `script.js`: データ表 SECTORS, DEFS（実在企業をもじった架空30社, 6業種, 架空取引所NTX, 指数NTX225）, DIFF, SCEN, RANKS, MISSIONS, GLOSS, TIPS, TERM_GROUPS, TRIVIA
 - 乱数: シード付き mulberry32 + Box–Muller。同じシード = 同じ相場
 - 株価エンジン: 1ゲーム分ごとに `r = μΔt + β·M + S_sector + e (+jump) + κ·ln(V/P)Δt + news`。日次ボラは GARCH 風 `h = clamp(0.04+0.06z²+0.90h, 0.4, 3)`、寄り・引けは 1.5 倍（正規化）
 - 取引ルール: 100株単位、呼値、値幅制限、S高/S安、前場/後場/昼休み、成行(板を食う)/指値/逆指値、税 20.315%、本格モード手数料 0.1%、配当と権利落ち、四半期決算
-- 画面: チャート（自前 Canvas のローソク足 + 出来高 + 移動平均 + ニュースピン + 自分の売買）、板、注文パネル、保有、カレンダー、ミッション、用語集
+- 画面: チャート（自前 Canvas のローソク足 + 出来高 + 移動平均 + ニュースピン + 自分の売買）、板、注文パネル、保有、カレンダー、ミッション、ヒント（Q&A形式。TIPS = コツ、GLOSS を TERM_GROUPS で分類 = 用語、TRIVIA = 答えに添える豆知識）
+- カブ先生: 出すのはチュートリアル（TUT。「はじめての1か月」の初回のみ。操作すると `tutEvent` で次へ進む）とリザルト画面（`senseiAdvice`）だけ
 - デバッグ: `window.__kabutore`（G, newGame, tick, asset, rank, profile, runDay, nextDay, closeModal）
 
 ## 調整済みの重要定数（むやみに変えない）

@@ -1,4 +1,6 @@
 <title>カブトレ！</title>
+<link rel="icon" type="image/png" href="Aseet/stock_trading_game_icon.png">
+<link rel="apple-touch-icon" href="Aseet/stock_trading_game_icon.png">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +43,7 @@
     </div>
     <div class="chart-tools">
       <div class="seg" role="group" aria-label="チャートの期間"><button data-cm="5m">5分足（今日）</button><button data-cm="1d">日足</button></div>
+      <div class="seg zoom" role="group" aria-label="チャートの表示範囲"><button data-zoom="in" aria-label="拡大">＋</button><button data-zoom="out" aria-label="縮小">−</button><button data-zoom="latest">最新</button></div>
       <span class="ohlc num" id="ohlc"></span>
     </div>
     <div class="legend" id="legend"></div>
@@ -83,19 +86,21 @@
 <main id="view-hold" class="view" hidden></main>
 <main id="view-cal" class="view" hidden></main>
 <main id="view-mission" class="view" hidden></main>
-<main id="view-dict" class="view" hidden></main>
+<main id="view-hint" class="view" hidden></main>
 
 <nav class="tabbar" aria-label="画面の切り替え">
-  <button data-view="trade" aria-current="page">取引</button>
-  <button data-view="hold">保有株</button>
   <button data-view="cal">決算・配当</button>
+  <button data-view="hold">保有株</button>
+  <button data-view="trade" aria-current="page">取引</button>
   <button data-view="mission">ミッション</button>
-  <button data-view="dict">用語辞典</button>
+  <button data-view="hint">ヒント</button>
 </nav>
 
 <div id="title" class="overlay"></div>
 <div id="modal" class="overlay" hidden><div class="card" id="modal-card" role="dialog" aria-modal="true"></div></div>
 <div id="pop" class="pop" hidden></div>
 <div id="toasts" aria-live="polite"></div>
+<div id="tut-ring" hidden></div>
+<div id="coach" role="dialog" aria-label="カブ先生のチュートリアル" aria-live="polite" hidden></div>
 
 <script src="script.js"></script>
