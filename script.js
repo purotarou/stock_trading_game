@@ -1577,10 +1577,10 @@ function showTitle() {
   if (!REAL || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (SCEN[pick.scen].rank > r || !!SCEN[pick.scen].real !== real) pick.scen = real ? 'real' : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'normal';
-  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? '実在の30銘柄。過去の実際の相場になる。' : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
+  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? '実在の30銘柄。過去の現実の相場になる。' : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
-      <p>${real ? '2020年の東証の実際の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
+      <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
       <div class="prof"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
     <div class="setup">
       <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!REAL || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && REAL && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
