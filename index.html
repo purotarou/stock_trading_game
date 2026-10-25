@@ -8,8 +8,9 @@
   (function () {
     function detect() {
       var touch = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
-      var small = Math.min(screen.width, screen.height) < 600;
-      document.documentElement.dataset.device = !touch ? 'pc' : small ? 'phone' : 'tablet';
+      var small = Math.min(screen.width, screen.height) < 600, w = innerWidth;
+      // タッチ判定が効かない環境（ブラウザの幅を狭めた・開発者ツールの表示切り替えなど）でも、画面の幅で判断する
+      document.documentElement.dataset.device = (touch && small) || w <= 700 ? 'phone' : touch || w <= 1120 ? 'tablet' : 'pc';
     }
     detect();
     addEventListener('resize', detect);   // 画面の回転や、開発者ツールでの端末切り替えにも追従する

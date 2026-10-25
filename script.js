@@ -238,7 +238,7 @@ const SENSEI_SVG = `<svg viewBox="0 0 64 64" width="72" height="72" aria-hidden=
 let G = null;
 let profile = loadProfile();
 let modalOpen = false, titleOpen = true;
-const UI = { side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, vw: null, hcat: 'tip', tut: null, seenNews: null };
+const UI = { side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, vw: null, hcat: 'tip', tut: null };
 // チャートの表示範囲。cnt = 見えるローソク足の本数、end = 右端の位置（null なら最新に追従）、yOff = 上下のずらし量（値幅に対する割合）
 function resetView() { UI.vw = { '5m': { cnt: 60, end: null }, '1d': { cnt: 60, end: null }, yOff: 0 }; }
 resetView();
@@ -774,7 +774,7 @@ function updateTape() {
 
 function render() {
   if (!G) return;
-  renderHeader(); updateTape(); notifyNews();
+  renderHeader(); updateTape();
   if (UI.view === 'trade') { renderList(); renderChartHead(); drawChart(); renderBoard(); renderOrderPanel(); renderNews(); }
   else if (UI.view === 'hold') renderHold();
   else if (UI.view === 'cal') renderCal();
@@ -1045,15 +1045,14 @@ function renderNews() {
   }).join('') || '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>';
 }
 
-// スマホ・タブレットでは、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）
-function notifyNews() {
-  if (document.documentElement.dataset.device === 'pc') return;
-  if (UI.seenNews == null || UI.seenNews > G.newsId) { UI.seenNews = G.newsId; return; }
-  if (UI.seenNews === G.newsId) return;
-  const fresh = G.news.filter(n => n.id > UI.seenNews).slice(-2); UI.seenNews = G.newsId;
+// ×1〜×4 で時間を進めているあいだ、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）。
+// 「〜まで進める」で飛ばしたときは出さない（loop からだけ呼ぶ）。since = 進める前の G.newsId
+function notifyNews(since) {
+  const fresh = G.news.filter(n => n.id > since).slice(-2);
+  if (!fresh.length) return;
   const hint = DIFF[G.diff].hint, box = $('#toasts');
   for (const n of fresh) {
-    const sub = hint === 'stars' && n.type !== 'div' ? `<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>` : hint === 'dir' && n.hint ? esc(n.hint) : '';
+    const sub = hint === 'stars' && n.type !== 'div' ? `情報の確かさ <span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>` : hint === 'dir' && n.hint ? esc(n.hint) : '';
     const t = document.createElement('button'); t.className = 'toast news'; t.dataset.news = n.id;
     t.innerHTML = `<span class="nt-top"><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span class="num muted small">${n.time}</span></span>${esc(n.text)}${sub ? `<span class="nt-sub">${sub}</span>` : ''}`;
     box.prepend(t);
@@ -1513,9 +1512,9 @@ function loop(ts) {
   tutPlace();
   const dt = lastTs ? Math.min(ts - lastTs, 1000) : 0; lastTs = ts;
   if (G && !titleOpen && !modalOpen && G.phase !== 'closed' && G.speed > 0) {
-    acc += dt * G.speed; let n = 0;
+    acc += dt * G.speed; let n = 0; const since = G.newsId;
     while (acc >= 1000 && n < 20) { acc -= 1000; tick(); n++; if (G.phase === 'closed' || modalOpen) { acc = 0; break; } }
-    if (n) render();
+    if (n) { render(); notifyNews(since); }
   } else acc = 0;
   requestAnimationFrame(loop);
 }
