@@ -5,6 +5,7 @@
 ## 動かし方
 - `index.html` をブラウザで開く（または VS Code の Live Server 拡張 / `npx serve .`）
 - 構文チェック: `node --check script.js`
+- ランダム相場が変わっていないかの確認: `git show HEAD:script.js > /tmp/before.js && node tools/check_random.js /tmp/before.js script.js`（シナリオ×難易度×シードごとに値動き・ニュースの指紋を比べる。すべて [OK] なら同じ）
 - セーブは localStorage（`kabutore.profile` = 経験値・ランク、`kabutore.save` = 進行中の1日の終わり時点）
 
 ## ファイル構成（目印コメント `/* ===== ... ===== */` で検索）
@@ -13,12 +14,13 @@
 - `style.css`: 先頭の `:root` にトークン（`--up` 赤 / `--down` 緑 = 日本式配色、ライト/ダーク両対応）
 - `script.js`: データ表 SECTORS, DEFS（実在企業をもじった架空30社, 6業種, 架空取引所NTX, 指数NTX225）, DIFF, SCEN, RANKS, MISSIONS, GLOSS, TIPS, TERM_GROUPS, TRIVIA
 - 乱数: シード付き mulberry32 + Box–Muller。同じシード = 同じ相場
+- リアル相場チャレンジ: `data/corona2020.js`（`const CORONA2020`、`tools/fetch_prices.py` で作る。git には入れない・配布しない）があるときだけ選べる。`G.mode = 'random' | 'real'`、`SCEN.real`。終値は実データどおり、日中は前日終値→実際の終値のブラウニアン・ブリッジ（`realOpen` / `realStep`）。作りもののニュース・決算・配当・暴落は出さない。当時の実際のニュースは `data/news2020.js`（`const NEWS2020`、git に入れる。なくても動く）から、date より後の最初の営業日の寄り付き前に表示だけする（`pushRealNews` → `pushNews`。genNews / apply 系にはつながないので株価は不変）。各ニュースは type（fact = 報道 / report = 観測 / rumor = 当時実際に出回った噂）と importance（3 は全体の1〜2割）を持つ。リアル相場ではニュースを `NEWS_KEEP_REAL` 件まで保存・表示する（1年分が収まる）。業種は東証の業種名で `REAL_SECTORS`（`SECTORS` に混ぜるとランダム相場の乱数の順番が変わるので分けている。表示は `SEC(k)`）。指数は30銘柄を同額ずつ持った平均（開始=100、`idxName()`）
 - 株価エンジン: 1ゲーム分ごとに `r = μΔt + β·M + S_sector + e (+jump) + κ·ln(V/P)Δt + news`。日次ボラは GARCH 風 `h = clamp(0.04+0.06z²+0.90h, 0.4, 3)`、寄り・引けは 1.5 倍（正規化）
 - 取引ルール: 100株単位、呼値、値幅制限、S高/S安、前場/後場/昼休み、成行(板を食う)/指値/逆指値、税 20.315%、本格モード手数料 0.1%、配当と権利落ち、四半期決算
 - 画面: チャート（自前 Canvas のローソク足 + 出来高 + 移動平均 + ニュースピン + 自分の売買）、板、注文パネル、保有、カレンダー、ミッション、ヒント（Q&A形式。TIPS = コツ、GLOSS を TERM_GROUPS で分類 = 用語、TRIVIA = 答えに添える豆知識）
 - 端末別レイアウト: `index.html` 先頭の小さなスクリプトが `<html data-device="pc|tablet|phone">` を付ける（タッチ端末かつ画面の短辺600px未満、または幅700px以下 = phone / それ以外のタッチ端末、または幅1120px以下 = tablet）。スマホ・タブレット専用の見た目は `style.css` 末尾の `[data-device=...]` だけに書き、PC の表示は変えない。スマホ・タブレットでは見出し＋流れる銘柄（`.hdr`）を上部に固定し。×1〜×4 で進めている間は全端末で新着ニュースを右下にポップアップ（`notifyNews`。loop からだけ呼ぶので「〜まで進める」では出ない）
 - カブ先生: 出すのはチュートリアル（TUT。「はじめての1か月」の初回のみ。操作すると `tutEvent` で次へ進む）とリザルト画面（`senseiAdvice`）だけ
-- デバッグ: `window.__kabutore`（G, newGame, tick, asset, rank, profile, runDay, nextDay, closeModal）
+- デバッグ: `window.__kabutore`（G, newGame(scen, diff, seed, cash, mode), tick, asset, rank, profile, runDay, nextDay, closeModal）
 
 ## 調整済みの重要定数（むやみに変えない）
 - `MKT_SIG=0.17`、`NEWS_RATE`（ニュース頻度）。年率ボラの目安: 食品 約22% / 自動車・銀行 約32% / 新興 約67%
