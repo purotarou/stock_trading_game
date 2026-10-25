@@ -109,7 +109,7 @@ const MISSIONS = [
   { id: 'crash', t: '暴落を−10%以内で乗り切ろう', xp: 100 },
 ];
 const KIND = { mkt: '成行', lmt: '指値', stp: '逆指値' };
-const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', deny: '訂正', div: '配当', real: '報道' };
+const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', deny: '訂正', div: '配当', real: '報道', realReport: '観測', realRumor: 'うわさ' };
 
 /* ニュースのテンプレート（影響は対数リターン） */
 const NEWS_MACRO = [
@@ -384,10 +384,12 @@ if (REAL && typeof NEWS2020 !== 'undefined' && Array.isArray(NEWS2020)) {
   for (const k in REAL_NEWS) REAL_NEWS[k].sort((a, b) => (a.importance || 2) - (b.importance || 2));
 }
 const hasRealNews = () => Object.keys(REAL_NEWS).length > 0;
+const NEWS_KEEP_REAL = 400;   // リアル相場で保存・表示するニュースの上限（1年分が収まる数）
 function pushRealNews() {
   const t = G.date.slice(5).split('-').map(Number).join('/') + ' 朝';
   for (const n of REAL_NEWS[G.dayIndex] || []) {
-    pushNews({ day: G.dayIndex, time: t, type: 'real', stars: 3, codes: (n.codes || []).filter(c => REAL_PX[c]), text: n.headline, body: n.body || '', imp: n.importance || 2, hint: '', flash: false });
+    const type = n.type === 'report' ? 'realReport' : n.type === 'rumor' ? 'realRumor' : 'real';   // 実際の報道 / 観測報道 / 当時の噂
+    pushNews({ day: G.dayIndex, time: t, type, stars: 3, codes: (n.codes || []).filter(c => REAL_PX[c]), text: n.headline, body: n.body || '', imp: n.importance || 2, hint: '', flash: false });
   }
 }
 
@@ -504,7 +506,8 @@ function minuteBar(s, prev, r, eps1) {
 /* ===================== ニュース ===================== */
 function unlockedStocks() { const r = rank(); return G.stocks.filter(s => s.unlock <= r); }
 function pushNews(item) {
-  item.id = ++G.newsId; G.news.push(item); if (G.news.length > 120) G.news.shift();
+  // リアル相場は1年分（約200件）の当時のニュースを全部残す。ランダム相場は今までどおり120件
+  item.id = ++G.newsId; G.news.push(item); if (G.news.length > (isReal() ? NEWS_KEEP_REAL : 120)) G.news.shift();
 }
 function pinFor(s, imp, mode) { s.pins.push({ d: G.dayIndex, m: mode === 'gap' ? 0 : G.minute, dir: Math.sign(imp) }); if (s.pins.length > 160) s.pins.shift(); }
 function applyStock(s, imp, mode, real) {
@@ -1155,12 +1158,12 @@ function renderNews() {
   const hint = DIFF[G.diff].hint;
   $('#news-hint').textContent = isReal() ? '日付は報道が届いた朝' : hint === 'dir' ? '矢印は影響の向き' : hint === 'stars' ? '★は情報の確かさ' : '';
   if (UI.lastNews === G.newsId) return; UI.lastNews = G.newsId;
-  $('#news').innerHTML = G.news.slice(-50).reverse().map(n => {
+  $('#news').innerHTML = G.news.slice(isReal() ? -NEWS_KEEP_REAL : -50).reverse().map(n => {
     const sub = [];
     // 当時のニュース（real）は日付を出していて、すべて確かな報道なので、★と「◯日前」は省く
-    if (hint === 'stars' && n.type !== 'div' && n.type !== 'real') sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
+    if (hint === 'stars' && n.type !== 'div' && !n.type.startsWith('real')) sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
     if (hint === 'dir' && n.hint) sub.push(`<span>${esc(n.hint)}</span>`);
-    if (n.day !== G.dayIndex && n.type !== 'real') sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
+    if (n.day !== G.dayIndex && !n.type.startsWith('real')) sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
     return `<li><button class="nw${n.imp === 3 ? ' imp3' : ''}" data-news="${n.id}"><span class="nw-time num">${n.time}</span><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span>${esc(n.text)}</span>${n.body ? `<span class="nw-body">${esc(n.body)}</span>` : ''}${sub.length ? `<span class="nw-sub">${sub.join('')}</span>` : ''}</button></li>`;
   }).join('') || (isReal() ? `<li class="empty">${hasRealNews() ? 'まだニュースはありません。当時の報道が、出来事の翌営業日の朝に届きます。' : 'ニュースのデータ（data/news2020.js）がないため、ニュースは流れません。'}</li>` : '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>');
 }
