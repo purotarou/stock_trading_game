@@ -238,7 +238,7 @@ const SENSEI_SVG = `<svg viewBox="0 0 64 64" width="72" height="72" aria-hidden=
 let G = null;
 let profile = loadProfile();
 let modalOpen = false, titleOpen = true;
-const UI = { side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, vw: null, hcat: 'tip', tut: null };
+const UI = { side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, vw: null, hcat: 'tip', tut: null, seenNews: null };
 // チャートの表示範囲。cnt = 見えるローソク足の本数、end = 右端の位置（null なら最新に追従）、yOff = 上下のずらし量（値幅に対する割合）
 function resetView() { UI.vw = { '5m': { cnt: 60, end: null }, '1d': { cnt: 60, end: null }, yOff: 0 }; }
 resetView();
@@ -774,7 +774,7 @@ function updateTape() {
 
 function render() {
   if (!G) return;
-  renderHeader(); updateTape();
+  renderHeader(); updateTape(); notifyNews();
   if (UI.view === 'trade') { renderList(); renderChartHead(); drawChart(); renderBoard(); renderOrderPanel(); renderNews(); }
   else if (UI.view === 'hold') renderHold();
   else if (UI.view === 'cal') renderCal();
@@ -1043,6 +1043,23 @@ function renderNews() {
     if (n.day !== G.dayIndex) sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
     return `<li><button class="nw" data-news="${n.id}"><span class="nw-time num">${n.time}</span><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span>${esc(n.text)}</span>${sub.length ? `<span class="nw-sub">${sub.join('')}</span>` : ''}</button></li>`;
   }).join('') || '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>';
+}
+
+// スマホ・タブレットでは、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）
+function notifyNews() {
+  if (document.documentElement.dataset.device === 'pc') return;
+  if (UI.seenNews == null || UI.seenNews > G.newsId) { UI.seenNews = G.newsId; return; }
+  if (UI.seenNews === G.newsId) return;
+  const fresh = G.news.filter(n => n.id > UI.seenNews).slice(-2); UI.seenNews = G.newsId;
+  const hint = DIFF[G.diff].hint, box = $('#toasts');
+  for (const n of fresh) {
+    const sub = hint === 'stars' && n.type !== 'div' ? `<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>` : hint === 'dir' && n.hint ? esc(n.hint) : '';
+    const t = document.createElement('button'); t.className = 'toast news'; t.dataset.news = n.id;
+    t.innerHTML = `<span class="nt-top"><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span class="num muted small">${n.time}</span></span>${esc(n.text)}${sub ? `<span class="nt-sub">${sub}</span>` : ''}`;
+    box.prepend(t);
+    setTimeout(() => t.classList.add('out'), 6000); setTimeout(() => t.remove(), 6500);
+  }
+  while (box.children.length > (window.innerWidth < 700 ? 2 : 3)) box.lastChild.remove();
 }
 
 /* ---------- 保有株 ---------- */
@@ -1444,7 +1461,7 @@ function bindUI() {
     const nw = e.target.closest('[data-news]'); if (nw) {
       const n = G.news.find(x => x.id === +nw.dataset.news); if (!n) return;
       let code = n.codes[0]; if (!code && n.sector) code = unlockedStocks().find(s => s.sector === n.sector)?.code;
-      if (code && byCode(code).unlock <= rank()) { G.sel = code; render(); } else if (code) toast(`${byCode(code).name}はランク${byCode(code).unlock}で取引できるようになります`);
+      if (code && byCode(code).unlock <= rank()) { G.sel = code; if (UI.view !== 'trade') switchView('trade'); else render(); } else if (code) toast(`${byCode(code).name}はランク${byCode(code).unlock}で取引できるようになります`);
       return;
     }
     const hc = e.target.closest('[data-hcat]'); if (hc) { UI.hcat = hc.dataset.hcat; renderHint($('#dict-q').value.trim()); return; }
@@ -1465,7 +1482,8 @@ function bindUI() {
   // チャート：ドラッグで上下左右に移動、ホイール・ピンチ・＋−ボタンで拡大縮小、ダブルクリックで最新に戻す
   const cv = $('#chart'), ptrs = new Map(); let pinch = 0, dragged = 0;
   const relX = e => e.clientX - cv.getBoundingClientRect().left;
-  cv.addEventListener('pointerdown', e => { if (!G) return; cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.classList.add('dragging'); UI.hover = null; if (ptrs.size === 2) { const [a, b] = ptrs.values(); pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
+  cv.addEventListener('pointerdown', e => { if (!G) return; if (e.isPrimary) { ptrs.clear(); pinch = 0; }   // 前のタッチが残っていると2本指扱い（＝拡大縮小）になるので消す
+    cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.classList.add('dragging'); UI.hover = null; if (ptrs.size === 2) { const [a, b] = ptrs.values(); pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
   cv.addEventListener('pointermove', e => {
     const g = UI.geom; if (!g) return;
     const p = ptrs.get(e.pointerId);
@@ -1475,9 +1493,15 @@ function bindUI() {
     const v = UI.vw[g.mode]; v.end = g.s0 + g.cnt - dx / g.slotW; UI.vw.yOff += dy / g.prH; dragged += Math.abs(dx) + Math.abs(dy); drawChart();
   });
   const up = e => { ptrs.delete(e.pointerId); pinch = 0; if (!ptrs.size) { cv.classList.remove('dragging'); if (dragged > 20) tutEvent('drag'); dragged = 0; } };
-  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('lostpointercapture', up);
   cv.addEventListener('pointerleave', () => { if (!ptrs.size) { UI.hover = null; drawChart(); } });
-  cv.addEventListener('wheel', e => { if (!UI.geom) return; e.preventDefault(); zoomChart(Math.exp(e.deltaY * 0.002), relX(e)); drawChart(); }, { passive: false });
+  cv.addEventListener('wheel', e => {
+    const g = UI.geom; if (!g) return; e.preventDefault();
+    // 横向きのスクロール（トラックパッドの左右など）は移動、縦向きとピンチは拡大縮小
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) { UI.vw[g.mode].end = g.s0 + g.cnt + e.deltaX / g.slotW; drawChart(); return; }
+    zoomChart(Math.exp(e.deltaY * 0.002), relX(e)); drawChart();
+  }, { passive: false });
+  cv.addEventListener('gesturestart', e => e.preventDefault());   // iPad の Safari で、チャート上のピンチがページの拡大にならないように
   cv.addEventListener('dblclick', () => { if (!G) return; UI.vw[G.chartMode].end = null; UI.vw.yOff = 0; drawChart(); });
   new ResizeObserver(() => { if (G && UI.view === 'trade') drawChart(); }).observe($('.chart-wrap'));
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => G && render());

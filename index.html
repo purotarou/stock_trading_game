@@ -2,11 +2,25 @@
 <link rel="icon" type="image/png" href="Aseet/stock_trading_game_icon.png">
 <link rel="apple-touch-icon" href="Aseet/stock_trading_game_icon.png">
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // 端末の種類（pc / tablet / phone）。スマホ・タブレットだけ専用レイアウトにする（style.css の [data-device=...]）
+  (function () {
+    function detect() {
+      var touch = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+      var small = Math.min(screen.width, screen.height) < 600;
+      document.documentElement.dataset.device = !touch ? 'pc' : small ? 'phone' : 'tablet';
+    }
+    detect();
+    addEventListener('resize', detect);   // 画面の回転や、開発者ツールでの端末切り替えにも追従する
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 
+<div class="hdr">
 <header class="topbar">
   <div class="brand"><span class="logo">カブトレ<span class="bang">！</span></span><span class="exch">NTX ネオ東京証券取引所</span></div>
   <div class="clock">
@@ -28,6 +42,7 @@
   <button class="menu-btn" id="menu-btn" aria-label="メニュー">≡</button>
 </header>
 <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
+</div>
 
 <main id="view-trade" class="layout">
   <section class="panel a-list" aria-label="銘柄リスト">

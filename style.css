@@ -337,3 +337,53 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .toast.warn{border-left:4px solid var(--up)}
 .toast.out{opacity:0;transform:translateY(6px)}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+
+
+/* ===== スマホ・タブレット専用（index.html の data-device。PC の表示は上のまま） ===== */
+/* 見出しと流れる銘柄をまとめて画面上部に固定。PC では .hdr は箱を作らない */
+.hdr{display:contents}
+[data-device="tablet"] .hdr,[data-device="phone"] .hdr{display:block;position:sticky;top:0;z-index:30;background:var(--paper);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-top:env(safe-area-inset-top,0px)}
+[data-device="tablet"] .topbar,[data-device="phone"] .topbar{position:static;margin-inline:0}
+[data-device="tablet"] .tape,[data-device="phone"] .tape{margin-inline:0}
+[data-device="tablet"] .a-list,[data-device="phone"] .a-list{position:static}
+
+/* タブレット：チャートは横いっぱい、その下に「注文｜銘柄」「ニュース｜板」 */
+@media (min-width:701px){
+  [data-device="tablet"] .layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"chart chart" "order list" "news board"}
+  [data-device="tablet"] .col-main,[data-device="tablet"] .col-side{display:contents}
+  [data-device="tablet"] .a-list{grid-area:list}
+  [data-device="tablet"] .list{max-height:560px}
+}
+
+/* スマホ：上から チャート → 注文 → 銘柄 → 板 → ニュース の1列 */
+[data-device="phone"] .layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"chart" "order" "list" "board" "news"}
+[data-device="phone"] .col-main,[data-device="phone"] .col-side{display:contents}
+[data-device="phone"] .a-list{grid-area:list}
+[data-device="phone"] .list{max-height:380px}
+[data-device="phone"] #chart{height:260px}
+/* スマホの見出し：ランクとメニューを右の空きに置いて高さを抑える */
+[data-device="phone"] .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"brand clock clock" "ctrl ctrl ctrl" "asset day day" "idx rank menu";gap:6px 10px;padding-block:8px 6px;align-items:center}
+[data-device="phone"] .brand{grid-area:brand}
+[data-device="phone"] .exch{display:none}
+[data-device="phone"] .logo{font-size:22px}
+[data-device="phone"] .clock{grid-area:clock;justify-self:end;text-align:right}
+[data-device="phone"] .clock .t{justify-content:flex-end}
+[data-device="phone"] .clock .time{font-size:19px}
+[data-device="phone"] .controls{grid-area:ctrl;flex-wrap:nowrap}
+[data-device="phone"] .speed button{padding:6px 10px}
+[data-device="phone"] .controls .ghost{flex:1;white-space:nowrap}
+[data-device="phone"] .stats{display:contents}
+[data-device="phone"] .stat:nth-child(1){grid-area:asset}
+[data-device="phone"] .stat:nth-child(2){grid-area:day}
+[data-device="phone"] .stat:nth-child(3){grid-area:idx}
+[data-device="phone"] .stat dd{font-size:15px}
+[data-device="phone"] .rank-chip{grid-area:rank;font-size:11.5px;padding:3px 10px 3px 3px}
+[data-device="phone"] .menu-btn{grid-area:menu}
+[data-device="phone"] .tabbar{gap:0;justify-content:space-around}
+[data-device="phone"] .tabbar button{padding:9px 8px;font-size:13px}
+
+/* 新しいニュースのお知らせ（スマホ・タブレット） */
+.toast.news{pointer-events:auto;cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line-strong);border-left:4px solid var(--accent);text-align:left;font:inherit;font-size:13px;width:100%;display:block}
+.toast.news .nt-top{display:flex;gap:8px;align-items:center;margin-bottom:3px}
+.toast.news .nt-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+.toast.news .stars{color:var(--warn)}
