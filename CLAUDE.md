@@ -6,6 +6,7 @@
 - `index.html` をブラウザで開く（または VS Code の Live Server 拡張 / `npx serve .`）
 - 構文チェック: `node --check script.js`
 - ランダム相場が変わっていないかの確認: `git show HEAD:script.js > /tmp/before.js && node tools/check_random.js /tmp/before.js script.js`（シナリオ×難易度×シードごとに値動き・ニュースの指紋を比べる。すべて [OK] なら同じ）
+- リアル相場が変わっていないかの確認: 変更前の script.js を `data/` が隣にあるフォルダに置き（例: `mkdir /tmp/b && git show HEAD:script.js > /tmp/b/script.js && cp -R data /tmp/b/`）、`node tools/check_real.js /tmp/b/script.js script.js`（シード42・7で全営業日を回し、日ごとの分足・日足・指数・ニュースを比べる。初日が変わったときは差の中身も出す）
 - セーブは localStorage（`kabutore.profile` = 経験値・ランク、`kabutore.save` = 進行中の1日の終わり時点）
 
 ## ファイル構成（目印コメント `/* ===== ... ===== */` で検索）
@@ -14,7 +15,8 @@
 - `style.css`: 先頭の `:root` にトークン（`--up` 赤 / `--down` 緑 = 日本式配色、ライト/ダーク両対応）
 - `script.js`: データ表 SECTORS, DEFS（実在企業をもじった架空30社, 6業種, 架空取引所NTX, 指数NTX225）, DIFF, SCEN, RANKS, MISSIONS, GLOSS, TIPS, TERM_GROUPS, TRIVIA
 - 乱数: シード付き mulberry32 + Box–Muller。同じシード = 同じ相場
-- リアル相場チャレンジ: `data/corona2020.js`（`const CORONA2020`、`tools/fetch_prices.py` で作る。git には入れない・配布しない）があるときだけ選べる。`G.mode = 'random' | 'real'`、`SCEN.real`。終値は実データどおり、日中は前日終値→実際の終値のブラウニアン・ブリッジ（`realOpen` / `realStep`）。作りもののニュース・決算・配当・暴落は出さない。当時の実際のニュースは `data/news2020.js`（`const NEWS2020`、git に入れる。なくても動く）から、date より後の最初の営業日の寄り付き前に表示だけする（`pushRealNews` → `pushNews`。genNews / apply 系にはつながないので株価は不変）。各ニュースは type（fact = 報道 / report = 観測 / rumor = 当時実際に出回った噂）と importance（3 は全体の1〜2割）を持つ。リアル相場ではニュースを `NEWS_KEEP_REAL` 件まで保存・表示する（1年分が収まる）。業種は東証の業種名で `REAL_SECTORS`（`SECTORS` に混ぜるとランダム相場の乱数の順番が変わるので分けている。表示は `SEC(k)`）。指数は30銘柄を同額ずつ持った平均（開始=100、`idxName()`）
+- リアル相場チャレンジ: `data/corona2020.js`（`const CORONA2020`、`tools/fetch_prices.py` で作る。git には入れない・配布しない）があるときだけ選べる。`G.mode = 'random' | 'real'`、`SCEN.real`。終値は実データどおり、日中は前日終値→実際の終値のブラウニアン・ブリッジ（`realOpen` / `realStep`）。作りもののニュース・決算・配当・暴落は出さない。当時の実際のニュースは `data/news2020.js`（`const NEWS2020`、git に入れる。なくても動く）から、date より後の最初の営業日の寄り付き前に表示だけする（`pushRealNews` → `pushNews`。genNews / apply 系にはつながないので株価は不変）。各ニュースは type（fact = 報道 / report = 観測 / rumor = 当時実際に出回った噂）と importance（3 は全体の1〜2割）を持つ。リアル相場ではニュースを `NEWS_KEEP_REAL` 件まで保存・表示する（1年分が収まる）。業種は東証の業種名で `REAL_SECTORS`（`SECTORS` に混ぜるとランダム相場の乱数の順番が変わるので分けている。表示は `SEC(k)`）。指数は30銘柄を同額ずつ持った平均（2020-01-06 の終値=100、`idxName()`）
+- リアル相場の過去チャート: `CORONA2020.history`（2019年の日足 OHLCV。`python3 tools/fetch_prices.py --history` で 2020年分には触れずにファイル末尾へ足す。なくても動く）から `realHistory` が `s.daily`（di は負）と `idxDaily` を作る。乱数は使わない。初日の前日終値 = 2019-12-30 の終値。出来高は日ごとの増減だけ実データで、大きさはゲーム内の出来高（`minVol × MIN_PER_DAY`）にそろえる。日足を残す数は `dailyKeep()`（リアル600 / ランダム320）。日足チャートの日付は、リアル相場だけ最初と年が変わったところに年を付け、年の境目に点線
 - 株価エンジン: 1ゲーム分ごとに `r = μΔt + β·M + S_sector + e (+jump) + κ·ln(V/P)Δt + news`。日次ボラは GARCH 風 `h = clamp(0.04+0.06z²+0.90h, 0.4, 3)`、寄り・引けは 1.5 倍（正規化）
 - 取引ルール: 100株単位、呼値、値幅制限、S高/S安、前場/後場/昼休み、成行(板を食う)/指値/逆指値、税 20.315%、本格モード手数料 0.1%、配当と権利落ち、四半期決算
 - 画面: チャート（自前 Canvas のローソク足 + 出来高 + 移動平均 + ニュースピン + 自分の売買）、板、注文パネル、保有、カレンダー、ミッション、ヒント（Q&A形式。TIPS = コツ、GLOSS を TERM_GROUPS で分類 = 用語、TRIVIA = 答えに添える豆知識）

@@ -337,7 +337,7 @@ function newGame(scen, diff, seed, cash, mode) {
   afterLoad();
   if (real) realStart(); else genHistory();
   G.player.startIdx = G.market.idx;
-  G.player.hist.push({ d: prevTD(G.date), a: cash0, idx: G.market.idx });
+  G.player.hist.push({ d: G.market.idxDaily.at(-1)?.d || prevTD(G.date), a: cash0, idx: G.market.idx });
   startDay(true);
 }
 function afterLoad() { G._map = Object.fromEntries(G.stocks.map(s => [s.code, s])); }
@@ -376,6 +376,8 @@ function genHistory() {
 const REAL = typeof CORONA2020 !== 'undefined' && CORONA2020.dates?.length ? CORONA2020 : null;
 const REAL_PX = REAL ? Object.fromEntries(REAL.stocks.map(d => [d.code, d.prices])) : {};
 const REAL_IDX_BASE = 100;
+const REAL_HIST = REAL?.history?.dates?.length ? REAL.history : null;   // 開始前の過去チャート（2019年の日足。なくても動く）
+const dailyKeep = () => (isReal() ? 600 : 320);   // 日足を残す数。リアル相場は過去分（約240日）と1年分が収まるように多めにする
 // 実データの業種（東証の業種名）。SECTORS を回すランダム相場の乱数の順番を変えないよう、別の表にしておく
 const REAL_SECTORS = {};
 if (REAL) for (const d of REAL.stocks) REAL_SECTORS[d.sector] ||= { name: d.sector, short: d.sector };
@@ -418,11 +420,35 @@ function makeRealStock(d) {
     shock: 0, gap: 0, pend: [], intraday: [], daily: [], pins: [], limUp: price, limDn: price, stop: null,
   };
 }
-// 開始時の指数（30銘柄平均）を 100 にする。過去のチャートはない
+// 初日の終値での指数（30銘柄平均）を 100 にする。過去分があれば、過去チャートも同じ基準で作る
 function realStart() {
   const mk = G.market; let cap = 0; for (const s of G.stocks) cap += s.shares * s.price;
   mk.capBase = cap * IDX_BASE / REAL_IDX_BASE;
   mk.idx = mk.idxPrev = mk.idxOpen = mk.idxHigh = mk.idxLow = REAL_IDX_BASE;
+  if (REAL_HIST) realHistory();
+}
+// 開始前の過去チャート（CORONA2020.history）。乱数は使わない。初日の前日終値は過去分の最終日の終値にする
+function realHistory() {
+  const H = REAL_HIST, mk = G.market, n = H.dates.length;
+  for (const s of G.stocks) {
+    const x = H.stocks[s.code]; if (!x) continue;   // 過去分が取れなかった銘柄は過去チャートなし
+    // 出来高は日ごとの増減だけ実データを使い、大きさはゲーム内の出来高（実際の1割前後）にそろえる
+    let sum = 0, cnt = 0; for (const v of x.v) if (v) { sum += v; cnt++; }
+    const vk = cnt ? s.minVol * MIN_PER_DAY / (sum / cnt) : 0;
+    H.dates.forEach((d, i) => {
+      if (x.c[i] == null) return;   // 上場前など値のない日は足を作らない
+      s.daily.push({ d, di: i - n, o: roundTick(x.o[i]), h: roundTick(x.h[i]), l: roundTick(x.l[i]), c: roundTick(x.c[i]), v: Math.round((x.v[i] || 0) * vk / 100) * 100 });
+    });
+    if (s.daily.length) s.prevClose = s.daily.at(-1).c;
+  }
+  // 指数の過去分も同じ株式数・同じ基準で計算する（高値・安値は各銘柄の高値・安値の合計なので目安）。全銘柄の値がそろう日だけ作る
+  const f = IDX_BASE / mk.capBase;
+  H.dates.forEach((d, i) => {
+    const t = { o: 0, h: 0, l: 0, c: 0 };
+    for (const s of G.stocks) { const x = H.stocks[s.code]; if (x?.c[i] == null) return; for (const k in t) t[k] += s.shares * roundTick(x[k][i]); }
+    mk.idxDaily.push({ d, o: t.o * f, h: t.h * f, l: t.l * f, c: t.c * f });
+  });
+  if (mk.idxDaily.length) mk.idx = mk.idxPrev = mk.idxOpen = mk.idxHigh = mk.idxLow = mk.idxDaily.at(-1).c;
 }
 // 値幅制限は分割調整後の値で計算するので、実際の終値がはみ出す日がある（例：ストップ高の日）。その日は終値まで広げる
 function realLimits(s) {
@@ -679,7 +705,7 @@ function closeMarket() {
   // 日足と、ボラティリティの更新（GARCH型）
   for (const s of G.stocks) {
     s.daily.push({ d: G.date, di: G.dayIndex, o: s.open, h: s.high, l: s.low, c: s.price, v: s.dayVol });
-    if (s.daily.length > 320) s.daily.shift();
+    if (s.daily.length > dailyKeep()) s.daily.shift();
     const z = (s.dayZ || 0) / (s.idio * D.vol / Math.sqrt(DAYS)); s.dayZ = 0;   // 大きく動いた翌日ほど荒れやすい
     s.h = clamp(0.04 + 0.06 * z * z + 0.90 * s.h, 0.4, 3);
     s.V *= Math.exp(s.mu / DAYS);
@@ -687,7 +713,7 @@ function closeMarket() {
   const zM = (mk.dayZ || 0) / (MKT_SIG * D.vol / Math.sqrt(DAYS)); mk.dayZ = 0;
   mk.hM = clamp(0.04 + 0.06 * zM * zM + 0.90 * mk.hM, 0.4, mk.hM > 3 ? 5 : 3);
   mk.idxDaily.push({ d: G.date, o: mk.idxOpen, h: mk.idxHigh, l: mk.idxLow, c: mk.idx });
-  if (mk.idxDaily.length > 320) mk.idxDaily.shift();
+  if (mk.idxDaily.length > dailyKeep()) mk.idxDaily.shift();
   // 失効
   if (P.orders.length) { G.dayEvents.push(`未約定の注文${P.orders.length}件は、当日限りのため大引けで失効しました`); P.orders = []; }
   // 決算発表（引け後）
@@ -992,8 +1018,10 @@ function chartData() {
     const marks = P.trades.filter(t => t.code === s.code && t.d === G.dayIndex).map(t => ({ i: Math.min(59, Math.floor(t.m / 5)), side: t.side }));
     return { cs, total: 60, ma, pins, marks, ref: s.prevClose, mode: '5m' };
   }
-  const all = s.daily.map(x => ({ ...x, lab: mdLabel(x.d) }));
-  if (G.phase === 'open' && s.intraday.length) all.push({ o: s.open, h: s.high, l: s.low, c: s.price, v: s.dayVol, lab: mdLabel(G.date) + '（今日）', di: G.dayIndex });
+  // リアル相場は過去分で年をまたぐので、最初の足と年が変わった足だけ年を付ける
+  const lab = (d, prev) => (isReal() && prev?.slice(0, 4) !== d.slice(0, 4) ? d.slice(0, 4) + '/' : '') + mdLabel(d);
+  const all = s.daily.map((x, i, a) => ({ ...x, lab: lab(x.d, a[i - 1]?.d) }));
+  if (G.phase === 'open' && s.intraday.length) all.push({ o: s.open, h: s.high, l: s.low, c: s.price, v: s.dayVol, lab: lab(G.date, s.daily.at(-1)?.d) + '（今日）', di: G.dayIndex, d: G.date });
   const cs = all, closes = all.map(x => x.c);
   const ma = r >= 3 ? [{ v: sma(closes, 5), name: '5日移動平均' }, { v: sma(closes, 25), name: '25日移動平均' }] : [];
   const idxOf = di => cs.findIndex(c => c.di === di);
@@ -1094,7 +1122,22 @@ function drawChart() {
   ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.font = `10.5px ${C.num}`;
   const inX = x => x >= padL + 16 && x <= padL + pw - 16;
   if (D.mode === '5m') { const k = 6 * Math.ceil(64 / (6 * slotW)); for (let i = 0; i < 60; i += k) if (inX(X(i))) ctx.fillText(minLabel(i * 5), X(i), H - 8); }
-  else { const k = Math.max(1, Math.ceil(64 / slotW)); for (let i = D.cs.length - 1; i >= 0; i -= k) if (inX(X(i))) ctx.fillText(D.cs[i].lab.replace(/（.*$/, ''), X(i), H - 8); }
+  else if (!isReal()) { const k = Math.max(1, Math.ceil(64 / slotW)); for (let i = D.cs.length - 1; i >= 0; i -= k) if (inX(X(i))) ctx.fillText(D.cs[i].lab.replace(/（.*$/, ''), X(i), H - 8); }
+  else {   // リアル相場：いちばん左の目盛りと、年が変わった目盛りだけ年を付け、年の境目に点線を引く
+    const k = Math.max(1, Math.ceil(72 / slotW)), at = [];
+    for (let i = D.cs.length - 1; i >= 0; i -= k) if (inX(X(i))) at.unshift(i);
+    at.forEach((i, j) => {
+      const d = D.cs[i].d, y = j === 0 || D.cs[at[j - 1]].d.slice(0, 4) !== d.slice(0, 4);
+      const t = (y ? d.slice(0, 4) + '/' : '') + mdLabel(d).replace(/（.*$/, ''), w = ctx.measureText(t).width / 2;
+      ctx.fillText(t, clamp(X(i), padL + w, padL + pw - w), H - 8);   // 年付きは長いので、端で切れないよう内側に寄せる
+    });
+    for (let i = Math.max(1, i0); i < i1; i++) {
+      if (D.cs[i].d.slice(0, 4) === D.cs[i - 1].d.slice(0, 4)) continue;
+      const x = Math.round(X(i) - slotW / 2) + 0.5;
+      ctx.strokeStyle = C.line; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ph); ctx.stroke(); ctx.setLineDash([]);
+      ctx.textAlign = 'left'; ctx.font = `10.5px ${C.body}`; ctx.fillText(D.cs[i].d.slice(0, 4) + '年', x + 4, padT + 8); ctx.textAlign = 'center'; ctx.font = `10.5px ${C.num}`;
+    }
+  }
   if (D.mode === '5m' && inX(padL + (30 - s0) * slotW)) { const x = padL + (30 - s0) * slotW; ctx.strokeStyle = C.line; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ph); ctx.stroke(); ctx.setLineDash([]); }
   // カーソル
   if (UI.hover != null && D.cs[UI.hover]) { const x = Math.round(X(UI.hover)) + 0.5; ctx.strokeStyle = C.muted; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ph); ctx.stroke(); ctx.setLineDash([]); }
