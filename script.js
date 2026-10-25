@@ -83,16 +83,20 @@ const SCEN = {
   month: { name: 'はじめての1か月', days: 20,  rank: 1, mu: .14, desc: '穏やかな上昇相場で売買に慣れよう。', goal: '資産をプラスで終える', clear: (r) => r > 0 },
   storm: { name: '嵐の四半期',     days: 60,  rank: 3, mu: .05, desc: '途中で暴落が起きる。耐えるか、逃げるか。', goal: '指数（NTX225）に勝つ', clear: (r, ir) => r > ir, crash: true },
   year:  { name: '1年チャレンジ',   days: 245, rank: 4, mu: .06, desc: '決算が4回。相場の波を乗りこなそう。', goal: '1年で+10%', clear: (r) => r >= .10 },
-  free:  { name: 'フリープレイ',   days: 0,   rank: 1, mu: .06, desc: '期間無制限。自由に取引しよう。', goal: 'なし', clear: null },
-  // リアル相場チャレンジ専用（タイトルのシナリオ一覧には出さない）。日数は実データの営業日数
-  real:  { name: 'リアル相場チャレンジ 2020', get days() { return REAL ? REAL.dates.length : 0; }, rank: 1, mu: 0, desc: '2020年の実際の株価で1年間取引する。コロナ・ショックを乗り越えよう。', goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
+  free:  { name: 'フリープレイ',   days: 0,   rank: 1, mu: .06, desc: '期間無制限。自由に取引しよう。', goal: 'なし', clear: null, free: true },
+  // リアル相場チャレンジ専用（相場で「リアル相場チャレンジ」を選んだときだけ一覧に出す）。日数は実データの営業日数
+  real:  { name: 'コロナショック', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: '2020年の実際の株価で1年間取引する。', goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
+  // 相場は上のリアル相場のシナリオからランダムで選ぶ（G.base）。実データが終わったら終了
+  realfree: { name: 'フリープレイ', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: 'どの相場になるかは始まってからのお楽しみ。初期資金も自由に決められる。', goal: 'なし', clear: null, real: true, free: true },
 };
+// フリープレイで選べる初期資金（円）
+const CASH_MIN = 1e4, CASH_MAX = 1e9;
 const RANKS = [
   { n: '株デビュー', xp: 0, unlock: '3銘柄・成行注文' },
   { n: '見習いトレーダー', xp: 100, unlock: '10銘柄・指値注文・板' },
   { n: '一人前トレーダー', xp: 300, unlock: '20銘柄・逆指値注文・移動平均線・嵐の四半期' },
   { n: '中級トレーダー', xp: 700, unlock: '全30銘柄・決算カレンダー・RSI・1年チャレンジ' },
-  { n: '上級トレーダー', xp: 1500, unlock: '本格モード' },
+  { n: '上級トレーダー', xp: 1500, unlock: '本格モード・リアル相場チャレンジ' },
   { n: 'プロトレーダー', xp: 3000, unlock: '称号（信用取引は次のアップデートで追加予定）' },
   { n: '伝説の相場師', xp: 6000, unlock: '称号' },
 ];
@@ -252,6 +256,10 @@ function stopBgm() { bgm.pause(); bgm.currentTime = 0; }
 // 効果音は元の mp3 を <audio> でそのまま鳴らす。3つを順番に使い、巻き戻しを待たずに連打できるようにする
 const seClicks = [0, 1, 2].map(() => { const a = new Audio('Aseet/select_button.mp3'); a.preload = 'auto'; return a; });
 let seIdx = 0;
+// 鳴らさないボタン：選べない（disabled・カギ付き）、すでに選んでいる、タイトルロゴ
+function silentButton(b) {
+  return b.disabled || b.getAttribute('aria-disabled') === 'true' || b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-current') === 'page' || b.id === 'h-logo';
+}
 function playClick() {
   const a = seClicks[seIdx++ % seClicks.length];
   // スマホ・タブレットのタイトル画面は BGM が無く目立つので小さめにする
@@ -308,10 +316,13 @@ function makeStock(d, i) {
 function newGame(scen, diff, seed, cash, mode) {
   RNG.s = seed | 0; RNG.spare = null;
   const real = mode === 'real' && !!REAL;   // リアル相場は data/corona2020.js があるときだけ
-  if (real) scen = 'real';
+  if (real && !SCEN[scen].real) scen = 'real';
+  if (!real && SCEN[scen].real) scen = 'free';
+  // リアル相場のフリープレイは、ほかのリアル相場のシナリオから相場を選ぶ（乱数の順番を変えないようにシードで決める）
+  const pool = Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].free), base = real ? (SCEN[scen].free ? pool[Math.abs(seed | 0) % pool.length] : scen) : null;
   const D = DIFF[diff], S = SCEN[scen], cash0 = cash || D.cash;   // cash はフリープレイで選んだ初期資金
   G = {
-    v: 1, mode: real ? 'real' : 'random', seed, scen, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
+    v: 1, mode: real ? 'real' : 'random', seed, scen, base, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
     sel: real ? REAL.stocks[0].code : 'K201', chartMode: '5m', mkMu: S.mu,
     market: { hM: 1, shock: 0, secShock: {}, gapM: 0, secGap: {}, idx: IDX_BASE, idxPrev: IDX_BASE, idxOpen: IDX_BASE, idxHigh: IDX_BASE, idxLow: IDX_BASE, idxDaily: [], capBase: 1, crashLeft: 0, crashMin: 0 },
     stocks: real ? REAL.stocks.map(makeRealStock) : DEFS.map(makeStock), news: [], denials: [], newsId: 0, orderSeq: 0,
@@ -1517,38 +1528,58 @@ function senseiAdvice({ r, ir, clear, stars, P }) {
 /* ---------- タイトル ---------- */
 const pick = { mode: 'random', scen: 'month', diff: 'normal' };
 function showTitle() {
+  if (UI.tut) { UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true; }
   stopBgm(); titleOpen = true; const el = $('#title'); el.hidden = false; const r = rank(), save = loadSave();
-  if (SCEN[pick.scen].rank > r || SCEN[pick.scen].real) pick.scen = 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'normal';
-  if (!REAL) pick.mode = 'random';
-  const real = pick.mode === 'real', RS = SCEN.real, rb = profile.best.real;
-  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? `2020年の実在30銘柄の実際の終値で遊ぶ（${REAL.dates[0].replace(/-/g, '/')}〜${REAL.dates.at(-1).replace(/-/g, '/')}）。` : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
+  const realLock = SCEN.real.rank > r;
+  if (!REAL || realLock) pick.mode = 'random';
+  const real = pick.mode === 'real';
+  if (SCEN[pick.scen].rank > r || !!SCEN[pick.scen].real !== real) pick.scen = real ? 'real' : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'normal';
+  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? '実在の30銘柄。過去の実際の相場になる。' : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
   el.innerHTML = `<div class="title-card">
-    <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1>カブトレ<span class="bang">！</span></h1>
+    <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '2020年の東証の実際の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
       <div class="prof"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
     <div class="setup">
-      <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && !REAL ? 'disabled' : ''}><b>${n}</b><span>${d}</span></button>`).join('')}</div>
-      <h2>シナリオ</h2><div class="choices">${real ? `<button class="choice" aria-pressed="true"><b>${RS.name}</b><span>${RS.desc}（${RS.days}営業日）　目標：${RS.goal}</span><em class="${rb ? 'best' : ''}">${rb != null ? '★'.repeat(rb) + '☆'.repeat(3 - rb) : ''}</em></button>` : Object.entries(SCEN).filter(([, S]) => !S.real).map(([k, S]) => { const lock = S.rank > r, b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
+      <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!REAL || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && REAL && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
+      <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = S.rank > r, b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
       <div><h2>難易度</h2><div class="choices">${Object.entries(DIFF).map(([k, D]) => { const lock = D.rank > r; return `<button class="choice" data-diff="${k}" aria-pressed="${pick.diff === k}" ${lock ? 'disabled' : ''}><b>${D.name}</b><span>${D.desc}</span><em>${lock ? `ランク${D.rank}で解放` : ''}</em></button>`; }).join('')}</div>
-        <div class="seed-row" id="cash-row" ${pick.scen === 'free' && !real ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="100000" max="100000000" step="100000" placeholder="${DIFF[pick.diff].cash}"><span>円（10万〜1億円。フリープレイのみ）</span></div>
+        <div class="seed-row" id="cash-row" ${SCEN[pick.scen].free ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="${CASH_MIN}" max="${CASH_MAX}" step="10000" placeholder="${DIFF[pick.diff].cash}"><span>円（1万〜10億円。フリープレイのみ）</span></div>
         <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>${real ? '終値は実データどおり。番号で変わるのは日中の動きだけです' : '同じ番号なら、友達と同じ相場で勝負できます'}</span></div></div>
     </div>
     <div class="go"><button class="primary" id="go-new">はじめる</button>${save ? `<button class="ghost" id="go-cont">続きから（${esc(SCEN[save.scen].name)}・${mdLabel(save.date)}）</button>` : ''}</div>
     <p class="disclaimer">${real ? 'リアル相場チャレンジの終値は、2020年の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当・ニュースは出ません。実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。' : `このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。`}</p>
   </div>`;
   el.onclick = e => {
+    if (e.target.closest('#t-logo')) { logoTap(); return; }
     const sc = e.target.closest('[data-scen]'), df = e.target.closest('[data-diff]'), md = e.target.closest('[data-mode]');
     if (md && !md.disabled && md.dataset.mode !== pick.mode) { const sv = $('#seed').value; pick.mode = md.dataset.mode; showTitle(); $('#seed').value = sv; return; }
-    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = pick.scen !== 'free' || pick.mode === 'real'; }
+    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = !SCEN[pick.scen].free; }
     if (df && !df.disabled) { pick.diff = df.dataset.diff; $$('[data-diff]', el).forEach(b => b.setAttribute('aria-pressed', String(b === df))); $('#cash').placeholder = DIFF[pick.diff].cash; }
     if (e.target.closest('#go-new')) {
       const sv = $('#seed').value; const seed = sv ? (+sv | 0) : Math.floor(Math.random() * 1e9);
-      const cv = +$('#cash').value, cash = pick.scen === 'free' && pick.mode !== 'real' && cv ? clamp(Math.round(cv / 1000) * 1000, 1e5, 1e8) : 0;
+      const cv = +$('#cash').value, cash = SCEN[pick.scen].free && cv ? clamp(Math.round(cv / 1000) * 1000, CASH_MIN, CASH_MAX) : 0;
       newGame(pick.scen, pick.diff, seed, cash, pick.mode); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
-      if (G.scen === 'month' && !profile.tutorial) startTutorial(); else toast(isReal() ? '2020年1月6日から、実際の株価で取引します' : `相場の番号は ${seed} です`);
+      if (G.scen === 'month' && !profile.tutorial) startTutorial(); else toast(!isReal() ? `相場の番号は ${seed} です` : G.base !== G.scen ? `今回の相場は「${SCEN[G.base].name}」。${dateLabel(G.date)}から、実際の株価で取引します` : `${dateLabel(G.date)}から、実際の株価で取引します`);
     }
     if (e.target.closest('#go-cont')) { const g = loadSave(); if (g) { UI.lastNews = -1; resume(g); buildTypes(); buildFilter(); switchView('trade'); render(); } }
   };
+}
+// タイトルロゴを続けて10回タップすると、最高ランク（全機能解放）になる
+let logoTaps = 0, logoTapAt = 0;
+function logoTap() {
+  const now = performance.now(); logoTaps = now - logoTapAt < 1500 ? logoTaps + 1 : 1; logoTapAt = now;
+  if (logoTaps < 10) return;
+  logoTaps = 0;
+  if (rank() === RANKS.length) { toast('すでに全機能が解放されています'); return; }
+  profile.xp = RANKS.at(-1).xp; saveProfile();
+  const sv = $('#seed').value; showTitle(); $('#seed').value = sv;
+  toast(`ランク${RANKS.length}「${RANKS.at(-1).n}」になりました。全機能が解放されています`, 'rank');
+}
+// 経験値・ランク・ミッション・最高記録・チュートリアル・進行中のセーブをすべて消して、最初からにする
+function confirmReset(all) {
+  openModal(`<h2>${all ? '全解放をリセットしますか？' : 'データをリセットしますか？'}</h2><p>${all ? `いまは全機能が解放されています（ランク${RANKS.length}）。リセットすると解放はすべて元に戻り、` : ''}経験値・ランク・ミッション・最高記録・進行中のゲームがすべて消え、ランク1からやり直しになります。元には戻せません。</p>
+    <div class="actions"><button class="ghost" data-act="cancel">やめる</button><button class="primary" data-act="ok">リセットする</button></div>`,
+  { cancel: closeModal, ok: () => { closeModal(); profile = defProfile(); saveProfile(); clearSave(); pick.mode = 'random'; showTitle(); toast('リセットしました。ランク1からスタートです'); } });
 }
 function hideTitle() { titleOpen = false; $('#title').hidden = true; playBgm(); }
 
@@ -1575,8 +1606,8 @@ function bindUI() {
   document.addEventListener('pointerdown', () => { if (!titleOpen && bgm.paused) playBgm(); });
   // タッチ・マウスは押した瞬間に鳴らす。キーボード操作（pointerdown が無い click）は click で鳴らす
   let sePressedAt = 0;
-  document.addEventListener('pointerdown', e => { if (e.target.closest('button')) { sePressedAt = performance.now(); playClick(); } }, true);
-  document.addEventListener('click', e => { if (e.target.closest('button') && performance.now() - sePressedAt > 1000) playClick(); }, true);
+  document.addEventListener('pointerdown', e => { const b = e.target.closest('button'); if (b) { sePressedAt = performance.now(); if (!silentButton(b)) playClick(); } }, true);
+  document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && performance.now() - sePressedAt > 1000 && !silentButton(b)) playClick(); }, true);
   document.addEventListener('click', e => {
     const t = e.target.closest('.term'); if (t) { e.preventDefault(); e.stopPropagation(); showTerm(t); return; }
     hidePop();
@@ -1608,10 +1639,12 @@ function bindUI() {
     const hc = e.target.closest('[data-hcat]'); if (hc) { UI.hcat = hc.dataset.hcat; renderHint($('#dict-q').value.trim()); return; }
     const tv = e.target.closest('[data-view]'); if (tv) { switchView(tv.dataset.view); return; }
     if (e.target.closest('#h-rank')) { switchView('mission'); return; }
+    if (e.target.closest('#h-logo')) { showTitle(); return; }
     if (e.target.closest('#menu-btn')) {
+      const all = rank() === RANKS.length;   // 全機能が解放されているときは、リセットの表示を変える
       openModal(`<h2>メニュー</h2><p class="muted small">進行は1日の終わりごとに自動で保存されます。相場の番号：${G.seed}</p>
-        <div class="actions" style="justify-content:flex-start"><button class="ghost" data-act="tut">カブ先生の説明をもう一度見る</button><button class="ghost" data-act="title">タイトルに戻る</button><button class="primary" data-act="close">ゲームに戻る</button></div>`,
-      { close: closeModal, tut: () => { closeModal(); startTutorial(); }, title: () => { closeModal(); showTitle(); } });
+        <div class="actions" style="justify-content:flex-start"><button class="ghost" data-act="tut">カブ先生の説明をもう一度見る</button><button class="ghost" data-act="title">タイトルに戻る</button><button class="ghost" data-act="reset">${all ? '全解放をリセット' : 'データをリセット'}</button><button class="primary" data-act="close">ゲームに戻る</button></div>`,
+      { close: closeModal, tut: () => { closeModal(); startTutorial(); }, title: () => { closeModal(); showTitle(); }, reset: () => confirmReset(all) });
     }
   });
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' && $('#modal-card [data-act="cancel"], #modal-card [data-act="close"]')) closeModal(); });

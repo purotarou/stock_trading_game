@@ -40,10 +40,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 h2,h3,h4{text-wrap:balance;margin:0}
 
 /* ===== header ===== */
-.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding-block:12px 10px;background:var(--paper);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px))}
-@media (min-width:760px){.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30}}
+/* 見出しと流れる銘柄をまとめて画面上部に固定（全端末） */
+.hdr{position:sticky;top:0;z-index:30;background:var(--paper);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-top:env(safe-area-inset-top,0px)}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding-block:12px 10px;background:var(--paper);padding-inline:max(16px,env(safe-area-inset-left,0px))}
 .brand{display:flex;flex-direction:column;line-height:1.1}
-.logo{font-family:var(--f-display);font-size:26px;letter-spacing:.01em}
+.logo{font-family:var(--f-display);font-size:26px;letter-spacing:.01em;background:none;border:0;padding:0;text-align:left;cursor:pointer;line-height:inherit}
 .logo .bang{color:var(--up)}
 .exch{font-size:10.5px;letter-spacing:.14em;color:var(--muted)}
 .clock{display:flex;flex-direction:column;line-height:1.2}
@@ -67,7 +68,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .menu-btn{background:none;border:1px solid var(--line-strong);border-radius:8px;width:36px;height:34px;cursor:pointer;font-size:18px;line-height:1}
 
 /* ticker tape */
-.tape{overflow:hidden;white-space:nowrap;border-block:1px solid var(--line);background:var(--panel);font-size:12px;padding-block:5px;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)))}
+.tape{overflow:hidden;white-space:nowrap;border-block:1px solid var(--line);background:var(--panel);font-size:12px;padding-block:5px}
 .tape-track{display:inline-flex;animation:tape 70s linear infinite}
 .tape-track > span{display:inline-flex;gap:22px;padding-right:22px}
 .tk b{font-weight:500;margin-right:6px}
@@ -80,7 +81,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .col-main,.col-side{display:flex;flex-direction:column;gap:12px;min-width:0}
 @media (max-width:1120px){.layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"chart chart" "order board" "list news"}.col-main,.col-side{display:contents}}
 @media (max-width:700px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"chart" "order" "list" "board" "news"}}
-.a-list{grid-area:list}@media (min-width:1121px){.a-list{grid-area:auto;position:sticky;top:96px}}.a-chart{grid-area:chart}.a-news{grid-area:news}.a-board{grid-area:board}.a-order{grid-area:order}
+.a-list{grid-area:list}@media (min-width:1121px){.a-list{grid-area:auto;position:sticky;top:108px}}.a-chart{grid-area:chart}.a-news{grid-area:news}.a-board{grid-area:board}.a-order{grid-area:order}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:0}
 .p-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
 .p-head select{font:inherit;font-size:12px;font-weight:400;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
@@ -310,6 +311,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;border-bottom:2px solid var(--ink);padding-bottom:18px}
 .hero h1{font-family:var(--f-display);font-weight:400;font-size:clamp(48px,11vw,104px);line-height:.95;margin:0;letter-spacing:-.01em}
 .hero h1 .bang{color:var(--up)}
+.hero h1{user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .hero p{margin:10px 0 0;font-size:15px;max-width:34em}
 .hero .tagline{font-size:12px;letter-spacing:.18em;color:var(--muted);margin:0 0 6px}
 .prof{text-align:right;font-size:13px;color:var(--muted)}
@@ -347,11 +349,6 @@ h2,h3,h4{text-wrap:balance;margin:0}
 
 
 /* ===== スマホ・タブレット専用（index.html の data-device。PC の表示は上のまま） ===== */
-/* 見出しと流れる銘柄をまとめて画面上部に固定。PC では .hdr は箱を作らない */
-.hdr{display:contents}
-[data-device="tablet"] .hdr,[data-device="phone"] .hdr{display:block;position:sticky;top:0;z-index:30;background:var(--paper);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-top:env(safe-area-inset-top,0px)}
-[data-device="tablet"] .topbar,[data-device="phone"] .topbar{position:static;margin-inline:0}
-[data-device="tablet"] .tape,[data-device="phone"] .tape{margin-inline:0}
 [data-device="tablet"] .a-list,[data-device="phone"] .a-list{position:static}
 
 /* タブレット：チャートは横いっぱい、その下に「注文｜銘柄」「ニュース｜板」 */
