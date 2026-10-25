@@ -247,8 +247,21 @@ resetView();
 const bgm = new Audio('Aseet/kabutore_game_bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
 function playBgm() { bgm.play().catch(() => {}); }   // 自動再生がブロックされたら、次のクリックで再生する
 function stopBgm() { bgm.pause(); bgm.currentTime = 0; }
+// 効果音は Web Audio で鳴らす（スマホの <audio> は再生開始が遅れるため）。file:// などで読めなければ <audio> に戻す
 const seClick = new Audio('Aseet/select_button.mp3'); seClick.volume = 0.6;
-function playClick() { seClick.currentTime = 0; seClick.play().catch(() => {}); }
+const AC = window.AudioContext || window.webkitAudioContext;
+const actx = AC ? new AC() : null;
+let seBuf = null;
+if (actx) fetch('Aseet/select_button.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, ng) => actx.decodeAudioData(b, ok, ng))).then(b => { seBuf = b; }).catch(() => {});
+function unlockAudio() { if (actx && actx.state !== 'running') actx.resume().catch(() => {}); }
+function playClick() {
+  if (seBuf && actx.state === 'running') {
+    const src = actx.createBufferSource(), g = actx.createGain(); g.gain.value = 0.6;
+    src.buffer = seBuf; src.connect(g).connect(actx.destination); src.start();
+    return;
+  }
+  seClick.currentTime = 0; seClick.play().catch(() => {});
+}
 
 function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {} }; }
 function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') return Object.assign(defProfile(), p); } catch (e) {} return defProfile(); }
@@ -1434,7 +1447,11 @@ function zoomChart(f, ax) {
 function runUntil(cond) { let n = 0; while (!cond() && n++ < 400 && G.phase !== 'closed') tick(); render(); }
 function bindUI() {
   document.addEventListener('pointerdown', () => { if (!titleOpen && bgm.paused) playBgm(); });
-  document.addEventListener('click', e => { if (e.target.closest('button')) playClick(); }, true);
+  // タッチ・マウスは押した瞬間に鳴らす。キーボード操作（pointerdown が無い click）は click で鳴らす
+  let sePressedAt = 0;
+  document.addEventListener('pointerdown', e => { unlockAudio(); if (e.target.closest('button')) { sePressedAt = performance.now(); playClick(); } }, true);
+  document.addEventListener('touchend', unlockAudio, true);   // iOS は touchend でないと音声のロックが外れないことがある
+  document.addEventListener('click', e => { if (e.target.closest('button') && performance.now() - sePressedAt > 1000) playClick(); }, true);
   document.addEventListener('click', e => {
     const t = e.target.closest('.term'); if (t) { e.preventDefault(); e.stopPropagation(); showTerm(t); return; }
     hidePop();

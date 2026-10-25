@@ -387,3 +387,6 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .toast.news .nt-top{display:flex;gap:8px;align-items:center;margin-bottom:3px}
 .toast.news .nt-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
 .toast.news .stars{color:var(--warn)}
+
+/* ===== タップの遅延をなくす ===== */
+button{touch-action:manipulation}
