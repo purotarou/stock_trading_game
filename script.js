@@ -84,6 +84,8 @@ const SCEN = {
   storm: { name: '嵐の四半期',     days: 60,  rank: 3, mu: .05, desc: '途中で暴落が起きる。耐えるか、逃げるか。', goal: '指数（NTX225）に勝つ', clear: (r, ir) => r > ir, crash: true },
   year:  { name: '1年チャレンジ',   days: 245, rank: 4, mu: .06, desc: '決算が4回。相場の波を乗りこなそう。', goal: '1年で+10%', clear: (r) => r >= .10 },
   free:  { name: 'フリープレイ',   days: 0,   rank: 1, mu: .06, desc: '期間無制限。自由に取引しよう。', goal: 'なし', clear: null },
+  // リアル相場チャレンジ専用（タイトルのシナリオ一覧には出さない）。日数は実データの営業日数
+  real:  { name: 'リアル相場チャレンジ 2020', get days() { return REAL ? REAL.dates.length : 0; }, rank: 1, mu: 0, desc: '2020年の実際の株価で1年間取引する。コロナ・ショックを乗り越えよう。', goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
 };
 const RANKS = [
   { n: '株デビュー', xp: 0, unlock: '3銘柄・成行注文' },
@@ -107,7 +109,7 @@ const MISSIONS = [
   { id: 'crash', t: '暴落を−10%以内で乗り切ろう', xp: 100 },
 ];
 const KIND = { mkt: '成行', lmt: '指値', stp: '逆指値' };
-const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', deny: '訂正', div: '配当' };
+const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', deny: '訂正', div: '配当', real: '報道' };
 
 /* ニュースのテンプレート（影響は対数リターン） */
 const NEWS_MACRO = [
@@ -247,20 +249,14 @@ resetView();
 const bgm = new Audio('Aseet/kabutore_game_bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
 function playBgm() { bgm.play().catch(() => {}); }   // 自動再生がブロックされたら、次のクリックで再生する
 function stopBgm() { bgm.pause(); bgm.currentTime = 0; }
-// 効果音は Web Audio で鳴らす（スマホの <audio> は再生開始が遅れるため）。file:// などで読めなければ <audio> に戻す
-const seClick = new Audio('Aseet/select_button.mp3'); seClick.volume = 0.6;
-const AC = window.AudioContext || window.webkitAudioContext;
-const actx = AC ? new AC() : null;
-let seBuf = null;
-if (actx) fetch('Aseet/select_button.mp3').then(r => r.arrayBuffer()).then(b => new Promise((ok, ng) => actx.decodeAudioData(b, ok, ng))).then(b => { seBuf = b; }).catch(() => {});
-function unlockAudio() { if (actx && actx.state !== 'running') actx.resume().catch(() => {}); }
+// 効果音は元の mp3 を <audio> でそのまま鳴らす。3つを順番に使い、巻き戻しを待たずに連打できるようにする
+const seClicks = [0, 1, 2].map(() => { const a = new Audio('Aseet/select_button.mp3'); a.preload = 'auto'; return a; });
+let seIdx = 0;
 function playClick() {
-  if (seBuf && actx.state === 'running') {
-    const src = actx.createBufferSource(), g = actx.createGain(); g.gain.value = 0.6;
-    src.buffer = seBuf; src.connect(g).connect(actx.destination); src.start();
-    return;
-  }
-  seClick.currentTime = 0; seClick.play().catch(() => {});
+  const a = seClicks[seIdx++ % seClicks.length];
+  // スマホ・タブレットのタイトル画面は BGM が無く目立つので小さめにする
+  a.volume = titleOpen && document.documentElement.dataset.device !== 'pc' ? 0.25 : 0.6;
+  a.currentTime = 0; a.play().catch(() => {});
 }
 
 function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {} }; }
@@ -309,24 +305,28 @@ function makeStock(d, i) {
   };
 }
 
-function newGame(scen, diff, seed, cash) {
+function newGame(scen, diff, seed, cash, mode) {
   RNG.s = seed | 0; RNG.spare = null;
+  const real = mode === 'real' && !!REAL;   // リアル相場は data/corona2020.js があるときだけ
+  if (real) scen = 'real';
   const D = DIFF[diff], S = SCEN[scen], cash0 = cash || D.cash;   // cash はフリープレイで選んだ初期資金
   G = {
-    v: 1, seed, scen, diff, dayIndex: 0, date: START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
-    sel: 'K201', chartMode: '5m', mkMu: S.mu,
+    v: 1, mode: real ? 'real' : 'random', seed, scen, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
+    sel: real ? REAL.stocks[0].code : 'K201', chartMode: '5m', mkMu: S.mu,
     market: { hM: 1, shock: 0, secShock: {}, gapM: 0, secGap: {}, idx: IDX_BASE, idxPrev: IDX_BASE, idxOpen: IDX_BASE, idxHigh: IDX_BASE, idxLow: IDX_BASE, idxDaily: [], capBase: 1, crashLeft: 0, crashMin: 0 },
-    stocks: DEFS.map(makeStock), news: [], denials: [], newsId: 0, orderSeq: 0,
-    player: { cash: cash0, pos: {}, orders: [], trades: [], sells: [], realizedYear: 0, taxYear: 0, taxTotal: 0, year: 2026, divTotal: 0, pendingDiv: 0, hist: [], peak: cash0, maxDD: 0, dayStart: cash0, start: cash0, startIdx: 0, feesTotal: 0 },
+    stocks: real ? REAL.stocks.map(makeRealStock) : DEFS.map(makeStock), news: [], denials: [], newsId: 0, orderSeq: 0,
+    player: { cash: cash0, pos: {}, orders: [], trades: [], sells: [], realizedYear: 0, taxYear: 0, taxTotal: 0, year: real ? +REAL.dates[0].slice(0, 4) : 2026, divTotal: 0, pendingDiv: 0, hist: [], peak: cash0, maxDD: 0, dayStart: cash0, start: cash0, startIdx: 0, feesTotal: 0 },
     crashDay: -1, crashStart: 0, crashCheck: -1, div5: 0, ended: false, dayXP: 0, dayEvents: [], last: null,
   };
-  if (S.crash) G.crashDay = 22 + Math.floor(RNG.next() * 14);
-  else if (diff === 'hard' && scen !== 'month' && RNG.next() < 0.7) G.crashDay = 50 + Math.floor(RNG.next() * 150);
-  for (const s of G.stocks) s.consensus = (s.eps / 4) * (1 + s.mu / 4 + RNG.normal() * 0.02);
+  if (!real) {   // 暴落イベントと決算の市場予想はランダム相場だけ
+    if (S.crash) G.crashDay = 22 + Math.floor(RNG.next() * 14);
+    else if (diff === 'hard' && scen !== 'month' && RNG.next() < 0.7) G.crashDay = 50 + Math.floor(RNG.next() * 150);
+    for (const s of G.stocks) s.consensus = (s.eps / 4) * (1 + s.mu / 4 + RNG.normal() * 0.02);
+  }
   afterLoad();
-  genHistory();
+  if (real) realStart(); else genHistory();
   G.player.startIdx = G.market.idx;
-  G.player.hist.push({ d: prevTD(START_DATE), a: cash0, idx: G.market.idx });
+  G.player.hist.push({ d: prevTD(G.date), a: cash0, idx: G.market.idx });
   startDay(true);
 }
 function afterLoad() { G._map = Object.fromEntries(G.stocks.map(s => [s.code, s])); }
@@ -359,6 +359,76 @@ function genHistory() {
   mk.idx = mk.idxPrev = mk.idxDaily.at(-1).c;
 }
 
+/* ===================== リアル相場（data/corona2020.js の実データ） ===================== */
+// 株価の数値は CORONA2020 からだけ読む。終値は実データどおり、日中の動き（始値・高値・安値・分足）は
+// 「前日終値 → その日の実際の終値」を結ぶ乱数の道筋（ブラウニアン・ブリッジ）で作る
+const REAL = typeof CORONA2020 !== 'undefined' && CORONA2020.dates?.length ? CORONA2020 : null;
+const REAL_PX = REAL ? Object.fromEntries(REAL.stocks.map(d => [d.code, d.prices])) : {};
+const REAL_IDX_BASE = 100;
+// 実データの業種（東証の業種名）。SECTORS を回すランダム相場の乱数の順番を変えないよう、別の表にしておく
+const REAL_SECTORS = {};
+if (REAL) for (const d of REAL.stocks) REAL_SECTORS[d.sector] ||= { name: d.sector, short: d.sector };
+const SEC = k => SECTORS[k] || REAL_SECTORS[k];
+const isReal = () => G?.mode === 'real';
+const idxName = () => (isReal() ? '30銘柄平均' : 'NTX225');
+const realClose = (s, di) => REAL_PX[s.code][di];
+// 当時の実際のニュース（data/news2020.js。なくても動く）。表示するだけで、株価を動かす genNews / apply 系には一切つながない。
+// date（出来事・発表の日）より後の最初の営業日の寄り付き前に出す（その朝に分かっていたことだけになる）
+const REAL_NEWS = {};
+if (REAL && typeof NEWS2020 !== 'undefined' && Array.isArray(NEWS2020)) {
+  for (const n of NEWS2020) {
+    const di = REAL.dates.findIndex(d => d > n.date);
+    if (di >= 0) (REAL_NEWS[di] ||= []).push(n);   // 最終営業日より後の出来事は出さない
+  }
+  // 一覧は新しい順に並ぶので、同じ朝の中では重要なものを後に入れて上に来るようにする
+  for (const k in REAL_NEWS) REAL_NEWS[k].sort((a, b) => (a.importance || 2) - (b.importance || 2));
+}
+const hasRealNews = () => Object.keys(REAL_NEWS).length > 0;
+function pushRealNews() {
+  const t = G.date.slice(5).split('-').map(Number).join('/') + ' 朝';
+  for (const n of REAL_NEWS[G.dayIndex] || []) {
+    pushNews({ day: G.dayIndex, time: t, type: 'real', stars: 3, codes: (n.codes || []).filter(c => REAL_PX[c]), text: n.headline, body: n.body || '', imp: n.importance || 2, hint: '', flash: false });
+  }
+}
+
+function makeRealStock(d) {
+  const p0 = d.prices[0], price = roundTick(p0);
+  let sq = 0; for (let i = 1; i < d.prices.length; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
+  const rsig = Math.sqrt(sq / (d.prices.length - 1));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
+  return {
+    code: d.code, name: d.name, sector: d.sector, desc: '2020年の実際の終値で動きます', unlock: 1, rec: [],
+    shares: 1e9 / p0, div: 0,   // 株式数は実データにないので、指数が「30銘柄を同じ金額ずつ持った平均」になるようにする
+    sig: rsig * Math.sqrt(DAYS), beta: 1, idio: rsig * Math.sqrt(DAYS), mu: 0, kappa: 0, jump: 0, jsize: 0, rsig, dsig: rsig,
+    price, lp: Math.log(price), prevClose: price, open: price, high: price, low: price, dayVol: 0,
+    V: price, h: 1, eps: 0, bps: 0, consensus: 0, nextEarn: -1,
+    minVol: Math.max(300, 3e9 / p0 / MIN_PER_DAY),
+    shock: 0, gap: 0, pend: [], intraday: [], daily: [], pins: [], limUp: price, limDn: price, stop: null,
+  };
+}
+// 開始時の指数（30銘柄平均）を 100 にする。過去のチャートはない
+function realStart() {
+  const mk = G.market; let cap = 0; for (const s of G.stocks) cap += s.shares * s.price;
+  mk.capBase = cap * IDX_BASE / REAL_IDX_BASE;
+  mk.idx = mk.idxPrev = mk.idxOpen = mk.idxHigh = mk.idxLow = REAL_IDX_BASE;
+}
+// 値幅制限は分割調整後の値で計算するので、実際の終値がはみ出す日がある（例：ストップ高の日）。その日は終値まで広げる
+function realLimits(s) {
+  const c = roundTick(realClose(s, G.dayIndex));
+  s.limUp = Math.max(s.limUp, c); s.limDn = Math.min(s.limDn, c);
+}
+function realOpen(s) {
+  const p0 = Math.log(s.prevClose), T = Math.log(realClose(s, G.dayIndex));
+  s.dsig = Math.max(s.rsig * 0.7, Math.abs(T - p0) * 0.5);
+  setPrice(s, p0 + (T - p0) * 0.35 + s.dsig * 0.3 * RNG.normal());
+}
+/** 1分ぶんの動き。残り n 分で実際の終値 T に着くように引き寄せつつ揺らす（最後の1分でちょうど T） */
+function realStep(s, im) {
+  const n = MIN_PER_DAY - G.minute, T = Math.log(realClose(s, G.dayIndex));
+  const eps1 = s.dsig / Math.sqrt(MIN_PER_DAY) * im;
+  const r = n <= 1 ? T - s.lp : (T - s.lp) / n + eps1 * Math.sqrt((n - 1) / n) * RNG.normal();
+  return { r, eps1 };
+}
+
 /* ===================== 株価エンジン ===================== */
 function setPrice(s, lp) {
   lp = clamp(lp, Math.log(s.limDn), Math.log(s.limUp));
@@ -377,6 +447,7 @@ function updateIndex(open) {
 function stepMinute() {
   const m = G.minute, mk = G.market;
   const im = (m < 30 || m >= 270 ? 1.5 : 1) / Math.sqrt(1.25);   // 寄り付き直後と大引け前は荒れる
+  if (isReal()) return stepMinuteReal(im);
   const dv = DIFF[G.diff].vol;
   let crash = 0;
   if (mk.crashMin > 0) { crash = mk.crashLeft / mk.crashMin; mk.crashLeft -= crash; mk.crashMin--; }
@@ -386,7 +457,6 @@ function stepMinute() {
   mk.shock = 0;
   const S = {};
   for (const k in SECTORS) { S[k] = SECTORS[k].ss * Math.sqrt(DT) * im * dv * RNG.normal() + (mk.secShock[k] || 0); mk.secShock[k] = 0; }
-  const late = m >= 270, early = m < 30;
   for (const s of G.stocks) {
     const prev = s.price;
     const eps1 = s.idio * Math.sqrt(s.h * DT) * im * dv;
@@ -397,19 +467,38 @@ function stepMinute() {
     if (s.pend.length) { for (const p of s.pend) { const a = p.left * 0.035; r += a; p.left -= a; } s.pend = s.pend.filter(p => Math.abs(p.left) > 2e-4); }
     r += s.shock; s.shock = 0;
     setPrice(s, s.lp + r);
-    const o = prev, c = s.price;
-    const ext = Math.abs(RNG.normal()) * eps1 * 0.6 * prev;
-    const hi = Math.max(o, c, Math.min(s.limUp, roundTick(Math.max(o, c) + ext)));
-    const lo = Math.min(o, c, Math.max(s.limDn, roundTick(Math.min(o, c) - ext)));
-    const v = Math.max(100, Math.round(s.minVol * (early || late ? 1.9 : 0.78) * (1 + Math.abs(r) / (eps1 + 1e-9) * 0.25) * Math.exp(0.4 * RNG.normal()) / 100) * 100);
-    s.intraday.push({ o, h: hi, l: lo, c, v });
-    s.high = Math.max(s.high, hi); s.low = Math.min(s.low, lo); s.dayVol += v;
+    minuteBar(s, prev, r, eps1);
   }
   updateIndex(false);
   processOrders();
   // うわさの否定
   for (const dn of [...G.denials]) if (dn.at <= G.clock) { G.denials.splice(G.denials.indexOf(dn), 1); denyNews(dn); }
   maybeNews();
+}
+// リアル相場の1分：実データの終値へ向かうだけ。作りもののニュースは流さない
+function stepMinuteReal(im) {
+  for (const s of G.stocks) {
+    const prev = s.price, { r, eps1 } = realStep(s, im);
+    setPrice(s, s.lp + r);
+    if (G.minute === MIN_PER_DAY - 1) {   // 最後の1分は、丸めの誤差で1刻みずれないよう実データの終値をそのまま使う
+      s.price = roundTick(realClose(s, G.dayIndex));
+      s.stop = s.price >= s.limUp ? 'up' : s.price <= s.limDn ? 'down' : null;
+    }
+    minuteBar(s, prev, r, eps1);
+  }
+  updateIndex(false);
+  processOrders();
+}
+/** 1分足（高値・安値・出来高）を記録する */
+function minuteBar(s, prev, r, eps1) {
+  const late = G.minute >= 270, early = G.minute < 30;
+  const o = prev, c = s.price;
+  const ext = Math.abs(RNG.normal()) * eps1 * 0.6 * prev;
+  const hi = Math.max(o, c, Math.min(s.limUp, roundTick(Math.max(o, c) + ext)));
+  const lo = Math.min(o, c, Math.max(s.limDn, roundTick(Math.min(o, c) - ext)));
+  const v = Math.max(100, Math.round(s.minVol * (early || late ? 1.9 : 0.78) * (1 + Math.abs(r) / (eps1 + 1e-9) * 0.25) * Math.exp(0.4 * RNG.normal()) / 100) * 100);
+  s.intraday.push({ o, h: hi, l: lo, c, v });
+  s.high = Math.max(s.high, hi); s.low = Math.min(s.low, lo); s.dayVol += v;
 }
 
 /* ===================== ニュース ===================== */
@@ -507,6 +596,7 @@ function startDay(first) {
     const w = limitWidth(s.prevClose);
     s.limUp = s.prevClose + w; s.limDn = Math.max(1, s.prevClose - w);
     s.intraday = []; s.price = s.open = s.high = s.low = s.prevClose; s.lp = Math.log(s.price); s.dayVol = 0; s.stop = null;
+    if (isReal()) realLimits(s);
   }
   mk.idx = mk.idxPrev;
   if (P.pendingDiv > 0) {
@@ -515,10 +605,11 @@ function startDay(first) {
     pushNews({ day: G.dayIndex, time: '8:00', type: 'div', stars: 3, codes: [], text: `配当金 ${yen(net)}円が入金されました（実際の株では約3か月後に入金されます）`, hint: '' });
     complete('div');
   }
-  if (!first) {
+  if (!first && !isReal()) {
     const x = RNG.next(), n = x < 0.45 ? 0 : x < 0.85 ? 1 : 2;
     for (let i = 0; i < n; i++) genNews('gap');
   }
+  if (isReal()) pushRealNews();
   if (G.dayIndex === G.crashDay) {
     mk.gapM -= 0.045; mk.hM = Math.max(mk.hM, 4.5); mk.crashLeft = -0.05; mk.crashMin = 220;
     G.crashStart = asset(); G.crashCheck = G.dayIndex + 5;
@@ -530,6 +621,16 @@ function startDay(first) {
 
 function openMarket() {
   const mk = G.market;
+  if (isReal()) for (const s of G.stocks) { realOpen(s); s.open = s.high = s.low = s.price; }
+  else openGaps();
+  G.phase = 'open'; G.minute = 0;
+  updateIndex(true);
+  for (const o of [...G.player.orders]) if (o.type === 'mkt') { removeOrder(o); marketTrade(byCode(o.code), o.side, o.qty, 'mkt'); }
+  toast('9:00 寄り付き。取引が始まりました');
+}
+// ランダム相場の寄り付き：夜のあいだのニュースと揺れで窓を開ける
+function openGaps() {
+  const mk = G.market;
   const gM = mk.gapM + MKT_SIG * Math.sqrt(mk.hM / DAYS) * 0.35 * RNG.normal(); mk.gapM = 0;
   const gS = {}; for (const k in SECTORS) { gS[k] = (mk.secGap[k] || 0) + SECTORS[k].ss / Math.sqrt(DAYS) * 0.3 * RNG.normal(); mk.secGap[k] = 0; }
   for (const s of G.stocks) {
@@ -537,15 +638,13 @@ function openMarket() {
     setPrice(s, Math.log(s.prevClose) + r);
     s.open = s.high = s.low = s.price;
   }
-  G.phase = 'open'; G.minute = 0;
-  updateIndex(true);
-  for (const o of [...G.player.orders]) if (o.type === 'mkt') { removeOrder(o); marketTrade(byCode(o.code), o.side, o.qty, 'mkt'); }
-  toast('9:00 寄り付き。取引が始まりました');
 }
 function lunchBreak() {
   const mk = G.market;
-  mk.shock += MKT_SIG * Math.sqrt(mk.hM / DAYS) * 0.1 * RNG.normal();
-  for (const s of G.stocks) s.shock += s.idio * Math.sqrt(s.h / DAYS) * 0.12 * RNG.normal();
+  if (!isReal()) {
+    mk.shock += MKT_SIG * Math.sqrt(mk.hM / DAYS) * 0.1 * RNG.normal();
+    for (const s of G.stocks) s.shock += s.idio * Math.sqrt(s.h / DAYS) * 0.12 * RNG.normal();
+  }
   toast('11:30 昼休み。12:30から後場が始まります');
 }
 
@@ -631,7 +730,7 @@ function closeMarket() {
 }
 
 function nextDay() {
-  G.dayIndex++; G.date = nextTD(G.date);
+  G.dayIndex++; G.date = isReal() ? REAL.dates[G.dayIndex] : nextTD(G.date);
   startDay(false);
   saveGame();
   render();
@@ -757,7 +856,7 @@ function saveGame() {
     localStorage.setItem('kabutore.save', JSON.stringify(G, (k, v) => (k === '_map' ? undefined : k === 'intraday' ? [] : v)));
   } catch (e) {}
 }
-function loadSave() { try { const g = JSON.parse(localStorage.getItem('kabutore.save')); if (g && g.v === 1 && !g.ended) return g; } catch (e) {} return null; }
+function loadSave() { try { const g = JSON.parse(localStorage.getItem('kabutore.save')); if (g && g.v === 1 && !g.ended && (g.mode !== 'real' || REAL)) return g; } catch (e) {} return null; }
 function clearSave() { try { localStorage.removeItem('kabutore.save'); } catch (e) {} }
 function resume(g) {
   G = g; afterLoad();
@@ -797,6 +896,8 @@ function render() {
 function renderHeader() {
   $('#h-date').textContent = dateLabel(G.date) + `　${SCEN[G.scen].days ? `${Math.min(G.dayIndex + 1, SCEN[G.scen].days)}/${SCEN[G.scen].days}日目` : `${G.dayIndex + 1}日目`}`;
   $('#h-time').textContent = timeLabel();
+  $('.exch').textContent = isReal() ? '東証 2020年の実データ' : 'NTX ネオ東京証券取引所';
+  $('#h-idx-name').textContent = idxName();
   const ph = $('#h-phase'); ph.textContent = phaseLabel(); ph.dataset.phase = G.phase;
   const a = asset(), d = a - G.player.dayStart;
   $('#h-asset').textContent = yen(a) + '円';
@@ -809,9 +910,9 @@ function renderHeader() {
 }
 
 function buildFilter() {
-  const r = rank(); const keys = Object.keys(SECTORS).filter(k => G.stocks.some(s => s.sector === k && s.unlock <= r));
+  const r = rank(); const keys = Object.keys(isReal() ? REAL_SECTORS : SECTORS).filter(k => G.stocks.some(s => s.sector === k && s.unlock <= r));
   if (UI.filter !== 'all' && !keys.includes(UI.filter)) UI.filter = 'all';
-  $('#sec-filter').innerHTML = `<option value="all">すべての業種</option>` + keys.map(k => `<option value="${k}"${UI.filter === k ? ' selected' : ''}>${SECTORS[k].name}</option>`).join('');
+  $('#sec-filter').innerHTML = `<option value="all">すべての業種</option>` + keys.map(k => `<option value="${k}"${UI.filter === k ? ' selected' : ''}>${SEC(k).name}</option>`).join('');
 }
 function renderList() {
   const r = rank(), P = G.player;
@@ -819,7 +920,7 @@ function renderList() {
   $('#stock-list').innerHTML = items.map(s => {
     const ch = s.price / s.prevClose - 1;
     return `<button class="row${s.code === G.sel ? ' sel' : ''}" data-code="${s.code}" aria-pressed="${s.code === G.sel}">
-      <span class="r-name"><span>${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}</span><small>${s.code}・${SECTORS[s.sector].short}</small></span>
+      <span class="r-name"><span>${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}</span><small>${s.code}・${SEC(s.sector).short}</small></span>
       <span class="r-px num">${s.stop ? `<em class="stop ${s.stop}">${s.stop === 'up' ? 'S高' : 'S安'}</em> ` : ''}${yen(s.price)}</span>
       <span class="r-ch num ${cls(ch)}">${pctS(ch)}</span></button>`;
   }).join('');
@@ -835,13 +936,18 @@ function rsi(closes, n = 14) {
 function renderChartHead() {
   const s = sel(), ch = s.price - s.prevClose, r = rank();
   $('#c-name').innerHTML = `${esc(s.name)}<span class="code num">${s.code}</span>`;
-  $('#c-meta').textContent = `${SECTORS[s.sector].name}｜${s.desc}`;
+  $('#c-meta').textContent = `${SEC(s.sector).name}｜${s.desc}`;
   $('#c-price').innerHTML = `${yen(s.price)}<small>円</small>${s.stop ? ` <em class="stop ${s.stop}">${s.stop === 'up' ? 'ストップ高' : 'ストップ安'}</em>` : ''}`;
   const cp = $('#c-chg'); cp.textContent = `前日比 ${yenS(ch)}円（${pctS(ch / s.prevClose)}）`; cp.className = 'num ' + cls(ch);
   $$('[data-cm]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cm === G.chartMode)));
   const f = (k, v) => `<div><dt>${k}</dt><dd class="num">${v}</dd></div>`;
   const closes = s.daily.map(d => d.c); if (G.phase === 'open') closes.push(s.price);
   const rv = rsi(closes);
+  if (isReal()) {   // 実データは終値だけなので、株式数・利益・配当にもとづく数字は出さない
+    $('#facts').innerHTML = f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株') + f(term('値幅制限'), `${yen(s.limDn)}〜${yen(s.limUp)}`)
+      + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${yen(s.open)}／${yen(s.high)}／${yen(s.low)}`) + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0)) : '');
+    return;
+  }
   let html = f(term('時価総額'), fmtCap(s.shares * s.price))
     + f(term('PER'), s.eps > 0 ? (s.price / s.eps).toFixed(1) + '倍' : '赤字のため—')
     + f(term('PBR'), (s.price / s.bps).toFixed(2) + '倍')
@@ -1047,15 +1153,16 @@ function renderOrderPanel() {
 
 function renderNews() {
   const hint = DIFF[G.diff].hint;
-  $('#news-hint').textContent = hint === 'dir' ? '矢印は影響の向き' : hint === 'stars' ? '★は情報の確かさ' : '';
+  $('#news-hint').textContent = isReal() ? '日付は報道が届いた朝' : hint === 'dir' ? '矢印は影響の向き' : hint === 'stars' ? '★は情報の確かさ' : '';
   if (UI.lastNews === G.newsId) return; UI.lastNews = G.newsId;
   $('#news').innerHTML = G.news.slice(-50).reverse().map(n => {
     const sub = [];
-    if (hint === 'stars' && n.type !== 'div') sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
+    // 当時のニュース（real）は日付を出していて、すべて確かな報道なので、★と「◯日前」は省く
+    if (hint === 'stars' && n.type !== 'div' && n.type !== 'real') sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
     if (hint === 'dir' && n.hint) sub.push(`<span>${esc(n.hint)}</span>`);
-    if (n.day !== G.dayIndex) sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
-    return `<li><button class="nw" data-news="${n.id}"><span class="nw-time num">${n.time}</span><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span>${esc(n.text)}</span>${sub.length ? `<span class="nw-sub">${sub.join('')}</span>` : ''}</button></li>`;
-  }).join('') || '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>';
+    if (n.day !== G.dayIndex && n.type !== 'real') sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
+    return `<li><button class="nw${n.imp === 3 ? ' imp3' : ''}" data-news="${n.id}"><span class="nw-time num">${n.time}</span><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span>${esc(n.text)}</span>${n.body ? `<span class="nw-body">${esc(n.body)}</span>` : ''}${sub.length ? `<span class="nw-sub">${sub.join('')}</span>` : ''}</button></li>`;
+  }).join('') || (isReal() ? `<li class="empty">${hasRealNews() ? 'まだニュースはありません。当時の報道が、出来事の翌営業日の朝に届きます。' : 'ニュースのデータ（data/news2020.js）がないため、ニュースは流れません。'}</li>` : '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>');
 }
 
 // ×1〜×4 で時間を進めているあいだ、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）。
@@ -1080,7 +1187,7 @@ function renderHold() {
   const rows = Object.entries(P.pos).map(([c, p]) => { const s = byCode(c); const val = p.qty * s.price; return { s, p, val, pl: val - p.avg * p.qty }; }).sort((x, y) => y.val - x.val);
   const stockVal = rows.reduce((t, r) => t + r.val, 0), unreal = rows.reduce((t, r) => t + r.pl, 0);
   const bySec = {}; rows.forEach(r => { bySec[r.s.sector] = (bySec[r.s.sector] || 0) + r.val; });
-  const segs = Object.entries(bySec).map(([k, v]) => ({ k, v, name: SECTORS[k].short, col: `var(--c-${k})` })).concat([{ k: 'cash', v: Math.max(0, P.cash), name: '現金', col: 'var(--c-cash)' }]);
+  const segs = (isReal() ? realSegs(bySec) : Object.entries(bySec).map(([k, v]) => ({ k, v, name: SECTORS[k].short, col: `var(--c-${k})` }))).concat([{ k: 'cash', v: Math.max(0, P.cash), name: '現金', col: 'var(--c-cash)' }]);
   const tot = segs.reduce((t, x) => t + x.v, 0) || 1;
   const ret = a / P.start - 1, iret = G.market.idx / P.startIdx - 1;
   $('#view-hold').innerHTML = `
@@ -1088,7 +1195,7 @@ function renderHold() {
     <dl class="sum-grid">
       <div><dt>総資産</dt><dd class="num">${yen(a)}円</dd></div>
       <div><dt>はじめから</dt><dd class="num ${cls(ret)}">${pctS(ret)}</dd></div>
-      <div><dt>指数（NTX225）は</dt><dd class="num ${cls(iret)}">${pctS(iret)}</dd></div>
+      <div><dt>指数（${idxName()}）は</dt><dd class="num ${cls(iret)}">${pctS(iret)}</dd></div>
       <div><dt>現金</dt><dd class="num">${yen(P.cash)}円</dd></div>
       <div><dt>株の評価額</dt><dd class="num">${yen(stockVal)}円</dd></div>
       <div><dt>${term('含み損益')}</dt><dd class="num ${cls(unreal)}">${yenS(unreal)}円</dd></div>
@@ -1105,12 +1212,22 @@ function renderHold() {
     <canvas id="hist-chart" role="img" aria-label="資産と指数の推移"></canvas>
   </section>
   <section class="panel"><h2>保有株</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">株数</th><th class="r">平均取得単価</th><th class="r">現在値</th><th class="r">評価額</th><th class="r">含み損益</th></tr></thead><tbody>
-    ${rows.map(r => `<tr><td>${esc(r.s.name)} <span class="muted">${SECTORS[r.s.sector].short}</span></td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.avg * 10) / 10)}</td><td class="r num">${yen(r.s.price)}</td><td class="r num">${yen(r.val)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}（${pctS(r.s.price / r.p.avg - 1)}）</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ株を持っていません。取引画面で買ってみよう。</td></tr>'}
+    ${rows.map(r => `<tr><td>${esc(r.s.name)} <span class="muted">${SEC(r.s.sector).short}</span></td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.avg * 10) / 10)}</td><td class="r num">${yen(r.s.price)}</td><td class="r num">${yen(r.val)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}（${pctS(r.s.price / r.p.avg - 1)}）</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ株を持っていません。取引画面で買ってみよう。</td></tr>'}
   </tbody></table></div></section>
   <section class="panel"><h2>最近の売買</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>日時</th><th>銘柄</th><th>売買</th><th>種類</th><th class="r">株数</th><th class="r">約定値段</th></tr></thead><tbody>
     ${P.trades.slice(-15).reverse().map(t => `<tr><td class="num">${t.d === G.dayIndex ? '今日' : (G.dayIndex - t.d) + '日前'} ${minLabel(t.m)}</td><td>${esc(byCode(t.code).name)}</td><td class="${t.side === 'buy' ? 'up' : 'down'}">${t.side === 'buy' ? '買い' : '売り'}</td><td>${KIND[t.kind]}</td><td class="r num">${t.qty.toLocaleString()}</td><td class="r num">${px(Math.round(t.px * 10) / 10)}</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ売買していません。</td></tr>'}
   </tbody></table></div></section>`;
   drawLines($('#hist-chart'), P.hist);
+}
+
+// リアル相場は業種が15あるので、金額の大きい6業種だけ色を分け、残りは「その他の業種」にまとめる
+const ALLOC_COLS = ['tech', 'auto', 'bank', 'food', 'game', 'growth'].map(k => `var(--c-${k})`);
+function realSegs(bySec) {
+  const e = Object.entries(bySec).sort((x, y) => y[1] - x[1]);
+  const top = e.length > ALLOC_COLS.length ? e.slice(0, ALLOC_COLS.length - 1) : e, rest = e.slice(top.length);
+  const segs = top.map(([k, v], i) => ({ k, v, name: SEC(k).short, col: ALLOC_COLS[i] }));
+  if (rest.length) segs.push({ k: 'other', v: rest.reduce((t, x) => t + x[1], 0), name: `その他の${rest.length}業種`, col: 'var(--c-other)' });
+  return segs;
 }
 
 function drawLines(cv, hist) {
@@ -1129,20 +1246,21 @@ function drawLines(cv, hist) {
   const line = (arr, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); arr.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1; };
   line(I, C.muted, 1.5, [4, 3]); line(A, C.accent, 2.2, []);
   ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(X(A.length - 1), Y(A.at(-1)), 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.textAlign = 'left'; ctx.font = `11.5px ${C.body}`; ctx.fillStyle = C.accent; ctx.fillText('あなたの資産', padL + 4, padT + 6); ctx.fillStyle = C.muted; ctx.fillText('- - NTX225', padL + 96, padT + 6);
+  ctx.textAlign = 'left'; ctx.font = `11.5px ${C.body}`; ctx.fillStyle = C.accent; ctx.fillText('あなたの資産', padL + 4, padT + 6); ctx.fillStyle = C.muted; ctx.fillText('- - ' + idxName(), padL + 96, padT + 6);
 }
 
 /* ---------- 決算・配当 ---------- */
 function renderCal() {
   const el = $('#view-cal');
   if (rank() < 4) { el.innerHTML = `<section class="panel"><div class="locked"><b>ランク4で解放</b><p>決算発表の予定日と、配当の権利確定日がわかるカレンダーです。</p></div></section>`; return; }
+  if (isReal()) { el.innerHTML = `<section class="panel"><h2>決算・配当</h2><p class="muted">リアル相場チャレンジでは、決算と配当は扱いません（実データは毎日の終値だけで、決算や配当による値動きはすでに終値に含まれています）。</p></section>`; return; }
   const P = G.player;
   const up = G.stocks.filter(s => s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
   const divs = G.stocks.filter(s => s.div);
   const recDate = s => { let best = null; for (let k = 0; k < 270 && !best; k++) { const d = addTD(G.date, k); if (s.rec.includes(monthOf(d)) && lastTradingDayOfMonth(d)) best = d; } return best; };
   el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">決算は大引け後（15:30）に発表され、翌日の寄り付きで株価に反映されます。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>銘柄</th><th>業種</th><th class="r">${term('市場予想')}（1株利益）</th><th>保有</th></tr></thead><tbody>
-    ${up.map(s => `<tr><td class="num">${mdLabel(addTD(G.date, s.nextEarn - G.dayIndex))}${s.nextEarn === G.dayIndex ? ' 今日' : ''}</td><td>${esc(s.name)}</td><td>${SECTORS[s.sector].short}</td><td class="r num">${s.consensus.toFixed(1)}円</td><td>${P.pos[s.code] ? '●' : ''}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
+    ${up.map(s => `<tr><td class="num">${mdLabel(addTD(G.date, s.nextEarn - G.dayIndex))}${s.nextEarn === G.dayIndex ? ' 今日' : ''}</td><td>${esc(s.name)}</td><td>${SEC(s.sector).short}</td><td class="r num">${s.consensus.toFixed(1)}円</td><td>${P.pos[s.code] ? '●' : ''}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
     </tbody></table></div></section>
     <section class="panel"><h2>配当と${term('権利確定日')}</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">年間配当（1株）</th><th class="r">${term('配当利回り')}</th><th>確定月</th><th>次の権利確定日</th></tr></thead><tbody>
     ${divs.map(s => `<tr><td>${esc(s.name)}</td><td class="r num">${s.div}円</td><td class="r num">${(s.div / s.price * 100).toFixed(2)}%</td><td>${s.rec.map(m => m + '月').join('・')}</td><td class="num">${(d => d ? mdLabel(d) : '—')(recDate(s))}</td></tr>`).join('')}
@@ -1279,7 +1397,7 @@ function dailyReport() {
   const li = arr => arr.map(([n, c]) => `<li><span>${esc(n)}</span><span class="num ${cls(c)}">${pctS(c)}</span></li>`).join('') || '<li><span class="muted">なし</span></li>';
   openModal(`<h2>${dateLabel(L.date)}の取引終了</h2>
     <p class="muted small">${S.name}　${S.days ? `${G.dayIndex + 1}/${S.days}日目` : `${G.dayIndex + 1}日目`}</p>
-    <dl class="rep-grid"><div><dt>総資産</dt><dd>${yen(L.a)}円</dd></div><div><dt>今日の損益</dt><dd class="${cls(L.dayPnl)}">${yenS(L.dayPnl)}円<br><small>${pctS(L.dp)}</small></dd></div><div><dt>NTX225</dt><dd>${L.idx.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}<br><small class="${cls(L.ic)}">${pctS(L.ic)}</small></dd></div></dl>
+    <dl class="rep-grid"><div><dt>総資産</dt><dd>${yen(L.a)}円</dd></div><div><dt>今日の損益</dt><dd class="${cls(L.dayPnl)}">${yenS(L.dayPnl)}円<br><small>${pctS(L.dp)}</small></dd></div><div><dt>${idxName()}</dt><dd>${L.idx.toLocaleString('ja-JP', { maximumFractionDigits: 0 })}<br><small class="${cls(L.ic)}">${pctS(L.ic)}</small></dd></div></dl>
     <div class="movers"><div><h3>値上がり</h3><ul>${li(L.up)}</ul></div><div><h3>値下がり</h3><ul>${li(L.down)}</ul></div></div>
     ${L.events.length ? `<h3>今日のできごと</h3><ul class="ev">${L.events.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
     <h3>経験値</h3><p>今日 +${L.xp} XP　／　ランク${r}「${RANKS[r - 1].n}」${nx ? `（次まであと${(nx.xp - profile.xp).toLocaleString()} XP）` : ''}</p>
@@ -1302,7 +1420,7 @@ function finalReport() {
     adv.push(`一番損した取引は${worst.name}（${yenS(worst.pnl)}円、${pctS(worst.pct)}）。` + (worst.pct < -0.05 ? `−5%で${term('損切り')}していれば、損は約${yen(cut)}円で済み、約${yen(-worst.pnl - cut)}円減らせました。` : '損を小さく抑えられています。'));
   }
   if (!sells.length) adv.push('一度も株を売りませんでした。利益や損失は、売って初めて確定します。');
-  adv.push(`指数（NTX225）を買って持っていただけなら ${pctS(ir)}。あなたは ${pctS(r)}。${r > ir ? '指数に勝ちました。これは本物の投資でも簡単ではありません。' : '指数に勝つのは、プロでも難しいことです。'}`);
+  adv.push(`指数（${idxName()}）を買って持っていただけなら ${pctS(ir)}。あなたは ${pctS(r)}。${r > ir ? '指数に勝ちました。これは本物の投資でも簡単ではありません。' : '指数に勝つのは、プロでも難しいことです。'}`);
   adv.push(`${term('最大ドローダウン')}は${(P.maxDD * 100).toFixed(1)}%でした。${P.maxDD > 0.15 ? '大きく減った時期がありました。1社への集中を減らすと、落ち込みを小さくできます。' : 'リスクをうまく抑えられています。'}`);
   G.ended = true; clearSave();
   openModal(`<h2>${S.name}　結果</h2>
@@ -1312,7 +1430,7 @@ function finalReport() {
     <div class="sensei result-sensei">${SENSEI_SVG}<div><b class="who">カブ先生</b><div class="bubble">${esc(senseiAdvice({ r, ir, clear, stars, P }))}</div></div></div>
     <canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>
     <h3>振り返り</h3><ul class="ev">${adv.map(x => `<li>${x}</li>`).join('')}</ul>
-    <p class="muted small">このゲームの株価と企業はすべて架空です。実際の投資では、元本を割り込む（損をする）可能性があります。</p>
+    <p class="muted small">${isReal() ? '株価は2020年の実際の終値です（日中の動きはゲームが作ったもの）。過去の値動きは将来を保証しません。' : 'このゲームの株価と企業はすべて架空です。'}実際の投資では、元本を割り込む（損をする）可能性があります。</p>
     <div class="actions"><button class="primary" data-act="title">タイトルへ</button></div>`,
   { title: () => { closeModal(); showTitle(); } });
   requestAnimationFrame(() => drawLines($('#final-chart'), P.hist));
@@ -1389,37 +1507,42 @@ function senseiAdvice({ r, ir, clear, stars, P }) {
   const worst = P.sells.reduce((x, y) => (y.pct < x.pct ? y : x));
   if (worst.pct < -0.1) return `${worst.name}で${pctS(worst.pct)}の損が出たから、次は「ここまで下がったら売る」を先に決めておこう。`;
   if (clear && r > ir) return '目標クリア、しかも指数に勝てたね、この調子で次のシナリオにも挑戦しよう！';
-  if (clear) return '目標クリアおめでとう、次は指数（NTX225）に勝つことを目指してみよう！';
+  if (clear) return `目標クリアおめでとう、次は指数（${idxName()}）に勝つことを目指してみよう！`;
   return 'おしかったね、ニュースの★と決算の日を意識すると、もっと良い場面で売り買いできるよ。';
 }
 
 /* ---------- タイトル ---------- */
-const pick = { scen: 'month', diff: 'normal' };
+const pick = { mode: 'random', scen: 'month', diff: 'normal' };
 function showTitle() {
   stopBgm(); titleOpen = true; const el = $('#title'); el.hidden = false; const r = rank(), save = loadSave();
-  if (SCEN[pick.scen].rank > r) pick.scen = 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'normal';
+  if (SCEN[pick.scen].rank > r || SCEN[pick.scen].real) pick.scen = 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'normal';
+  if (!REAL) pick.mode = 'random';
+  const real = pick.mode === 'real', RS = SCEN.real, rb = profile.best.real;
+  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? `2020年の実在30銘柄の実際の終値で遊ぶ（${REAL.dates[0].replace(/-/g, '/')}〜${REAL.dates.at(-1).replace(/-/g, '/')}）。` : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1>カブトレ<span class="bang">！</span></h1>
-      <p>架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
+      <p>${real ? '2020年の東証の実際の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
       <div class="prof"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
     <div class="setup">
-      <div><h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).map(([k, S]) => { const lock = S.rank > r, b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
+      <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && !REAL ? 'disabled' : ''}><b>${n}</b><span>${d}</span></button>`).join('')}</div>
+      <h2>シナリオ</h2><div class="choices">${real ? `<button class="choice" aria-pressed="true"><b>${RS.name}</b><span>${RS.desc}（${RS.days}営業日）　目標：${RS.goal}</span><em class="${rb ? 'best' : ''}">${rb != null ? '★'.repeat(rb) + '☆'.repeat(3 - rb) : ''}</em></button>` : Object.entries(SCEN).filter(([, S]) => !S.real).map(([k, S]) => { const lock = S.rank > r, b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
       <div><h2>難易度</h2><div class="choices">${Object.entries(DIFF).map(([k, D]) => { const lock = D.rank > r; return `<button class="choice" data-diff="${k}" aria-pressed="${pick.diff === k}" ${lock ? 'disabled' : ''}><b>${D.name}</b><span>${D.desc}</span><em>${lock ? `ランク${D.rank}で解放` : ''}</em></button>`; }).join('')}</div>
-        <div class="seed-row" id="cash-row" ${pick.scen === 'free' ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="100000" max="100000000" step="100000" placeholder="${DIFF[pick.diff].cash}"><span>円（10万〜1億円。フリープレイのみ）</span></div>
-        <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>同じ番号なら、友達と同じ相場で勝負できます</span></div></div>
+        <div class="seed-row" id="cash-row" ${pick.scen === 'free' && !real ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="100000" max="100000000" step="100000" placeholder="${DIFF[pick.diff].cash}"><span>円（10万〜1億円。フリープレイのみ）</span></div>
+        <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>${real ? '終値は実データどおり。番号で変わるのは日中の動きだけです' : '同じ番号なら、友達と同じ相場で勝負できます'}</span></div></div>
     </div>
     <div class="go"><button class="primary" id="go-new">はじめる</button>${save ? `<button class="ghost" id="go-cont">続きから（${esc(SCEN[save.scen].name)}・${mdLabel(save.date)}）</button>` : ''}</div>
-    <p class="disclaimer">このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。</p>
+    <p class="disclaimer">${real ? 'リアル相場チャレンジの終値は、2020年の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当・ニュースは出ません。実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。' : `このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。`}</p>
   </div>`;
   el.onclick = e => {
-    const sc = e.target.closest('[data-scen]'), df = e.target.closest('[data-diff]');
-    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = pick.scen !== 'free'; }
+    const sc = e.target.closest('[data-scen]'), df = e.target.closest('[data-diff]'), md = e.target.closest('[data-mode]');
+    if (md && !md.disabled && md.dataset.mode !== pick.mode) { const sv = $('#seed').value; pick.mode = md.dataset.mode; showTitle(); $('#seed').value = sv; return; }
+    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = pick.scen !== 'free' || pick.mode === 'real'; }
     if (df && !df.disabled) { pick.diff = df.dataset.diff; $$('[data-diff]', el).forEach(b => b.setAttribute('aria-pressed', String(b === df))); $('#cash').placeholder = DIFF[pick.diff].cash; }
     if (e.target.closest('#go-new')) {
       const sv = $('#seed').value; const seed = sv ? (+sv | 0) : Math.floor(Math.random() * 1e9);
-      const cv = +$('#cash').value, cash = pick.scen === 'free' && cv ? clamp(Math.round(cv / 1000) * 1000, 1e5, 1e8) : 0;
-      newGame(pick.scen, pick.diff, seed, cash); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
-      if (pick.scen === 'month' && !profile.tutorial) startTutorial(); else toast(`相場の番号は ${seed} です`);
+      const cv = +$('#cash').value, cash = pick.scen === 'free' && pick.mode !== 'real' && cv ? clamp(Math.round(cv / 1000) * 1000, 1e5, 1e8) : 0;
+      newGame(pick.scen, pick.diff, seed, cash, pick.mode); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
+      if (G.scen === 'month' && !profile.tutorial) startTutorial(); else toast(isReal() ? '2020年1月6日から、実際の株価で取引します' : `相場の番号は ${seed} です`);
     }
     if (e.target.closest('#go-cont')) { const g = loadSave(); if (g) { UI.lastNews = -1; resume(g); buildTypes(); buildFilter(); switchView('trade'); render(); } }
   };
@@ -1449,8 +1572,7 @@ function bindUI() {
   document.addEventListener('pointerdown', () => { if (!titleOpen && bgm.paused) playBgm(); });
   // タッチ・マウスは押した瞬間に鳴らす。キーボード操作（pointerdown が無い click）は click で鳴らす
   let sePressedAt = 0;
-  document.addEventListener('pointerdown', e => { unlockAudio(); if (e.target.closest('button')) { sePressedAt = performance.now(); playClick(); } }, true);
-  document.addEventListener('touchend', unlockAudio, true);   // iOS は touchend でないと音声のロックが外れないことがある
+  document.addEventListener('pointerdown', e => { if (e.target.closest('button')) { sePressedAt = performance.now(); playClick(); } }, true);
   document.addEventListener('click', e => { if (e.target.closest('button') && performance.now() - sePressedAt > 1000) playClick(); }, true);
   document.addEventListener('click', e => {
     const t = e.target.closest('.term'); if (t) { e.preventDefault(); e.stopPropagation(); showTerm(t); return; }

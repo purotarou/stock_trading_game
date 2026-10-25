@@ -37,7 +37,7 @@
   <dl class="stats">
     <div class="stat"><dt>総資産</dt><dd class="num" id="h-asset">—</dd></div>
     <div class="stat"><dt>今日の損益</dt><dd class="num" id="h-day">—</dd></div>
-    <div class="stat"><dt><button class="term" data-term="株価指数">NTX225</button></dt><dd class="num" id="h-idx">—</dd></div>
+    <div class="stat"><dt><button class="term" data-term="株価指数" id="h-idx-name">NTX225</button></dt><dd class="num" id="h-idx">—</dd></div>
   </dl>
   <button class="rank-chip" id="h-rank" aria-label="ランクとミッションを見る"></button>
   <button class="menu-btn" id="menu-btn" aria-label="メニュー">≡</button>
@@ -119,4 +119,8 @@
 <div id="tut-ring" hidden></div>
 <div id="coach" role="dialog" aria-label="カブ先生のチュートリアル" aria-live="polite" hidden></div>
 
+<!-- リアル相場チャレンジの実データ（tools/fetch_prices.py で作る。なければリアル相場は選べない） -->
+<script src="data/corona2020.js"></script>
+<!-- リアル相場チャレンジで流す当時のニュース（表示だけ。なくても動く） -->
+<script src="data/news2020.js"></script>
 <script src="script.js"></script>
