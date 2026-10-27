@@ -73,9 +73,10 @@
   </div>
   <div class="col-side">
   <section class="panel a-order" aria-label="注文">
-    <div class="p-head"><span>注文</span><span class="muted small num" id="o-avail"></span></div>
+    <div class="p-head"><span class="p-title">注文<button class="help-btn" id="m-help" aria-label="信用取引の使い方（カブ先生）" hidden>?</button></span><span class="muted small num" id="o-avail"></span></div>
     <div class="order">
       <div class="o-target"><span id="o-name"></span><span class="num" id="o-cur"></span></div>
+      <div class="seg acct" id="o-acct" role="group" aria-label="現物か信用か"></div>
       <div class="seg side" role="group" aria-label="売買"><button data-side="buy" class="buy">買う</button><button data-side="sell" class="sell">売る</button></div>
       <div class="field"><span class="lab">注文の種類</span><div class="seg" id="o-types" role="group" aria-label="注文の種類"></div></div>
       <div class="field">
