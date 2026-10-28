@@ -72,6 +72,10 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .rank-chip.fast{border-color:var(--fast)}
 .rank-chip.fast .rk{background:var(--fast);color:var(--fast-ink)}
 .prof.fast b{color:var(--fast-text)}
+/* 伝説の相場師（最高ランク）は金色。ファストスターターより優先 */
+.rank-chip.rank-legend{border-color:var(--gold)}
+.rank-chip.rank-legend .rk{background:var(--gold);color:var(--gold-ink)}
+.prof.rank-legend b{color:var(--gold)}
 .menu-btn{background:none;border:1px solid var(--line-strong);border-radius:8px;width:36px;height:34px;cursor:pointer;font-size:18px;line-height:1}
 
 /* ticker tape */

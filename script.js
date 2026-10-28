@@ -85,8 +85,10 @@ const SCEN = {
   year:  { name: '1年チャレンジ',   days: 245, rank: 4, mu: .06, desc: '決算が4回。相場の波を乗りこなそう。', goal: '1年で+10%', clear: (r) => r >= .10 },
   free:  { name: 'フリープレイ',   days: 0,   rank: 1, mu: .06, desc: '期間無制限。初期資金を変更可能。自由に取引しよう。', goal: 'なし', clear: null, free: true },
   // リアル相場チャレンジ専用（相場で「リアル相場チャレンジ」を選んだときだけ一覧に出す）。日数は実データの営業日数
-  real:  { name: 'コロナショック', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: '2020年の実際の株価で1年間取引する。', goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
-  // 相場は上のリアル相場のシナリオからランダムで選ぶ（G.base）。実データが終わったら終了
+  // 名前・期間の表示は REAL_SETS（リアル相場のデータ表）にまとめてある。キーは REAL_SETS のキーと同じ
+  real:  { get name() { return REAL_SETS.real.name; }, get days() { return realDays('real'); }, rank: 5, mu: 0, get desc() { return `${REAL_SETS.real.period}の実際の株価で1年間取引する。`; }, goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
+  real2026: { get name() { return REAL_SETS.real2026.name; }, get days() { return realDays('real2026'); }, rank: 5, mu: 0, get desc() { return `${REAL_SETS.real2026.period}の実際の株価で取引する。`; }, goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true, noFree: true },   // noFree: フリープレイの相場の候補に入れない
+  // 相場は上のリアル相場のシナリオ（noFree でないもの）からランダムで選ぶ（G.base）。実データが終わったら終了
   realfree: { name: 'フリープレイ', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: 'どの相場になるかは始まってからのお楽しみ。初期資金も自由に決められる。', goal: 'なし', clear: null, real: true, free: true },
 };
 // フリープレイで選べる初期資金（円）
@@ -378,14 +380,15 @@ function makeStock(d, i) {
 
 function newGame(scen, diff, seed, cash, mode) {
   RNG.s = seed | 0; RNG.spare = null;
-  const real = mode === 'real' && !!REAL;   // リアル相場は data/corona2020.js があるときだけ
-  if (real && !SCEN[scen].real) scen = 'real';
-  if (!real && SCEN[scen].real) scen = 'free';
+  if (mode === 'real' && !SCEN[scen].real) scen = 'real';
   // リアル相場のフリープレイは、ほかのリアル相場のシナリオから相場を選ぶ（乱数の順番を変えないようにシードで決める）
-  const pool = Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].free), base = real ? (SCEN[scen].free ? pool[Math.abs(seed | 0) % pool.length] : scen) : null;
+  const pool = freePool(), base = mode === 'real' ? (SCEN[scen].free ? pool[Math.abs(seed | 0) % pool.length] : scen) : null;
+  const real = mode === 'real' && realOK(base);   // リアル相場は、そのシナリオのデータ（data/corona2020.js など）があるときだけ
+  if (!real && SCEN[scen].real) scen = 'free';
+  if (real) useReal(base);
   const D = DIFF[diff], S = SCEN[scen], cash0 = cash || D.cash;   // cash はフリープレイで選んだ初期資金
   G = {
-    v: 1, mode: real ? 'real' : 'random', seed, scen, base, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
+    v: 1, mode: real ? 'real' : 'random', seed, scen, base: real ? base : null, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
     sel: real ? REAL.stocks[0].code : 'K201', chartMode: '5m', mkMu: S.mu,
     market: { hM: 1, shock: 0, secShock: {}, gapM: 0, secGap: {}, idx: IDX_BASE, idxPrev: IDX_BASE, idxOpen: IDX_BASE, idxHigh: IDX_BASE, idxLow: IDX_BASE, idxDaily: [], capBase: 1, crashLeft: 0, crashMin: 0 },
     stocks: real ? REAL.stocks.map(makeRealStock) : DEFS.map(makeStock), news: [], denials: [], newsId: 0, orderSeq: 0,
@@ -405,6 +408,7 @@ function newGame(scen, diff, seed, cash, mode) {
   startDay(true);
 }
 function afterLoad() {
+  if (G.mode === 'real') useReal(realKeyOf(G));   // 保存データ・練習からの復元でも、そのシナリオのデータに切り替える
   G._map = Object.fromEntries(G.stocks.map(s => [s.code, s])); G.player.mpos ||= {};   // 信用取引より前のセーブには mpos がない
   // 梅山カンパニーの乱数は状態を G.ume.r に持つ（保存すると関数は消えるので、読み込むたびに付け直す）
   if (G.ume) { G._map[G.ume.code] = G.ume; Object.assign(G.ume.r, { next: RNG.next, normal: RNG.normal, pick: RNG.pick }); }
@@ -438,32 +442,63 @@ function genHistory() {
   mk.idx = mk.idxPrev = mk.idxDaily.at(-1).c;
 }
 
-/* ===================== リアル相場（data/corona2020.js の実データ） ===================== */
-// 株価の数値は CORONA2020 からだけ読む。終値は実データどおり、日中の動き（始値・高値・安値・分足）は
+/* ===================== リアル相場（data/ 以下の実データ） ===================== */
+// リアル相場のシナリオごとの情報は、この REAL_SETS に1か所でまとめる（キーは SCEN のキーと同じ）。
+// シナリオ名・期間の表示（name / period / year / span）もここだけ。データの期間を延ばしたときは span を直す。
+//   data: 株価（CORONA2020 / RECENT。ファイルがなければ null で、そのシナリオは選べない）
+//   news: 当時のニュース（NEWS2020 / NEWS2026。なくても動く）
+const REAL_SETS = {
+  real: {
+    file: 'data/corona2020.js', newsFile: 'data/news2020.js', name: 'コロナショック', period: '2020年',
+    data: typeof CORONA2020 !== 'undefined' ? CORONA2020 : null, news: typeof NEWS2020 !== 'undefined' ? NEWS2020 : null,
+  },
+  real2026: {
+    file: 'data/recent.js', newsFile: 'data/news2026.js', year: 2026, span: '1〜9月',
+    get name() { return '今年の相場'; }, get period() { return `${this.year}年${this.span}`; },
+    data: typeof RECENT !== 'undefined' ? RECENT : null, news: typeof NEWS2026 !== 'undefined' ? NEWS2026 : null,
+  },
+};
+// 株価の数値は選んだシナリオのデータからだけ読む。終値は実データどおり、日中の動き（始値・高値・安値・分足）は
 // 「前日終値 → その日の実際の終値」を結ぶ乱数の道筋（ブラウニアン・ブリッジ）で作る
-const REAL = typeof CORONA2020 !== 'undefined' && CORONA2020.dates?.length ? CORONA2020 : null;
-const REAL_PX = REAL ? Object.fromEntries(REAL.stocks.map(d => [d.code, d.prices])) : {};
+for (const k in REAL_SETS) {
+  const S = REAL_SETS[k];
+  S.data = S.data?.dates?.length ? S.data : null;
+  if (!S.data) continue;
+  S.px = Object.fromEntries(S.data.stocks.map(d => [d.code, d.prices]));
+  S.hist = S.data.history?.dates?.length ? S.data.history : null;   // 開始前の過去チャート（日足。なくても動く）
+  // 実データの業種（東証の業種名）。SECTORS を回すランダム相場の乱数の順番を変えないよう、別の表にしておく
+  S.sectors = {};
+  for (const d of S.data.stocks) S.sectors[d.sector] ||= { name: d.sector, short: d.sector };
+  // 当時の実際のニュース。表示するだけで、株価を動かす genNews / apply 系には一切つながない。
+  // date（出来事・発表の日）より後の最初の営業日の寄り付き前に出す（その朝に分かっていたことだけになる）
+  S.newsByDay = {};
+  if (Array.isArray(S.news)) {
+    for (const n of S.news) {
+      const di = S.data.dates.findIndex(d => d > n.date);
+      if (di >= 0) (S.newsByDay[di] ||= []).push(n);   // 最終営業日より後の出来事は出さない
+    }
+    // 一覧は新しい順に並ぶので、同じ朝の中では重要なものを後に入れて上に来るようにする
+    for (const d in S.newsByDay) S.newsByDay[d].sort((a, b) => (a.importance || 2) - (b.importance || 2));
+  }
+}
+// いま遊んでいる（または遊ぼうとしている）シナリオのデータ。useReal で切り替える
+let REAL = null, REAL_KEY = null, REAL_PX = {}, REAL_HIST = null, REAL_SECTORS = {}, REAL_NEWS = {};
+const realOK = k => !!REAL_SETS[k]?.data;   // そのシナリオのデータがあるか
+const anyReal = () => Object.keys(REAL_SETS).some(realOK);
+const realDays = k => REAL_SETS[k]?.data?.dates.length || 0;
+const freePool = () => Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].free && !SCEN[k].noFree);   // フリープレイの相場の候補
+const realKeyOf = g => { const k = g.base || g.scen; return REAL_SETS[k] ? k : 'real'; };   // 保存データのシナリオ（古い保存データは base がない）
+function useReal(k) {
+  const S = REAL_SETS[k]; if (!S?.data) return false;
+  REAL_KEY = k; REAL = S.data; REAL_PX = S.px; REAL_HIST = S.hist; REAL_SECTORS = S.sectors; REAL_NEWS = S.newsByDay;
+  return true;
+}
 const REAL_IDX_BASE = 100;
-const REAL_HIST = REAL?.history?.dates?.length ? REAL.history : null;   // 開始前の過去チャート（2019年の日足。なくても動く）
 const dailyKeep = () => (isReal() ? 600 : 320);   // 日足を残す数。リアル相場は過去分（約240日）と1年分が収まるように多めにする
-// 実データの業種（東証の業種名）。SECTORS を回すランダム相場の乱数の順番を変えないよう、別の表にしておく
-const REAL_SECTORS = {};
-if (REAL) for (const d of REAL.stocks) REAL_SECTORS[d.sector] ||= { name: d.sector, short: d.sector };
 const SEC = k => SECTORS[k] || REAL_SECTORS[k];
 const isReal = () => G?.mode === 'real';
 const idxName = () => (isReal() ? '30銘柄平均' : 'NTX225');
 const realClose = (s, di) => REAL_PX[s.code][di];
-// 当時の実際のニュース（data/news2020.js。なくても動く）。表示するだけで、株価を動かす genNews / apply 系には一切つながない。
-// date（出来事・発表の日）より後の最初の営業日の寄り付き前に出す（その朝に分かっていたことだけになる）
-const REAL_NEWS = {};
-if (REAL && typeof NEWS2020 !== 'undefined' && Array.isArray(NEWS2020)) {
-  for (const n of NEWS2020) {
-    const di = REAL.dates.findIndex(d => d > n.date);
-    if (di >= 0) (REAL_NEWS[di] ||= []).push(n);   // 最終営業日より後の出来事は出さない
-  }
-  // 一覧は新しい順に並ぶので、同じ朝の中では重要なものを後に入れて上に来るようにする
-  for (const k in REAL_NEWS) REAL_NEWS[k].sort((a, b) => (a.importance || 2) - (b.importance || 2));
-}
 const hasRealNews = () => Object.keys(REAL_NEWS).length > 0;
 const NEWS_KEEP_REAL = 400;   // リアル相場で保存・表示するニュースの上限（1年分が収まる数）
 function pushRealNews() {
@@ -479,7 +514,7 @@ function makeRealStock(d) {
   let sq = 0; for (let i = 1; i < d.prices.length; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
   const rsig = Math.sqrt(sq / (d.prices.length - 1));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
   return {
-    code: d.code, name: d.name, sector: d.sector, desc: '2020年の実際の終値で動きます', unlock: 1, rec: [],
+    code: d.code, name: d.name, sector: d.sector, desc: `${REAL_SETS[REAL_KEY].period}の実際の終値で動きます`, unlock: 1, rec: [],
     shares: 1e9 / p0, div: 0,   // 株式数は実データにないので、指数が「30銘柄を同じ金額ずつ持った平均」になるようにする
     sig: rsig * Math.sqrt(DAYS), beta: 1, idio: rsig * Math.sqrt(DAYS), mu: 0, kappa: 0, jump: 0, jsize: 0, rsig, dsig: rsig,
     price, lp: Math.log(price), prevClose: price, open: price, high: price, low: price, dayVol: 0,
@@ -495,7 +530,7 @@ function realStart() {
   mk.idx = mk.idxPrev = mk.idxOpen = mk.idxHigh = mk.idxLow = REAL_IDX_BASE;
   if (REAL_HIST) realHistory();
 }
-// 開始前の過去チャート（CORONA2020.history）。乱数は使わない。初日の前日終値は過去分の最終日の終値にする
+// 開始前の過去チャート（data の history）。乱数は使わない。初日の前日終値は過去分の最終日の終値にする
 function realHistory() {
   const H = REAL_HIST, mk = G.market, n = H.dates.length;
   for (const s of G.stocks) {
@@ -1164,7 +1199,15 @@ function saveGame() {
     localStorage.setItem('kabutore.save', JSON.stringify(G, (k, v) => (k === '_map' ? undefined : k === 'intraday' ? [] : v)));
   } catch (e) {}
 }
-function loadSave() { try { const g = JSON.parse(localStorage.getItem('kabutore.save')); if (g && g.v === 1 && !g.ended && (g.mode !== 'real' || REAL)) return g; } catch (e) {} return null; }
+// 保存データを続きから遊べるか。使えないものは消さずに出さないだけにする（データファイルを戻せば、また出る）。
+// リアル相場は、そのシナリオのデータがあり、保存した日がそのデータの同じ営業日であるときだけ（データが差し替わっていたら株価がずれるので出さない）
+function saveUsable(g) {
+  if (!g || g.v !== 1 || g.ended || !SCEN[g.scen]) return false;
+  if (g.mode !== 'real') return true;
+  const S = REAL_SETS[realKeyOf(g)];
+  return !!S?.data && g.dayIndex >= 0 && g.dayIndex < S.data.dates.length && S.data.dates[g.dayIndex] === g.date;
+}
+function loadSave() { try { const g = JSON.parse(localStorage.getItem('kabutore.save')); if (saveUsable(g)) return g; } catch (e) {} return null; }
 function clearSave() { try { localStorage.removeItem('kabutore.save'); } catch (e) {} }
 function resume(g) {
   G = g; afterLoad();
@@ -1204,7 +1247,7 @@ function render() {
 function renderHeader() {
   $('#h-date').textContent = dateLabel(G.date) + `　${SCEN[G.scen].days ? `${Math.min(G.dayIndex + 1, SCEN[G.scen].days)}/${SCEN[G.scen].days}日目` : `${G.dayIndex + 1}日目`}`;
   $('#h-time').textContent = timeLabel();
-  $('.exch').textContent = isReal() ? '東証 2020年の実データ' : 'NTX ネオ東京証券取引所';
+  $('.exch').textContent = isReal() ? `東証 ${REAL_SETS[REAL_KEY].period}の実データ` : 'NTX ネオ東京証券取引所';
   $('#h-idx-name').textContent = idxName();
   const ph = $('#h-phase'); ph.textContent = phaseLabel(); ph.dataset.phase = G.phase;
   const a = asset(), d = a - G.player.dayStart;
@@ -1212,7 +1255,7 @@ function renderHeader() {
   const hd = $('#h-day'); hd.textContent = `${yenS(d)}円（${pctS(d / G.player.dayStart)}）`; hd.className = 'num ' + cls(d);
   const mk = G.market, ic = mk.idx / mk.idxPrev - 1;
   $('#h-idx').innerHTML = `${mk.idx.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span class="${cls(ic)}">${pctS(ic)}</span>`;
-  const r = rank(), hr = $('#h-rank'); hr.innerHTML = `<span class="rk">R${r}</span>${RANKS[r - 1].n}`; hr.classList.toggle('fast', isFast());   // ファストスターターは金色
+  const r = rank(), hr = $('#h-rank'); hr.innerHTML = `<span class="rk">R${r}</span>${RANKS[r - 1].n}`; hr.classList.toggle('fast', isFast()); hr.classList.toggle('rank-legend', r >= RANKS.length);   // ファストスターターは金色
   // 信用の建玉があるときは、保有株タブに維持率の色の印を付ける（追証中は赤）
   const mr = hasMargin() ? marginStat().ratio : null, hb = $('.tabbar [data-view="hold"]');
   hb.dataset.mlv = G.mcall ? 'bad' : mLevel(mr);
@@ -1517,7 +1560,7 @@ function renderNews() {
     if (hint === 'dir' && n.hint) sub.push(`<span>${esc(n.hint)}</span>`);
     if (n.day !== G.dayIndex && !n.type.startsWith('real')) sub.push(`<span>${n.day < G.dayIndex ? (G.dayIndex - n.day) + '日前' : ''}</span>`);
     return `<li><button class="nw${n.imp === 3 ? ' imp3' : ''}" data-news="${n.id}"><span class="nw-time num">${n.time}</span><span class="nw-tag ${n.flash ? 'flash' : 't-' + n.type}">${n.flash ? '速報' : TAG[n.type]}</span><span>${esc(n.text)}</span>${n.body ? `<span class="nw-body">${esc(n.body)}</span>` : ''}${sub.length ? `<span class="nw-sub">${sub.join('')}</span>` : ''}</button></li>`;
-  }).join('') || (isReal() ? `<li class="empty">${hasRealNews() ? 'まだニュースはありません。当時の報道が、出来事の翌営業日の朝に届きます。' : 'ニュースのデータ（data/news2020.js）がないため、ニュースは流れません。'}</li>` : '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>');
+  }).join('') || (isReal() ? `<li class="empty">${hasRealNews() ? 'まだニュースはありません。当時の報道が、出来事の翌営業日の朝に届きます。' : `ニュースのデータ（${REAL_SETS[REAL_KEY].newsFile}）がないため、ニュースは流れません。`}</li>` : '<li class="empty">まだニュースはありません。9:00の寄り付きから、ニュースが流れ始めます。</li>');
 }
 
 // ×1〜×4 で時間を進めているあいだ、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）。
@@ -1821,7 +1864,7 @@ function finalReport() {
     <div class="sensei result-sensei">${SENSEI_SVG}<div><b class="who">カブ先生</b><div class="bubble">${esc(senseiAdvice({ r, ir, clear, stars, P }))}</div></div></div>
     <canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>
     <h3>振り返り</h3><ul class="ev">${adv.map(x => `<li>${x}</li>`).join('')}</ul>
-    <p class="muted small">${isReal() ? '株価は2020年の実際の終値です（日中の動きはゲームが作ったもの）。過去の値動きは将来を保証しません。' : 'このゲームの株価と企業はすべて架空です。'}実際の投資では、元本を割り込む（損をする）可能性があります。</p>
+    <p class="muted small">${isReal() ? `株価は${REAL_SETS[REAL_KEY].period}の実際の終値です（日中の動きはゲームが作ったもの）。過去の値動きは将来を保証しません。` : 'このゲームの株価と企業はすべて架空です。'}実際の投資では、元本を割り込む（損をする）可能性があります。</p>
     <div class="actions"><button class="primary" data-act="title">タイトルへ</button></div>`,
   { title: () => { closeModal(); showTitle(); } });
   requestAnimationFrame(() => drawLines($('#final-chart'), P.hist));
@@ -2028,34 +2071,44 @@ function senseiAdvice({ r, ir, clear, stars, P }) {
 
 /* ---------- タイトル ---------- */
 const pick = { mode: 'random', scen: 'month', diff: 'easy' };
+// シナリオが遊べるか（データがあるか）。フリープレイは、相場の候補のどれかのデータがあれば遊べる
+const scenAvail = k => !SCEN[k].real || (SCEN[k].free ? freePool().some(realOK) : realOK(k));
+const scenOff = (k, r) => scenLock(SCEN[k], r) || !scenAvail(k);
+const scenMissingFile = k => REAL_SETS[SCEN[k].free ? freePool()[0] : k].file;
+// リアル相場の注意書き。選んだシナリオの期間に合わせ、ニュースがあるかどうかで文を切り替える
+function realDisclaimer(k) {
+  const rs = REAL_SETS[SCEN[k].free ? freePool()[0] : k];
+  const news = rs && Object.keys(rs.newsByDay || {}).length > 0;
+  return `リアル相場チャレンジの終値は、${rs?.period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当は出ません。${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
+}
 function showTitle() {
   practiceEnd(true);
   if (UI.tut) { UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true; }
   stopBgm(); titleOpen = true; const el = $('#title'); el.hidden = false; const r = rank(), save = loadSave();
   const realLock = !realUnlocked(r);
-  if (!REAL || realLock) pick.mode = 'random';
+  if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
-  if (scenLock(SCEN[pick.scen], r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? 'real' : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', REAL ? '実在の30銘柄。過去の現実の相場になる。' : 'data/corona2020.js がないため遊べません（tools/fetch_prices.py で作成）。']];
+  if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
+  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
-      <div class="prof${isFast() ? ' fast' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
+      <div class="prof${isFast() ? ' fast' : ''}${r >= RANKS.length ? ' rank-legend' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
     <div class="setup">
-      <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!REAL || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && REAL && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
-      <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = scenLock(S, r), b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
+      <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!anyReal() || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && anyReal() && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
+      <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = scenLock(S, r), miss = !scenAvail(k), b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock || miss ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : miss ? `${scenMissingFile(k)} がありません` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
       <div><h2>難易度</h2><div class="choices">${Object.entries(DIFF).map(([k, D]) => { const lock = D.rank > r; return `<button class="choice" data-diff="${k}" aria-pressed="${pick.diff === k}" ${lock ? 'disabled' : ''}><b>${D.name}</b><span>${D.desc}</span><em>${lock ? `ランク${D.rank}で解放` : ''}</em></button>`; }).join('')}</div>
         <div class="seed-row" id="cash-row" ${SCEN[pick.scen].free ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="${CASH_MIN}" max="${CASH_MAX}" step="10000" placeholder="${DIFF[pick.diff].cash}"><span>円（1万〜10億円。フリープレイのみ）</span></div>
         <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>${real ? '終値は実データどおり。番号で変わるのは日中の動きだけです' : '同じ番号なら、友達と同じ相場で勝負できます'}</span></div></div>
     </div>
     <div class="go"><button class="primary" id="go-new">はじめる</button>${save ? `<button class="ghost" id="go-cont">続きから（${esc(SCEN[save.scen].name)}・${mdLabel(save.date)}）</button>` : ''}</div>
-    <p class="disclaimer">${real ? 'リアル相場チャレンジの終値は、2020年の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当・ニュースは出ません。実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。' : `このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。`}</p>
+    <p class="disclaimer">${real ? realDisclaimer(pick.scen) : `このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。`}</p>
   </div>`;
   el.onclick = e => {
     if (e.target.closest('#t-logo')) { fastTap(); return; }
     const sc = e.target.closest('[data-scen]'), df = e.target.closest('[data-diff]'), md = e.target.closest('[data-mode]');
     if (md && !md.disabled && md.dataset.mode !== pick.mode) { const sv = $('#seed').value; pick.mode = md.dataset.mode; showTitle(); $('#seed').value = sv; return; }
-    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = !SCEN[pick.scen].free; }
+    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = !SCEN[pick.scen].free; if (SCEN[pick.scen].real) $('.disclaimer').textContent = realDisclaimer(pick.scen); }
     if (df && !df.disabled) { pick.diff = df.dataset.diff; $$('[data-diff]', el).forEach(b => b.setAttribute('aria-pressed', String(b === df))); $('#cash').placeholder = DIFF[pick.diff].cash; }
     if (e.target.closest('#go-new')) {
       const sv = $('#seed').value; const seed = sv ? (+sv | 0) : Math.floor(Math.random() * 1e9);
@@ -2224,7 +2277,7 @@ function loop(ts) {
 function start(data) {
   bindUI();
   let resumed = false;
-  if (data && data.save) { try { const g = JSON.parse(data.save); if (g && g.v === 1) { UI.view = data.view || 'trade'; resume(g); buildTypes(); buildFilter(); switchView(UI.view); resumed = true; } } catch (e) {} }
+  if (data && data.save) { try { const g = JSON.parse(data.save); if (saveUsable(g)) { UI.view = data.view || 'trade'; resume(g); buildTypes(); buildFilter(); switchView(UI.view); resumed = true; } } catch (e) {} }
   if (!resumed) showTitle();
   requestAnimationFrame(loop);
 }
