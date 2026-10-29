@@ -76,7 +76,7 @@ const DEFS = [
 ];
 const DIFF = {
   easy:   { name: 'やさしい', cash: 3e6, vol: .7, fee: 0,    tax: false, hint: 'dir',   rank: 1, desc: '初期資金300万円。値動き穏やか。ニュースの影響の向きを表示。' },
-  normal: { name: 'ふつう',   cash: 1e6, vol: 1,  fee: 0,    tax: true,  hint: 'stars', rank: 2, desc: '初期資金100万円。税金あり。ニュースは信頼度★だけ表示。' },
+  normal: { name: 'ふつう',   cash: 1e6, vol: 1,  fee: 0,    tax: true,  hint: 'stars', rank: 3, desc: '初期資金100万円。税金あり。ニュースは信頼度★だけ表示。' },
   hard:   { name: '本格',     cash: 5e5, vol: 1,  fee: .001, tax: true,  hint: 'none',  rank: 5, desc: '初期資金50万円。手数料0.1%・税金あり・暴落あり。ヒントなし。' },
 };
 const SCEN = {
@@ -114,8 +114,8 @@ const UME_NEWS = [
 const MARGIN = { rank: 6, rate: 0.3, keep: 0.2, warn: 0.25, min: 3e5, days: 125, buyRate: 0.028, lendRate: 0.011 };
 const RANKS = [
   { n: '株デビュー', xp: 0, unlock: '3銘柄・成行注文' },
-  { n: '見習いトレーダー', xp: 100, unlock: '10銘柄・指値注文・板・難易度ふつう' },
-  { n: '一人前トレーダー', xp: 300, unlock: '20銘柄・逆指値注文・移動平均線・嵐の四半期' },
+  { n: '見習いトレーダー', xp: 100, unlock: '10銘柄・指値注文・逆指値注文' },
+  { n: '一人前トレーダー', xp: 300, unlock: '20銘柄・板・移動平均線・難易度ふつう・嵐の四半期' },
   { n: '中級トレーダー', xp: 700, unlock: '全30銘柄・決算カレンダー・RSI・1年チャレンジ' },
   { n: '上級トレーダー', xp: 1500, unlock: '本格モード・リアル相場チャレンジ' },
   { n: 'プロトレーダー', xp: 3000, unlock: '信用取引' },
@@ -132,7 +132,7 @@ const MISSIONS = [
   { id: 'div', t: '配当を受け取ろう', xp: 40, rank: 2 },
   { id: 'big5', t: '1回の売りで+5%以上の利益を出そう', xp: 30, rank: 2 },
   { id: 'streak3', t: '3回続けて利益で売ろう', xp: 40, rank: 2 },
-  { id: 'stop', t: '逆指値で損切りしよう', xp: 40, rank: 3 },
+  { id: 'stop', t: '逆指値で損切りしよう', xp: 40, rank: 2 },
   { id: 'earn', t: '決算発表をまたいで株を持とう', xp: 40, rank: 3 },
   { id: 'crash', t: '暴落を−10%以内で乗り切ろう', xp: 100, rank: 3 },
   { id: 'sec5', t: '5業種以上の株を持って1日を終えよう', xp: 50, rank: 3 },
@@ -253,7 +253,7 @@ const TIPS = [
     ['寄り付き直後に買っても大丈夫？', '9:00すぐは夜のあいだのニュースが一気に反映されて値段が大きく動く。落ち着くまで待つのも作戦。', '「寄り付き」は、売り手と買い手が「寄り」集まって最初の値段が「付く」ことから来た言葉。'],
   ] },
   { name: 'リスクの抑え方', items: [
-    ['値下がりしたらどうすればいい？', '買う前に「ここまで下がったら売る」を決めておこう。ランク3からは逆指値注文で自動にできる。'],
+    ['値下がりしたらどうすればいい？', '買う前に「ここまで下がったら売る」を決めておこう。ランク2からは逆指値注文で自動にできる。'],
     ['1つの会社に集中してもいい？', 'おすすめしない。同じ業種の株は一緒に動きやすいので、業種をまたいで持つと1つのニュースで全部が下がりにくい。'],
     ['負けが続いたときは？', '時間を止めてじっくり考えてもいい。焦って売買を繰り返すと、手数料や税金でじわじわ減っていく。'],
   ] },
@@ -308,6 +308,13 @@ resetView();
 
 /* ---------- 音（素材は Aseet フォルダ） ---------- */
 const bgm = new Audio('Aseet/kabutore_game_bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
+// 消音モード：BGM と効果音をまとめて止める。リセットでは消えないよう、プロフィールとは別に保存する
+let muted = false; try { muted = localStorage.getItem('kabutore.mute') === '1'; } catch (e) {}
+bgm.muted = muted;
+function setMuted(m) { muted = m; bgm.muted = m; try { localStorage.setItem('kabutore.mute', m ? '1' : '0'); } catch (e) {} }
+// スピーカーの記号（消音中は斜線入り）
+const cartIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h9.7a1 1 0 0 0 1-.8L21 7H6"/><circle cx="9.5" cy="20" r="1.5" fill="currentColor"/><circle cx="17.5" cy="20" r="1.5" fill="currentColor"/></svg>';
+const speakerIcon = m => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/>${m ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
 function playBgm() { bgm.play().catch(() => {}); }   // 自動再生がブロックされたら、次のクリックで再生する
 function stopBgm() { bgm.pause(); bgm.currentTime = 0; }
 // 効果音は元の mp3 を <audio> でそのまま鳴らす。3つを順番に使い、巻き戻しを待たずに連打できるようにする
@@ -318,13 +325,14 @@ function silentButton(b) {
   return b.disabled || b.getAttribute('aria-disabled') === 'true' || b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-current') === 'page' || b.id === 'h-logo' || (b.id === 'h-rank' && UI.view === 'mission');
 }
 function playClick() {
+  if (muted) return;
   const a = seClicks[seIdx++ % seClicks.length];
   // スマホ・タブレットのタイトル画面は BGM が無く目立つので小さめにする
   a.volume = titleOpen && document.documentElement.dataset.device !== 'pc' ? 0.25 : 0.6;
   a.currentTime = 0; a.play().catch(() => {});
 }
 
-function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false }; }
+function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', opts: {} }; }
 function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') return Object.assign(defProfile(), p); } catch (e) {} return defProfile(); }
 function saveProfile() { try { localStorage.setItem('kabutore.profile', JSON.stringify(profile)); } catch (e) {} }
 function rank(xp = profile.xp) { let r = 1; RANKS.forEach((k, i) => { if (xp >= k.xp) r = i + 1; }); return r; }
@@ -1052,12 +1060,13 @@ function realize(pnl) {
 function marketTrade(s, side, qty, kind, mg) {
   if (side === 'buy' && s.stop === 'up') { toast(`${s.name}はストップ高のため、買い注文が約定しませんでした`, 'warn'); return false; }
   if (side === 'sell' && s.stop === 'down') { toast(`${s.name}はストップ安のため、売り注文が約定しませんでした`, 'warn'); return false; }
+  if (mg) qty = mFit(s, side, qty, q => walk(s, side, q).gross);
   let w = walk(s, side, qty), fee = Math.round(w.gross * DIFF[G.diff].fee);
   const me = mg && mCheck(s, side, qty, w.gross);
-  if (me) { toast(`${s.name}の信用の注文を取り消しました。${me}`, 'warn'); return false; }
+  if (me) { cancelNotice(`${s.name}の信用の注文を取り消しました。${me}`); return false; }
   // 寄り付きなどで値上がりして足りなくなったら、買える株数まで減らす
   while (!mg && side === 'buy' && qty > lot(s) && w.gross + fee > availCash() + 0.5) { qty -= lot(s); w = walk(s, side, qty); fee = Math.round(w.gross * DIFF[G.diff].fee); }
-  if (!mg && side === 'buy' && w.gross + fee > availCash() + 0.5) { toast(`お金が足りないため、${s.name}の買い注文を取り消しました`, 'warn'); return false; }
+  if (!mg && side === 'buy' && w.gross + fee > availCash() + 0.5) { cancelNotice(`お金が足りないため、${s.name}の買い注文を取り消しました`); return false; }
   if (!mg && side === 'sell' && qty > availShares(s.code)) { toast('売れる株数が足りません', 'warn'); return false; }
   fill(s, side, qty, w.gross, w.avg, kind, mg);
   if (w.last !== s.price) {   // マーケットインパクト：自分の大口注文で株価が動く
@@ -1086,10 +1095,13 @@ function processOrders() {
     }
   }
 }
+// 約定のときに注文を取り消したら、トーストは速く進めていると見逃しやすいので、1日のまとめにも残す
+function cancelNotice(msg) { toast(msg, 'warn'); G.dayEvents.push(msg); }
 function lmtFill(s, o, p) {
-  const me = o.mg && mCheck(s, o.side, o.qty, p * o.qty);
-  if (me) { toast(`${s.name}の信用の指値注文を取り消しました。${me}`, 'warn'); return; }
-  fill(s, o.side, o.qty, p * o.qty, p, 'lmt', o.mg); complete('limit');
+  const qty = o.mg ? mFit(s, o.side, o.qty, q => p * q) : o.qty;
+  const me = o.mg && mCheck(s, o.side, qty, p * qty);
+  if (me) { cancelNotice(`${s.name}の信用の指値注文を取り消しました。${me}`); return; }
+  fill(s, o.side, qty, p * qty, p, 'lmt', o.mg); complete('limit');
 }
 
 /* ===================== 信用取引（ランク6） ===================== */
@@ -1109,10 +1121,12 @@ function marginStat() {
   const eq = P.cash + u - cost;
   return { n, u, cost, eq, ratio: n ? eq / n : null };
 }
-// 新しく建てられる金額（現物の買い注文で確保した現金と、注文中の新規の分を除く）
+// 値上がりに備えた上乗せ（寄り付き前の成行は窓、逆指値は約定が上の値段になりやすいため）。現物の買いの確保と信用の注文中の新規で使う
+const orderBuf = (type, phase) => (type === 'lmt' ? 1 : type === 'stp' ? 1.05 : phase === 'pre' ? 1.1 : 1);
+// 新しく建てられる金額（現物の買い注文で確保した現金と、注文中の新規の分を除く。注文中の新規は上乗せ込みで見込み、寄り付きで先の注文が余力不足で消えないようにする）
 function marginRoom() {
   const m = marginStat(); if (m.eq < MARGIN.min) return 0;
-  const pend = G.player.orders.reduce((a, o) => a + (o.mg && o.open ? o.qty * (o.price || byCode(o.code).price) : 0), 0);
+  const pend = G.player.orders.reduce((a, o) => a + (o.mg && o.open ? o.qty * (o.price || byCode(o.code).price) * orderBuf(o.type, G.phase) : 0), 0);
   return Math.max(0, (m.eq - reservedCash()) / MARGIN.rate - m.n - pend);
 }
 const mLevel = r => (r == null ? '' : r < MARGIN.warn ? 'bad' : r < 0.4 ? 'warn' : 'ok');   // ゲージの色：緑 / 黄 / 赤
@@ -1120,6 +1134,12 @@ function mGauge(r) { return r == null ? 'なし' : `<span class="mgauge" data-lv
 function mSideLabel(code, side) { const p = mPos(code); return (p && p.side !== side ? '返済' : '新規') + (side === 'buy' ? '買い' : '売り'); }
 // 返済期限の日（最初に建てた日から MARGIN.days 営業日目）
 function mDue(p) { const left = MARGIN.days - 1 - (G.dayIndex - p.d); return isReal() ? REAL.dates[Math.min(G.dayIndex + left, REAL.dates.length - 1)] : addTD(G.date, left); }
+// 信用の新規が約定するとき、寄り付きの窓などで余力が足りなくなっていたら、建てられる株数まで減らす（現物の買いと同じ。amt = 株数→金額）
+function mFit(s, side, qty, amt) {
+  const p = mPos(s.code), L = lot(s); if (p && p.side !== side) return qty;
+  while (qty > L && amt(qty) > marginRoom() + 0.5) qty -= L;
+  return qty;
+}
 // 信用の注文が通るか。だめなら理由を返す（通るときは ''）
 function mCheck(s, side, qty, amt) {
   const p = mPos(s.code);
@@ -1219,7 +1239,7 @@ function resume(g) {
 /* ===================== 表示 ===================== */
 function palette() {
   const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
-  return { up: g('--up'), down: g('--down'), ink: g('--ink'), muted: g('--muted'), line: g('--line'), accent: g('--accent'), warn: g('--warn'), panel: g('--panel'), on: g('--on-signal'), num: g('--f-num'), body: g('--f-body') };
+  return { up: g('--up'), down: g('--down'), ink: g('--ink'), muted: g('--muted'), line: g('--line'), accent: g('--accent'), accentSoft: g('--accent-soft'), warn: g('--warn'), panel: g('--panel'), on: g('--on-signal'), num: g('--f-num'), body: g('--f-body') };
 }
 
 function buildTape() {
@@ -1321,6 +1341,24 @@ function renderChartHead() {
 }
 
 function sma(a, n) { const out = []; let sum = 0; for (let i = 0; i < a.length; i++) { sum += a[i]; if (i >= n) sum -= a[i - n]; out.push(i >= n - 1 ? sum / n : null); } return out; }
+// ボリンジャーバンド（ショップ）：n 本の移動平均 ±2σ
+function bollinger(a, n) {
+  const m = sma(a, n), up = [], lo = [];
+  a.forEach((_, i) => { if (m[i] == null) { up.push(null); lo.push(null); return; } let v = 0; for (let j = i - n + 1; j <= i; j++) v += (a[j] - m[i]) ** 2; const sd = Math.sqrt(v / n); up.push(m[i] + 2 * sd); lo.push(m[i] - 2 * sd); });
+  return { up, lo };
+}
+// 平均足（ショップ）：描くときだけ使う。数字の表示や出来高の色は本来のローソク足のまま
+function heikin(cs) {
+  const out = [];
+  cs.forEach((c, i) => { const p = out[i - 1], o = p ? (p.o + p.c) / 2 : (c.o + c.c) / 2, cl = (c.o + c.h + c.l + c.c) / 4; out.push({ o, c: cl, h: Math.max(c.h, o, cl), l: Math.min(c.l, o, cl) }); });
+  return out;
+}
+// 買ったチャートのおまけを足す
+function chartExtras(D) {
+  if (optOn('bb')) D.bb = bollinger(D.cs.map(c => c.c), 20);
+  if (optOn('ha')) D.ha = heikin(D.cs);
+  return D;
+}
 function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x))); const m = x / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
 
 function chartData() {
@@ -1334,7 +1372,7 @@ function chartData() {
     const ma = r >= 3 ? [{ v: sma(cs.map(c => c.c), 12), name: '1時間の移動平均' }] : [];
     const pins = s.pins.filter(p => p.d === G.dayIndex).map(p => ({ i: Math.min(59, Math.floor(p.m / 5)), dir: p.dir }));
     const marks = P.trades.filter(t => t.code === s.code && t.d === G.dayIndex).map(t => ({ i: Math.min(59, Math.floor(t.m / 5)), side: t.side }));
-    return { cs, total: 60, ma, pins, marks, ref: s.prevClose, mode: '5m' };
+    return chartExtras({ cs, total: 60, ma, pins, marks, ref: s.prevClose, mode: '5m' });
   }
   // リアル相場は過去分で年をまたぐので、最初の足と年が変わった足だけ年を付ける
   const lab = (d, prev) => (isReal() && prev?.slice(0, 4) !== d.slice(0, 4) ? d.slice(0, 4) + '/' : '') + mdLabel(d);
@@ -1345,7 +1383,7 @@ function chartData() {
   const idxOf = di => cs.findIndex(c => c.di === di);
   const pins = s.pins.map(p => ({ i: idxOf(p.d), dir: p.dir })).filter(p => p.i >= 0);
   const marks = P.trades.filter(t => t.code === s.code).map(t => ({ i: idxOf(t.d), side: t.side })).filter(m => m.i >= 0);
-  return { cs, total: cs.length, ma, pins, marks, ref: null, mode: '1d' };
+  return chartExtras({ cs, total: cs.length, ma, pins, marks, ref: null, mode: '1d' });
 }
 
 // 見える範囲 [s0, s0 + cnt) を決める。end が null のときは最新のローソク足が右端に来る
@@ -1370,9 +1408,10 @@ function drawChart() {
   const { s0, cnt, follow } = chartView(D), slotW = pw / cnt, X = i => padL + (i - s0 + 0.5) * slotW;
   const i0 = Math.max(0, Math.floor(s0)), i1 = Math.min(D.cs.length, Math.ceil(s0 + cnt));   // 見えている足 [i0, i1)
   // 縦軸は見えている足に合わせて毎回自動で合わせる（はみ出しそうなら広げ、余裕があれば拡大）
+  const K = D.ha || D.cs;   // 描くローソク足（平均足がオンなら平均足）
   let lo = Infinity, hi = -Infinity;
-  for (let i = i0; i < i1; i++) { const c = D.cs[i]; lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }
-  D.ma.forEach(m => { for (let i = i0; i < i1; i++) { const v = m.v[i]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } });
+  for (let i = i0; i < i1; i++) { const c = K[i]; lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }
+  [...D.ma, ...(D.bb ? [{ v: D.bb.up }, { v: D.bb.lo }] : [])].forEach(m => { for (let i = i0; i < i1; i++) { const v = m.v[i]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } });
   if (D.ref) { lo = Math.min(lo, D.ref); hi = Math.max(hi, D.ref); }
   if (!isFinite(lo)) { lo = s.price * 0.98; hi = s.price * 1.02; }
   if (hi - lo < lo * 0.004) { const m = (hi + lo) / 2; lo = m * 0.997; hi = m * 1.003; }
@@ -1405,7 +1444,20 @@ function drawChart() {
   for (let i = i0; i < i1; i++) { const c = D.cs[i], vv = c.v / vmax * vh; ctx.fillStyle = c.c >= c.o ? C.up : C.down; ctx.fillRect(X(i) - bw / 2, vb - vv, bw, vv); }
   ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.rect(padL, 0, pw, padT + prH); ctx.clip();
-  D.cs.forEach((c, i) => {
+  // ボリンジャーバンド（ローソク足の下に、帯を薄く塗って上下の線を引く）
+  if (D.bb) {
+    const seg = [];
+    for (let i = Math.max(0, i0 - 1); i < Math.min(K.length, i1 + 1); i++) if (D.bb.up[i] != null) seg.push(i);
+    if (seg.length > 1) {
+      ctx.fillStyle = C.accentSoft; ctx.beginPath();
+      seg.forEach((i, j) => j ? ctx.lineTo(X(i), Y(D.bb.up[i])) : ctx.moveTo(X(i), Y(D.bb.up[i])));
+      seg.slice().reverse().forEach(i => ctx.lineTo(X(i), Y(D.bb.lo[i]))); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = C.muted; ctx.setLineDash([3, 3]);
+      for (const b of [D.bb.up, D.bb.lo]) { ctx.beginPath(); seg.forEach((i, j) => j ? ctx.lineTo(X(i), Y(b[i])) : ctx.moveTo(X(i), Y(b[i]))); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
+  }
+  K.forEach((c, i) => {
     if (i < i0 || i >= i1) return;
     const col = c.c >= c.o ? C.up : C.down, x = X(i);
     ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, Y(c.h)); ctx.lineTo(Math.round(x) + 0.5, Y(c.l)); ctx.stroke();
@@ -1464,13 +1516,14 @@ function drawChart() {
   const c = D.cs[UI.hover ?? D.cs.length - 1];
   $('#ohlc').textContent = c ? `${c.lab}　始${yen(c.o)}　高${yen(c.h)}　安${yen(c.l)}　終${yen(c.c)}　出来高${c.v.toLocaleString('ja-JP')}株` : '';
   $('#legend').innerHTML = D.ma.map((m, k) => `<span><i style="background:var(${k ? '--warn' : '--accent'})"></i>${m.name}</span>`).join('')
+    + (D.bb ? `<span><i style="background:var(--muted)"></i>ボリンジャーバンド（20本・±2σ）</span>` : '') + (D.ha ? '<span>平均足</span>' : '')
     + `<span><i style="background:var(--up);height:7px;width:7px;border-radius:50%"></i>ニュース</span><span>▲▼ 自分の売買</span><span class="muted">ドラッグで移動・ホイールで拡大縮小</span>`
     + (rank() < 3 ? `<span>移動平均線はランク3で解放</span>` : '');
 }
 
 function renderBoard() {
   const el = $('#board');
-  if (rank() < 2) { el.innerHTML = `<div class="locked"><b>ランク2で解放</b><p>板は、売りたい人と買いたい人の注文が値段ごとに並んだ表です。</p></div>`; return; }
+  if (rank() < 3) { el.innerHTML = `<div class="locked"><b>ランク3で解放</b><p>板は、売りたい人と買いたい人の注文が値段ごとに並んだ表です。</p></div>`; return; }
   const s = sel(), { asks, bids } = book(s);
   const pre = G.phase === 'pre';
   const btn = p => `<button data-px="${p}">${yen(p)}</button>`;
@@ -1482,7 +1535,7 @@ function renderBoard() {
     <p class="board-note">${pre ? '寄り付き前は前日終値のまわりに注文が並んでいます。' : `色付きの行が今の値段。成行で${term('約定')}するときは、上（買い）や下（売り）の注文から順に取引します。`}</p>`;
 }
 
-const TYPE_RANK = { mkt: 1, lmt: 2, stp: 3 };
+const TYPE_RANK = { mkt: 1, lmt: 2, stp: 2 };
 const LOCK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 function buildTypes() {
   const r = rank(), need = TYPE_RANK, lock = t => need[t] > r && !isFast();   // ファストスターターは全部使える
@@ -1649,13 +1702,13 @@ function realSegs(bySec) {
   return segs;
 }
 
-function drawLines(cv, hist) {
+function drawLines(cv, hist, rec) {   // rec = 取引成績の記録（G がなくても描ける）
   const W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const C = palette(), P = G.player;
-  const A = hist.map(h => h.a / P.start * 100), I = hist.map(h => h.idx / P.startIdx * 100);
-  if (G.phase === 'open') { A.push(asset() / P.start * 100); I.push(G.market.idx / P.startIdx * 100); }
+  const C = palette(), P = rec ? null : G.player, label = rec ? (rec.real ? '30銘柄平均' : 'NTX225') : idxName();
+  const A = rec ? rec.ha.slice() : hist.map(h => h.a / P.start * 100), I = rec ? rec.hi.slice() : hist.map(h => h.idx / P.startIdx * 100);
+  if (!rec && G.phase === 'open') { A.push(asset() / P.start * 100); I.push(G.market.idx / P.startIdx * 100); }
   let lo = Math.min(...A, ...I, 100), hi = Math.max(...A, ...I, 100); const pad = Math.max(1, (hi - lo) * 0.1); lo -= pad; hi += pad;
   const padL = 8, padR = 46, padT = 10, padB = 18, pw = W - padL - padR, ph = H - padT - padB;
   const X = i => padL + (A.length < 2 ? pw / 2 : i / (A.length - 1) * pw), Y = v => padT + (hi - v) / (hi - lo) * ph;
@@ -1665,7 +1718,7 @@ function drawLines(cv, hist) {
   const line = (arr, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); arr.forEach((v, i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1; };
   line(I, C.muted, 1.5, [4, 3]); line(A, C.accent, 2.2, []);
   ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(X(A.length - 1), Y(A.at(-1)), 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.textAlign = 'left'; ctx.font = `11.5px ${C.body}`; ctx.fillStyle = C.accent; ctx.fillText('あなたの資産', padL + 4, padT + 6); ctx.fillStyle = C.muted; ctx.fillText('- - ' + idxName(), padL + 96, padT + 6);
+  ctx.textAlign = 'left'; ctx.font = `11.5px ${C.body}`; ctx.fillStyle = C.accent; ctx.fillText('あなたの資産', padL + 4, padT + 6); ctx.fillStyle = C.muted; ctx.fillText('- - ' + label, padL + 96, padT + 6);
 }
 
 /* ---------- 決算・配当 ---------- */
@@ -1777,7 +1830,7 @@ function buildOrder() {
   let reserve = 0;
   if (side === 'buy') {
     // 買えるかどうかは画面に出している概算金額で判定する。値上がりに備えた上乗せは、余力の範囲内でだけ確保する
-    const need = gross + fee, buf = type === 'lmt' ? 1 : type === 'stp' ? 1.05 : G.phase === 'pre' ? 1.1 : 1;
+    const need = gross + fee, buf = orderBuf(type, G.phase);
     if (need > availCash() + 0.5) return { err: `お金が足りません（必要 約${yen(need)}円／買付余力 ${yen(availCash())}円）。` };
     reserve = G.phase === 'open' && type === 'mkt' ? 0 : Math.min(need * buf, availCash());
   }
@@ -1838,12 +1891,126 @@ function dailyReport() {
     <div class="actions"><button class="primary" data-act="next">${G.ended ? 'シナリオの結果を見る' : '翌営業日へ'}</button></div>`,
   { next: () => { closeModal(); if (G.ended) finalReport(); else nextDay(); } });
 }
+// 最後まで遊んだゲームの記録（新しい順。RECORD_MAX 件まで）
+const RECORD_MAX = 100;
+// 資産と指数の推移（開始=100 の割合）。長いゲームは 120 点までに間引く（最後の点は必ず残す）
+function histOf(P) {
+  const n = P.hist.length, step = Math.max(1, Math.ceil(n / 120)), idx = [];
+  for (let i = 0; i < n; i += step) idx.push(i);
+  if (idx.at(-1) !== n - 1) idx.push(n - 1);
+  const r2 = v => Math.round(v * 100) / 100;
+  return { ha: idx.map(i => r2(P.hist[i].a / P.start * 100)), hi: idx.map(i => r2(P.hist[i].idx / P.startIdx * 100)) };
+}
+function addRecord(rec) {
+  if (UI.practice) return;
+  profile.records = [rec].concat(profile.records || []).slice(0, RECORD_MAX);
+}
+const REC_SORTS = { at: ['日付', x => x.at], r: ['損益率', x => x.r], stars: ['星', x => x.stars], asset: ['最終資産', x => x.asset] };
+let recSort = { key: 'at', desc: true };
+function showRecords() {
+  const f = REC_SORTS[recSort.key][1], sg = recSort.desc ? -1 : 1;
+  const L = (profile.records || []).slice().sort((a, b) => sg * (f(a) - f(b)) || b.at - a.at), n = L.length;
+  const recName = x => { const S = SCEN[x.scen], D = DIFF[x.diff], d = new Date(x.at); return `${d.getMonth() + 1}/${d.getDate()} ${esc(S ? S.name : x.scen)}・${esc(D ? D.name : x.diff)}${x.fast ? ' ⚡' : ''}`; };
+  const starsOf = x => `<span class="rec-stars" aria-label="星${x.stars}つ">${'★'.repeat(x.stars)}${'☆'.repeat(3 - x.stars)}</span>`;
+  const row = (x, i) => `<li><button class="rec-row" data-act="rec" data-i="${i}">${starsOf(x)}<span class="rec-main">${recName(x)}<small class="muted">${x.clear ? '' : '未達　'}${yen(x.asset)}円　指数 ${pctS(x.ir)}${x.pt != null ? `　+${x.pt} pt` : ''}${x.sells ? `　売${x.sells}回(勝${x.wins})` : ''}</small></span><span class="num ${cls(x.r)}">${pctS(x.r)}</span></button></li>`;
+  // 1件の詳細（結果画面と同じグラフ）
+  const detail = x => {
+    openModal(`<h2>取引成績</h2><p class="muted small" style="text-align:center">${recName(x)}${x.real ? '' : `　相場の番号 ${x.seed}`}</p>
+      <div class="stars-big" aria-label="星${x.stars}つ">${'★'.repeat(x.stars)}${'☆'.repeat(3 - x.stars)}</div>
+      <p style="text-align:center">${x.clear ? 'クリア！' : 'クリアならず'}</p>
+      <dl class="rep-grid"><div><dt>最終資産</dt><dd>${yen(x.asset)}円</dd></div><div><dt>あなた</dt><dd class="${cls(x.r)}">${pctS(x.r)}</dd></div><div><dt>指数</dt><dd class="${cls(x.ir)}">${pctS(x.ir)}</dd></div></dl>
+      ${x.ha ? '<canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>' : ''}
+      <p class="muted small">売却${x.sells || 0}回（利益が出たのは${x.wins || 0}回）${x.pt != null ? `　獲得ポイント +${x.pt} pt` : ''}</p>
+      <div class="actions"><button class="primary" data-act="back">戻る</button></div>`, { back: showRecords });
+    if (x.ha) requestAnimationFrame(() => drawLines($('#final-chart'), null, x));
+  };
+  const bestR = n ? Math.max(...L.map(x => x.r)) : 0, sells = L.reduce((t, x) => t + (x.sells || 0), 0), wins = L.reduce((t, x) => t + (x.wins || 0), 0);
+  openModal(`<h2>取引成績</h2>` + (n ? `<dl class="rep-grid"><div><dt>プレイ回数</dt><dd>${n}回</dd></div><div><dt>最高の損益率</dt><dd class="${cls(bestR)}">${pctS(bestR)}</dd></div><div><dt>売却の勝率</dt><dd>${sells ? Math.round(wins / sells * 100) + '%' : '―'}</dd></div></dl>
+    <div class="rec-sort" role="group" aria-label="並べ替え">${Object.entries(REC_SORTS).map(([k, [nm]]) => `<button class="ghost" data-act="sort" data-k="${k}" aria-pressed="${recSort.key === k}">${nm}</button>`).join('')}<button class="ghost" data-act="dir" aria-label="${recSort.desc ? '降順' : '昇順'}">${recSort.desc ? '降順 ▼' : '昇順 ▲'}</button></div>
+    <ul class="ev rec-list">${L.map(row).join('')}</ul><p class="muted small">押すと、最終結果のグラフが見られます。最後まで遊んだゲームだけを、新しい順に最大${RECORD_MAX}件まで残します。</p>` : '<p class="muted">まだ取引成績がありません。シナリオを最後まで遊ぶと、ここに残ります。</p>') +
+    `<div class="actions"><button class="primary" data-act="close">閉じる</button></div>`, { close: closeModal, rec: b => detail(L[+b.dataset.i]), sort: b => { recSort.key = b.dataset.k; showRecords(); }, dir: () => { recSort.desc = !recSort.desc; showRecords(); } });
+}
+/* ===== ショップ ===== */
+// 最後まで遊んだゲームにポイントを付け、ショップでスタイルやチャートのおまけと交換する。株価と乱数には触れない
+// ポイント = (クリア20 + ★1つ10 | クリアならず5) + 指数に勝つ15 + 5回以上売って勝率6割10。難易度と遊んだ日数で倍率。1回 PT_CAP まで
+const PT_CAP = 300, PT_DIFF = { easy: 1, normal: 1.5, hard: 2 };
+const ptLen = days => days >= 200 ? 2.5 : days >= 50 ? 1.5 : 1;
+function gamePoints(x, days) {
+  let p = x.clear ? 20 + 10 * x.stars : 5;
+  if (x.r > x.ir) p += 15;
+  if (x.sells >= 5 && x.wins / x.sells >= 0.6) p += 10;
+  return Math.min(PT_CAP, Math.round(p * (PT_DIFF[x.diff] || 1) * ptLen(days)));
+}
+// 同じ相場をくり返して稼げないように、相場ごとの最高点を覚えておき、上回った分だけ払う。
+// リアル相場は終値が番号で変わらないので、番号を入れず相場（G.base）と難易度で数える
+const ptKey = () => isReal() ? `real:${G.base}|${G.diff}` : `${G.scen}|${G.diff}|${G.seed}`;
+function payPoints(rec) {
+  if (UI.practice) return null;
+  const pts = gamePoints(rec, G.player.hist.length), k = ptKey(), prev = profile.pbest[k] || 0, got = Math.max(0, pts - prev);
+  if (got) { profile.pbest[k] = pts; profile.points += got; }
+  return { pts, got, prev };
+}
+// skin = スタイル（<html data-skin>。色は style.css の末尾）、opt = チャートのおまけ（買ったあとオン・オフできる）
+const SHOP = [
+  { id: 'skin-fuji', kind: 'skin', skin: 'fuji', name: 'パープル', price: 150, desc: '上品で落ち着いた紫色です。' },
+  { id: 'skin-sora', kind: 'skin', skin: 'sora', name: 'ティール', price: 150, desc: '海のような、すっきりした青緑色です。' },
+  { id: 'skin-moegi', kind: 'skin', skin: 'moegi', name: 'グリーン', price: 150, desc: '若葉のような、明るくさわやかな緑色です。' },
+  { id: 'skin-peach', kind: 'skin', skin: 'peach', name: 'ピーチ', price: 150, desc: '桃の花のような、やわらかいピンク色です。' },
+  { id: 'skin-yellow', kind: 'skin', skin: 'yellow', name: 'イエロー', price: 150, desc: 'ひまわりのような、明るくあざやかな黄色です。' },
+  { id: 'skin-red', kind: 'skin', skin: 'red', name: 'レッド', price: 150, desc: 'りんごのような、あざやかな赤色です。' },
+  { id: 'skin-sumi', kind: 'skin', skin: 'sumi', name: 'モノクロ', price: 150, desc: '色を抑えた、落ち着いた墨色です。' },
+  { id: 'skin-black', kind: 'skin', skin: 'black', name: 'ブラック', price: 150, desc: '背景まで真っ黒の、引きしまった黒です。' },
+  { id: 'bb', kind: 'opt', name: 'ボリンジャーバンド', price: 300, desc: 'チャートに、20本の移動平均の上下±2σの帯を引きます。値動きの広がりが見えます。' },
+  { id: 'ha', kind: 'opt', name: '平均足', price: 400, desc: 'ローソク足を平均足で描きます。上げ・下げの流れが続いているかが見やすくなります（数字の表示は本来の値のまま）。' },
+];
+const SKIN_BASE = { id: '', kind: 'skin', skin: '', name: 'ブルー', price: 0, desc: 'はじめからの、くっきりした青色です。' };
+const owns = id => !id || !!profile.owned[id];
+const optOn = id => owns(id) && !!profile.opts[id];
+function applySkin() { const k = SHOP.some(x => x.skin === profile.skin && owns(x.id)) ? profile.skin : ''; if (k) document.documentElement.dataset.skin = k; else delete document.documentElement.dataset.skin; }
+let shopAll = false;   // スタイルを全部出しているか
+function showShop() {
+  const pt = profile.points;
+  const item = x => {
+    const have = owns(x.id), skin = x.kind === 'skin';
+    let btn;
+    if (!have) btn = pt >= x.price ? `<button class="primary" data-act="buy" data-id="${x.id}">${x.price} pt で買う</button>` : `<button class="ghost" disabled>${x.price} pt（あと${x.price - pt}）</button>`;
+    else if (x.kind === 'skin') btn = (profile.skin || '') === x.skin ? '<span class="shop-on">使用中</span>' : `<button class="ghost" data-act="use" data-id="${x.id}">使う</button>`;
+    else btn = `<button class="ghost shop-toggle${optOn(x.id) ? ' on' : ''}" data-act="opt" data-id="${x.id}" role="switch" aria-checked="${optOn(x.id)}">${optOn(x.id) ? 'オン' : 'オフ'}</button>`;
+    return `<li class="shop-item"><div class="shop-main">${skin ? `<span class="shop-head"><i class="shop-sw" data-skin-sw="${x.skin || 'base'}"></i><b>${x.name}</b></span>` : `<b>${x.name}</b>`}<small class="muted">${x.desc}</small></div><div class="shop-btn">${btn}</div></li>`;
+  };
+  const byId = id => id ? SHOP.find(x => x.id === id) : SKIN_BASE;
+  const skins = [SKIN_BASE, ...SHOP.filter(x => x.kind === 'skin')];
+  openModal(`<h2>ショップ</h2><p class="pt-bal">所持ポイント <b class="num">${pt.toLocaleString()} pt</b></p>
+    <h3>スタイル</h3><ul class="shop-list shop-grid${shopAll ? '' : ' fold'}">${skins.map(item).join('')}</ul>
+    <div class="shop-more"><button class="ghost" data-act="all" aria-expanded="${shopAll}">${shopAll ? 'たたむ' : `すべて表示（${skins.length}個）`}</button></div>
+    <h3>チャート</h3><ul class="shop-list">${SHOP.filter(x => x.kind === 'opt').map(item).join('')}</ul>
+    <p class="muted small">ポイントは、シナリオを最後まで遊ぶともらえます。クリアで20 pt＋★1つにつき10 pt（クリアならずは5 pt）、指数に勝つと＋15 pt、5回以上売って6割以上利益が出ると＋10 pt。難易度（ふつう×1.5・本格×2）と遊んだ日数（50日以上×1.5・200日以上×2.5）で増えます（1回${PT_CAP} ptまで）。同じ相場をもう一度遊んだときは、その相場の最高点を上回った分だけもらえます。データのリセットで、ポイントと買ったものも消えます。</p>
+    <div class="actions"><button class="primary" data-act="close">閉じる</button></div>`,
+  { all: () => { shopAll = !shopAll; showShop(); },
+    close: () => { closeModal(); const t = $('#t-pt'); if (t) t.textContent = `${profile.points.toLocaleString()} pt`; },
+    buy: b => { const x = byId(b.dataset.id); if (!x || owns(x.id) || profile.points < x.price) return; profile.points -= x.price; profile.owned[x.id] = true; if (x.kind === 'skin') profile.skin = x.skin; else profile.opts[x.id] = true; saveProfile(); applySkin(); toast(`${x.name}を買いました`); showShop(); },
+    use: b => { const x = byId(b.dataset.id); if (!x || !owns(x.id)) return; profile.skin = x.skin; saveProfile(); applySkin(); showShop(); },
+    opt: b => { const x = byId(b.dataset.id); if (!x || !owns(x.id)) return; profile.opts[x.id] = !profile.opts[x.id]; saveProfile(); showShop(); } });
+  // たたんでいるときは、2段目の真ん中あたりで見えなくする（見えない分のボタンは押せないようにする）
+  const grid = $('#modal-card .shop-grid.fold'), its = grid ? [...grid.children] : [];
+  const r2 = its.find(x => x.offsetTop > (its[0]?.offsetTop ?? 0));
+  if (r2) {
+    const top = grid.getBoundingClientRect().top, cut = r2.getBoundingClientRect().top - top + r2.offsetHeight / 2;
+    grid.style.maxHeight = cut + 'px';
+    its.forEach(x => { if (x.getBoundingClientRect().top - top >= cut) x.inert = true; });
+  } else if (grid) grid.classList.remove('fold');
+}
 function finalReport() {
   const P = G.player, S = SCEN[G.scen], a = asset();
   const r = a / P.start - 1, ir = G.market.idx / P.startIdx - 1;
   const clear = S.clear ? S.clear(r, ir) : true;
   let stars = 0; if (clear) { stars = 1; if (P.maxDD < 0.15) stars = 2; if (P.maxDD < 0.08 && r - ir >= 0.05) stars = 3; }
-  profile.best[G.scen] = Math.max(profile.best[G.scen] || 0, stars); saveProfile();
+  profile.best[G.scen] = Math.max(profile.best[G.scen] || 0, stars);
+  const rec = { ...histOf(P), scen: G.scen, diff: G.diff, seed: G.seed, real: isReal(), fast: isFast(), at: Date.now(), start: P.start, asset: a, r, ir, stars, clear, sells: P.sells.length, wins: P.sells.filter(x => x.pnl > 0).length };
+  const pay = payPoints(rec);
+  if (pay) rec.pt = pay.got;   // 取引成績にも、このゲームでもらったポイントを残す
+  addRecord(rec);
+  saveProfile();
   const sells = P.sells.slice();
   const best = sells.length ? sells.reduce((x, y) => (y.pnl > x.pnl ? y : x)) : null;
   const worst = sells.length ? sells.reduce((x, y) => (y.pnl < x.pnl ? y : x)) : null;
@@ -1860,6 +2027,7 @@ function finalReport() {
   openModal(`<h2>${S.name}　結果</h2>
     <div class="stars-big" aria-label="星${stars}つ">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
     <p style="text-align:center">${clear ? 'クリア！' : 'クリアならず'}　目標：${S.goal}</p>
+    ${pay ? `<p class="pt-get"><b class="num">+${pay.got} pt</b>　所持 ${profile.points.toLocaleString()} pt${pay.prev ? `<small class="muted">${pay.got ? `この相場の前の最高 ${pay.prev} pt → ${pay.pts} pt。上回った分だけもらえます` : `この相場の最高 ${pay.prev} pt を超えなかったので、今回は 0 pt です（今回 ${pay.pts} pt）`}</small>` : ''}</p>` : ''}
     <dl class="rep-grid"><div><dt>最終資産</dt><dd>${yen(a)}円</dd></div><div><dt>あなた</dt><dd class="${cls(r)}">${pctS(r)}</dd></div><div><dt>指数</dt><dd class="${cls(ir)}">${pctS(ir)}</dd></div></dl>
     <div class="sensei result-sensei">${SENSEI_SVG}<div><b class="who">カブ先生</b><div class="bubble">${esc(senseiAdvice({ r, ir, clear, stars, P }))}</div></div></div>
     <canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>
@@ -2093,7 +2261,7 @@ function showTitle() {
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
-      <div class="prof${isFast() ? ' fast' : ''}${r >= RANKS.length ? ' rank-legend' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP</div></div>
+      <div class="prof${isFast() ? ' fast' : ''}${r >= RANKS.length ? ' rank-legend' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP　<span id="t-pt">${profile.points.toLocaleString()} pt</span></div></div>
     <div class="setup">
       <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!anyReal() || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && anyReal() && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
       <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = scenLock(S, r), miss = !scenAvail(k), b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock || miss ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : miss ? `${scenMissingFile(k)} がありません` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
@@ -2101,7 +2269,7 @@ function showTitle() {
         <div class="seed-row" id="cash-row" ${SCEN[pick.scen].free ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="${CASH_MIN}" max="${CASH_MAX}" step="10000" placeholder="${DIFF[pick.diff].cash}"><span>円（1万〜10億円。フリープレイのみ）</span></div>
         <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>${real ? '終値は実データどおり。番号で変わるのは日中の動きだけです' : '同じ番号なら、友達と同じ相場で勝負できます'}</span></div></div>
     </div>
-    <div class="go"><button class="primary" id="go-new">はじめる</button>${save ? `<button class="ghost" id="go-cont">続きから（${esc(SCEN[save.scen].name)}・${mdLabel(save.date)}）</button>` : ''}</div>
+    <div class="go"><button class="primary" id="go-new">はじめる</button>${save ? `<button class="ghost" id="go-cont">続きから（${esc(SCEN[save.scen].name)}・${mdLabel(save.date)}）</button>` : ''}<button class="ghost" id="go-shop" aria-label="ショップ" title="ショップ">${cartIcon}</button><button class="ghost" id="go-rec">取引成績</button></div>
     <p class="disclaimer">${real ? realDisclaimer(pick.scen) : `このゲームに出てくる会社・株価・ニュースはすべて架空です。社名は実在の企業をもじったパロディで、実在の企業とは関係ありません。ゲームの値動きは作りものなので、本物の株価の予想には使えません。実際の投資では、元本を割り込む（損をする）可能性があります。`}</p>
   </div>`;
   el.onclick = e => {
@@ -2116,6 +2284,8 @@ function showTitle() {
       newGame(pick.scen, pick.diff, seed, cash, pick.mode); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
       if (G.scen === 'month' && !profile.tutorial) startTutorial(); else toast(!isReal() ? `相場の番号は ${seed} です` : G.base !== G.scen ? `今回の相場は「${SCEN[G.base].name}」。${dateLabel(G.date)}から、実際の株価で取引します` : `${dateLabel(G.date)}から、実際の株価で取引します`);
     }
+    if (e.target.closest('#go-rec')) { showRecords(); return; }
+    if (e.target.closest('#go-shop')) { shopAll = false; showShop(); return; }
     if (e.target.closest('#go-cont')) { const g = loadSave(); if (g) { UI.lastNews = -1; resume(g); buildTypes(); buildFilter(); switchView('trade'); render(); } }
   };
 }
@@ -2138,15 +2308,17 @@ function legendTap() {
   if (legendTaps < 10) return;
   legendTaps = 0;
   if (rank() === RANKS.length) { toast('すでに全機能が解放されています'); return; }
-  profile.xp = RANKS.at(-1).xp; saveProfile();
+  profile.xp = RANKS.at(-1).xp;
+  profile.points = Math.max(profile.points, SHOP.filter(x => !owns(x.id)).reduce((t, x) => t + x.price, 0));   // ショップの品物を全部買えるだけ渡す
+  saveProfile();
   buildTypes(); buildFilter(); render();
-  toast(`ランク${RANKS.length}「${RANKS.at(-1).n}」になりました。全機能が解放されています`, 'rank');
+  toast(`ランク${RANKS.length}「${RANKS.at(-1).n}」になりました。全機能が解放されています。ショップの品物も全部買えるポイントを渡しました`, 'rank');
 }
-// 経験値・ランク・ミッション・最高記録・チュートリアル・進行中のセーブをすべて消して、最初からにする
+// 経験値・ランク・ミッション・最高記録・チュートリアル・ポイント・ショップで買ったもの・進行中のセーブをすべて消して、最初からにする
 function confirmReset(all) {
-  openModal(`<h2>${all ? '全解放をリセットしますか？' : 'データをリセットしますか？'}</h2><p>${all ? `いまは全機能が解放されています（ランク${RANKS.length}）。リセットすると解放はすべて元に戻り、` : ''}経験値・ランク・ミッション・最高記録・進行中のゲームがすべて消え、ランク1からやり直しになります。元には戻せません。</p>
+  openModal(`<h2>${all ? '全解放をリセットしますか？' : 'データをリセットしますか？'}</h2><p>${all ? `いまは全機能が解放されています（ランク${RANKS.length}）。リセットすると解放はすべて元に戻り、` : ''}経験値・ランク・ミッション・最高記録・取引成績・ポイントとショップで買ったもの・進行中のゲームがすべて消え、ランク1からやり直しになります。元には戻せません。</p>
     <div class="actions"><button class="ghost" data-act="cancel">やめる</button><button class="primary" data-act="ok">リセットする</button></div>`,
-  { cancel: closeModal, ok: () => { closeModal(); profile = defProfile(); saveProfile(); clearSave(); pick.mode = 'random'; showTitle(); toast('リセットしました。ランク1からスタートです'); } });
+  { cancel: closeModal, ok: () => { closeModal(); profile = defProfile(); saveProfile(); applySkin(); clearSave(); pick.mode = 'random'; showTitle(); toast('リセットしました。ランク1からスタートです'); } });
 }
 function hideTitle() { titleOpen = false; $('#title').hidden = true; playBgm(); }
 
@@ -2179,8 +2351,8 @@ function bindUI() {
     const t = e.target.closest('.term'); if (t) { e.preventDefault(); e.stopPropagation(); showTerm(t); return; }
     hidePop();
     const tb = e.target.closest('[data-tut]'); if (tb) { if (tb.dataset.tut === 'skip') endTutorial(); else if (tb.dataset.tut === 'back') tutBack(); else tutGo(UI.tut.i + 1); return; }
+    const act = e.target.closest('#modal [data-act]'); if (act && modalHandlers[act.dataset.act]) { modalHandlers[act.dataset.act](act); return; }   // タイトル画面の記録もここで閉じる
     if (!G || titleOpen) return;
-    const act = e.target.closest('#modal [data-act]'); if (act && modalHandlers[act.dataset.act]) { modalHandlers[act.dataset.act](act); return; }
     if (modalOpen) return;
     const sp = e.target.closest('[data-speed]'); if (sp) { G.speed = +sp.dataset.speed; renderHeader(); tutEvent('speed', G.speed); return; }
     if (e.target.closest('#skip-btn')) { if (G.phase === 'pre') { runUntil(() => G.phase === 'open'); tutEvent('skip'); } else if (G.phase === 'open') runUntil(() => G.phase === 'closed'); else dailyReport(); return; }
@@ -2216,9 +2388,10 @@ function bindUI() {
     if (e.target.closest('#h-logo')) { showTitle(); return; }
     if (e.target.closest('#menu-btn')) {
       const all = rank() === RANKS.length;   // 全機能が解放されているときは、リセットの表示を変える
-      openModal(`<h2>メニュー</h2><p class="muted small">進行は1日の終わりごとに自動で保存されます。相場の番号：${G.seed}</p>
-        <div class="actions" style="justify-content:flex-start"><button class="ghost" data-act="tut">カブ先生の説明をもう一度見る</button><button class="ghost" data-act="title">タイトルに戻る</button><button class="ghost" data-act="reset">${all ? '全解放をリセット' : 'データをリセット'}</button>${isFast() ? '<button class="ghost" data-act="unfast">ファストスターターを解除</button>' : ''}<button class="primary" data-act="close">ゲームに戻る</button></div>`,
-      { close: closeModal, tut: () => { closeModal(); startTutorial(); }, title: () => { closeModal(); showTitle(); }, reset: () => confirmReset(all), unfast: () => {
+      openModal(`<button class="ghost sq-btn corner-btn" data-act="mute" aria-label="${muted ? '消音を解除' : '消音にする'}">${speakerIcon(muted)}</button><h2>メニュー</h2><p class="muted small">進行は1日の終わりごとに自動で保存されます。相場の番号：${G.seed}</p>
+        <div class="actions" style="justify-content:flex-start"><button class="ghost" data-act="tut">カブ先生の説明をもう一度見る</button><button class="ghost" data-act="reset">${all ? '全解放をリセット' : 'データをリセット'}</button>${isFast() ? '<button class="ghost" data-act="unfast">ファストスターターを解除</button>' : ''}</div>
+        <div class="actions" style="justify-content:space-between"><button class="ghost" data-act="title">タイトルに戻る</button><button class="primary" data-act="close">ゲームに戻る</button></div>`,
+      { close: closeModal, mute: () => { setMuted(!muted); const b = $('#modal-card [data-act="mute"]'); b.innerHTML = speakerIcon(muted); b.setAttribute('aria-label', muted ? '消音を解除' : '消音にする'); }, tut: () => { closeModal(); startTutorial(); }, title: () => { closeModal(); showTitle(); }, reset: () => confirmReset(all), unfast: () => {
         // 解除すると、銘柄・注文・信用取引はランクどおりに戻る（持っている株と建玉はそのまま）
         closeModal(); profile.fast = false; saveProfile();
         if (!isOpen(sel())) G.sel = unlockedStocks()[0].code;
@@ -2275,7 +2448,7 @@ function loop(ts) {
 }
 
 function start(data) {
-  bindUI();
+  applySkin(); bindUI();
   let resumed = false;
   if (data && data.save) { try { const g = JSON.parse(data.save); if (saveUsable(g)) { UI.view = data.view || 'trade'; resume(g); buildTypes(); buildFilter(); switchView(UI.view); resumed = true; } } catch (e) {} }
   if (!resumed) showTitle();

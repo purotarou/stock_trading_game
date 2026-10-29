@@ -8,6 +8,8 @@
 - ランダム相場が変わっていないかの確認: `git show HEAD:script.js > /tmp/before.js && node tools/check_random.js /tmp/before.js script.js`（シナリオ×難易度×シードごとに値動き・ニュースの指紋を比べる。すべて [OK] なら同じ。`check_random.js` はデータファイル `corona2020.js` / `recent.js` / `news2020.js` / `news2026.js` もあれば読み込む）
 - リアル相場が変わっていないかの確認: 変更前の script.js を `data/` が隣にあるフォルダに置き（例: `mkdir /tmp/b && git show HEAD:script.js > /tmp/b/script.js && cp -R data /tmp/b/`）、`node tools/check_real.js /tmp/b/script.js script.js`（シード42・7で全営業日を回し、日ごとの分足・日足・指数・ニュースを比べる。初日が変わったときは差の中身も出す）
 - 株価データの取得: `python3 tools/fetch_prices.py --scenario <名前>`（`--scenario` は必須。付けないと使い方を出して終わる。`pip install yfinance pandas` が要る）。シナリオの期間・出力先・変数名・銘柄名の上書き・検証の期待値は `tools/fetch_prices.py` の `SCENARIOS` に集めてある。`corona2020` → `data/corona2020.js`（`CORONA2020`、2020年）、`recent` → `data/recent.js`（`RECENT`、本編 2026-01-01〜2026-09-30・過去分 2025年、4689 は「LINEヤフー」）。`--history` を足すと過去チャートだけを取り直して末尾に差し替える。recent.js も corona2020.js と同じ構造（`{ dates, stocks, history }`）で、git には入れない・配布しない。`recent` の実行では corona2020.js に触れず、最後に前後の SHA-256 を表示する。ゲームはどちらのデータも読む（下の「リアル相場チャレンジ」）
+- 取引成績（記録）: 最後まで遊んだゲームだけ `profile.records` に新しい順で `RECORD_MAX`（100）件まで残す（`finalReport` → `addRecord`。信用取引の練習中は残さない）。タイトルの「取引成績」ボタンが `showRecords`。データのリセットで消える。株価と乱数には触れない
+- ポイントとショップ: 目印 `/* ===== ショップ ===== */`。`finalReport` → `payPoints` で、最後まで遊んだゲームにポイント（`gamePoints`。クリア・★・指数に勝つ・勝率、難易度と遊んだ日数で倍率、1回 `PT_CAP` まで）。同じ相場では `profile.pbest`（キーは `ptKey`。ランダムは シナリオ|難易度|シード、リアルは `G.base`|難易度）の最高点を上回った分だけもらえる。ファスト ON でも同じようにもらえる。信用取引の練習中はもらえない。タイトルの「ショップ」ボタンが `showShop`。売り物は `SHOP`（`kind: 'skin'` = `<html data-skin>` で背景・枠・文字・ボタンの色まで変える（ブルー = 初期、パープル・ティール・グリーン・ピーチ・イエロー・レッド・モノクロはライト/ダーク両対応、ブラックは常に暗い。ショップでは、たたんでいるあいだ2段目の真ん中で見えなくし（`.fold`）、「すべて表示」で全部出す）。色は `style.css` の「スタイル」。チャートの上昇=赤・下落=緑は変えない（ブラックだけダークの赤・緑を固定で持つ） / `kind: 'opt'` = チャートのおまけ。ボリンジャーバンド・平均足を `chartExtras` で足す。描くだけで、数字は本来の値）。R7（`legendTap`）になったときは、まだ買っていない品物を全部買える分まで所持ポイントを引き上げる。保存先は `profile.points` / `owned` / `skin` / `opts`。データのリセットで消える。株価と乱数には触れない
 - セーブは localStorage（`kabutore.profile` = 経験値・ランク、`kabutore.save` = 進行中の1日の終わり時点）
 
 ## ファイル構成（目印コメント `/* ===== ... ===== */` で検索）
@@ -28,7 +30,7 @@
 - リアル相場チャレンジはランク5で解放（`SCEN.real.rank`）。シナリオは「コロナショック」（`real`）、「今年の相場」（`real2026`）、「フリープレイ」（`realfree`）。フリープレイの相場は `free` でも `noFree` でもないリアル相場のシナリオ（`freePool()`）から、シードの剰余で選ぶ（`G.base`。乱数は使わない）。`real2026` は `noFree` で、フリープレイの候補に入れていない（今のフリープレイの動きを変えないため。入れるときは `noFree` を外す）
 - 保存データ（`kabutore.save`）が続きから使えるかは `saveUsable`：`SCEN` にあるシナリオで、リアル相場ならそのデータがあり、`date` がそのデータの `dayIndex` 番目の営業日と同じときだけ。使えないものは消さずに「続きから」を出さないだけ（データを戻せばまた出る）。保存は1つだけで、別のシナリオを始めると上書きされる
 - ミッション（`MISSIONS`）はすべて `rank` を持ち、そのランクに上がるまで画面に出さず、達成にもならない（`complete` が弾く）。リアル相場の `realbeat`（コロナショックで30銘柄平均に勝つ）は `G.scen === 'real'` 専用で、2026 用のミッションはない。判定は `sellMissions`（売り・返済）、`runDay` の日終わり・終了時、`G.dayWin` / `G.mcallEver` / 持ち始めた日 `pos[].d` を使う。株価と乱数には触れない
-- 難易度「ふつう」はランク2で解放（`DIFF.normal.rank`）。初期選択は「やさしい」
+- 難易度「ふつう」はランク3で解放（`DIFF.normal.rank`）。初期選択は「やさしい」
 - フリープレイの初期資金は `CASH_MIN`〜`CASH_MAX`（1万〜10億円）
 - デバッグ: `window.__kabutore`（G, newGame(scen, diff, seed, cash, mode), tick, asset, rank, profile, runDay, nextDay, closeModal）
 

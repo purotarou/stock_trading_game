@@ -63,6 +63,10 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .speed button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .ghost{background:var(--panel);border:1px solid var(--line-strong);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px}
 .ghost:hover{border-color:var(--accent)}
+.card .actions .ghost.sq-btn,.sq-btn{width:44px;height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.card:has(.corner-btn){position:relative}
+.card:has(.corner-btn) h2{padding-right:52px}
+.corner-btn{position:absolute;top:12px;right:12px}
 .stats{display:flex;gap:6px 22px;margin:0 0 0 auto;flex-wrap:wrap}
 .stat dt{font-size:11px;color:var(--muted);letter-spacing:.06em}
 .stat dd{margin:0;font-size:16px;font-weight:600;white-space:nowrap}
@@ -291,6 +295,18 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .movers li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
 .ev{margin:0;padding-left:18px;font-size:13px}
 .ev li{margin:3px 0}
+.rec-sort{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.rec-sort .ghost{padding:6px 12px;font-size:13px}
+.rec-sort .ghost[aria-pressed=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.rec-sort [data-act=dir]{margin-left:auto}
+.rec-list{list-style:none;padding:0;max-height:48vh;overflow:auto}
+.rec-list li{border-bottom:1px solid var(--soft)}
+.rec-row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 4px;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.rec-row:hover{background:var(--soft)}
+.rec-main{flex:1;min-width:0}
+.rec-main small{display:block}
+.rec-stars{flex:none;color:var(--warn);letter-spacing:1px;font-size:15px}
+.rec-row .num{flex:none}
 .confirm-tbl{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
 .confirm-tbl th{text-align:left;color:var(--muted);font-weight:500;padding:6px 0;width:42%}
 .confirm-tbl td{text-align:right;padding:6px 0;font-family:var(--f-num);font-variant-numeric:tabular-nums}
@@ -349,6 +365,35 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .go{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
 .go .primary{padding:14px 26px;font-size:16px}
 .go .ghost{padding:14px 20px;font-size:14px}
+.go #go-shop{margin-left:auto;width:48px;padding:14px 0;display:inline-flex;align-items:center;justify-content:center}
+/* ショップ */
+.pt-bal{margin:4px 0 6px}
+.pt-bal b{font-size:18px;color:var(--accent)}
+.pt-get{text-align:center;margin:6px 0}
+.pt-get b{font-size:18px;color:var(--accent)}
+.pt-get small{display:block}
+.shop-list{list-style:none;padding:0;margin:6px 0 14px}
+.shop-item{display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--soft)}
+.shop-main{flex:1;min-width:0}
+.shop-main small{display:block}
+.shop-btn{flex:none;display:flex;align-items:center;gap:8px}
+.shop-btn button{padding:8px 12px;font-size:13px}
+.shop-toggle{min-width:64px}
+.shop-toggle.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.shop-on{font-size:12px;font-weight:700;color:var(--accent)}
+/* スタイルは、以前の用語辞典のように枠線つきのマスをグリッドに並べる（チャートのおまけは長方形の行のまま） */
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.shop-grid .shop-item{flex-direction:column;align-items:flex-start;gap:8px;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.shop-grid .shop-main{flex:1;width:100%}
+.shop-grid .shop-btn{width:100%;justify-content:flex-end}
+.shop-grid.fold{overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.shop-more{display:flex;justify-content:center;margin:-2px 0 14px}
+.shop-more .ghost{padding:8px 18px;font-size:13px}
+.shop-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.shop-sw{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line-strong)}
+/* 見本の丸は、そのスタイルのアクセントの色 */
+[data-skin-sw=base]{background:#2B4AA0} [data-skin-sw=fuji]{background:#6A45A8} [data-skin-sw=sora]{background:#0E6E8C} [data-skin-sw=moegi]{background:#4FC03A} [data-skin-sw=peach]{background:#F06AA6} [data-skin-sw=yellow]{background:#FFD60A} [data-skin-sw=red]{background:#D8343F} [data-skin-sw=sumi]{background:#3A4150} [data-skin-sw=black]{background:#111}
+@media (max-width:480px){.shop-item{flex-wrap:wrap}.shop-btn{width:100%;justify-content:flex-end}}
 .disclaimer{margin-top:26px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
 /* toasts */
@@ -393,6 +438,40 @@ h2,h3,h4{text-wrap:balance;margin:0}
   [data-device="tablet"] .list{max-height:560px}
 }
 
+/* ===== スタイル（ショップで買う色。<html data-skin>）。背景・枠・文字・ボタンの色まで変える。上昇=赤・下落=緑の色は変えない（ブラックだけは、暗い背景に合わせたダークの赤・緑） ===== */
+:root[data-skin="fuji"]{--paper:#F1EDF7; --panel:#FFFFFF; --soft:#F7F4FB; --ink:#1E1631; --muted:#665C7A; --line:#DDD5EA; --line-strong:#C4B8DA; --accent:#6A45A8; --accent-ink:#FFFFFF; --accent-soft:rgba(106,69,168,.10)}
+:root[data-skin="sora"]{--paper:#E9F2F4; --panel:#FFFFFF; --soft:#F2F8F9; --ink:#0F2229; --muted:#54707A; --line:#CFE0E4; --line-strong:#B0CBD2; --accent:#0E6E8C; --accent-ink:#FFFFFF; --accent-soft:rgba(14,110,140,.10)}
+:root[data-skin="moegi"]{--paper:#EAF6E6; --panel:#FFFFFF; --soft:#F3FAF0; --ink:#10260F; --muted:#52704F; --line:#CDE5C7; --line-strong:#AFD2A7; --accent:#33A12B; --accent-ink:#FFFFFF; --accent-soft:rgba(51,161,43,.10)}
+:root[data-skin="peach"]{--paper:#FCEAF2; --panel:#FFFFFF; --soft:#FFF4F9; --ink:#35162A; --muted:#8A5A74; --line:#F2CFE0; --line-strong:#E6B0CB; --accent:#D6407F; --accent-ink:#FFFFFF; --accent-soft:rgba(214,64,127,.10)}
+:root[data-skin="yellow"]{--paper:#FBF3DA; --panel:#FFFDF6; --soft:#FEF9E8; --ink:#2B2608; --muted:#7A6A2A; --line:#EFE3B5; --line-strong:#E0CE86; --accent:#F0C000; --accent-ink:#2B2608; --accent-soft:rgba(240,192,0,.16)}
+:root[data-skin="red"]{--paper:#FBEAEA; --panel:#FFFFFF; --soft:#FFF4F4; --ink:#2E1212; --muted:#8A5A5A; --line:#F0CFCF; --line-strong:#E2B0B0; --accent:#C62F3A; --accent-ink:#FFFFFF; --accent-soft:rgba(198,47,58,.10)}
+:root[data-skin="sumi"]{--paper:#EDEDEE; --panel:#FFFFFF; --soft:#F5F5F6; --ink:#1A1A1C; --muted:#66666B; --line:#D9D9DC; --line-strong:#BDBDC2; --accent:#3A4150; --accent-ink:#FFFFFF; --accent-soft:rgba(58,65,80,.10)}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="fuji"]:not([data-theme="light"]){--paper:#130D22; --panel:#1C1430; --soft:#261B40; --ink:#ECE6F7; --muted:#A99DC2; --line:#33264F; --line-strong:#46366B; --accent:#B79AF0; --accent-ink:#0B1020; --accent-soft:rgba(183,154,240,.14)}
+  :root[data-skin="sora"]:not([data-theme="light"]){--paper:#07181D; --panel:#0D242B; --soft:#12303A; --ink:#E3F1F4; --muted:#8FB0B9; --line:#1B3A44; --line-strong:#2A5260; --accent:#62C1DC; --accent-ink:#0B1020; --accent-soft:rgba(98,193,220,.14)}
+  :root[data-skin="moegi"]:not([data-theme="light"]){--paper:#0B1A0A; --panel:#112411; --soft:#183218; --ink:#E6F5E1; --muted:#98B893; --line:#234023; --line-strong:#335A33; --accent:#7BE05A; --accent-ink:#0B1A0A; --accent-soft:rgba(123,224,90,.14)}
+  :root[data-skin="peach"]:not([data-theme="light"]){--paper:#1F0F18; --panel:#2A1621; --soft:#381C2C; --ink:#FBE6F0; --muted:#C79AB4; --line:#4A2A3B; --line-strong:#6A3E56; --accent:#FF8FBE; --accent-ink:#2A0A18; --accent-soft:rgba(255,143,190,.14)}
+  :root[data-skin="yellow"]:not([data-theme="light"]){--paper:#1A160A; --panel:#252011; --soft:#312A17; --ink:#FBF3D6; --muted:#C9B97A; --line:#433B22; --line-strong:#5E5432; --accent:#FFE14D; --accent-ink:#1C1800; --accent-soft:rgba(255,225,77,.18)}
+  :root[data-skin="red"]:not([data-theme="light"]){--paper:#1D0E0F; --panel:#2A1517; --soft:#381C1F; --ink:#FBE6E6; --muted:#C79A9A; --line:#4A2A2D; --line-strong:#6A3E42; --accent:#FF7B85; --accent-ink:#2A0A0C; --accent-soft:rgba(255,123,133,.14)}
+  :root[data-skin="sumi"]:not([data-theme="light"]){--paper:#0E0E0F; --panel:#19191B; --soft:#232326; --ink:#ECECEE; --muted:#A0A0A6; --line:#2E2E32; --line-strong:#44444A; --accent:#C3C9D6; --accent-ink:#0B1020; --accent-soft:rgba(195,201,214,.14)}
+}
+:root[data-skin="fuji"][data-theme="dark"]{--paper:#130D22; --panel:#1C1430; --soft:#261B40; --ink:#ECE6F7; --muted:#A99DC2; --line:#33264F; --line-strong:#46366B; --accent:#B79AF0; --accent-ink:#0B1020; --accent-soft:rgba(183,154,240,.14)}
+:root[data-skin="sora"][data-theme="dark"]{--paper:#07181D; --panel:#0D242B; --soft:#12303A; --ink:#E3F1F4; --muted:#8FB0B9; --line:#1B3A44; --line-strong:#2A5260; --accent:#62C1DC; --accent-ink:#0B1020; --accent-soft:rgba(98,193,220,.14)}
+:root[data-skin="moegi"][data-theme="dark"]{--paper:#0B1A0A; --panel:#112411; --soft:#183218; --ink:#E6F5E1; --muted:#98B893; --line:#234023; --line-strong:#335A33; --accent:#7BE05A; --accent-ink:#0B1A0A; --accent-soft:rgba(123,224,90,.14)}
+:root[data-skin="peach"][data-theme="dark"]{--paper:#1F0F18; --panel:#2A1621; --soft:#381C2C; --ink:#FBE6F0; --muted:#C79AB4; --line:#4A2A3B; --line-strong:#6A3E56; --accent:#FF8FBE; --accent-ink:#2A0A18; --accent-soft:rgba(255,143,190,.14)}
+:root[data-skin="yellow"][data-theme="dark"]{--paper:#1A160A; --panel:#252011; --soft:#312A17; --ink:#FBF3D6; --muted:#C9B97A; --line:#433B22; --line-strong:#5E5432; --accent:#FFE14D; --accent-ink:#1C1800; --accent-soft:rgba(255,225,77,.18)}
+:root[data-skin="red"][data-theme="dark"]{--paper:#1D0E0F; --panel:#2A1517; --soft:#381C1F; --ink:#FBE6E6; --muted:#C79A9A; --line:#4A2A2D; --line-strong:#6A3E42; --accent:#FF7B85; --accent-ink:#2A0A0C; --accent-soft:rgba(255,123,133,.14)}
+:root[data-skin="sumi"][data-theme="dark"]{--paper:#0E0E0F; --panel:#19191B; --soft:#232326; --ink:#ECECEE; --muted:#A0A0A6; --line:#2E2E32; --line-strong:#44444A; --accent:#C3C9D6; --accent-ink:#0B1020; --accent-soft:rgba(195,201,214,.14)}
+:root[data-skin="black"]{
+  --paper:#000000; --panel:#0A0A0A; --soft:#141414; --ink:#F2F2F2; --muted:#9A9A9A; --line:#262626; --line-strong:#3A3A3A;
+  --accent:#E6E6E6; --accent-ink:#000000; --accent-soft:rgba(230,230,230,.12);
+  --up:#FF6B59; --down:#36C690; --up-soft:rgba(255,107,89,.13); --down-soft:rgba(54,198,144,.13);
+  --warn:#F0B24A; --on-signal:#0B1020; --scrim:rgba(0,0,0,.72); --shadow:0 18px 50px rgba(0,0,0,.6);
+  --gold:#F2C94C; --gold-ink:#0B1020; --fast-text:#00FF00;
+  --c-tech:#7E9BEA; --c-auto:#E8925E; --c-bank:#5CC2BA; --c-food:#E0BC55; --c-game:#C08BDB; --c-growth:#EE7EA2; --c-cash:#5E6880; --c-other:#B39C86;
+  color-scheme:dark;
+}
+
 /* スマホ：上から チャート → 注文 → 銘柄 → 板 → ニュース の1列 */
 [data-device="phone"] .layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"chart" "order" "list" "board" "news"}
 [data-device="phone"] .col-main,[data-device="phone"] .col-side{display:contents}
@@ -428,3 +507,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 
 /* ===== タップの遅延をなくす ===== */
 button{touch-action:manipulation}
+
+/* 取引成績ボタンは、スマホでは右寄せにせず他のボタンと同じ並びにする */
+[data-device=phone] .go #go-shop{margin-left:0;margin-right:auto}
+[data-device=phone] .go #go-rec{margin-left:auto}
