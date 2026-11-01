@@ -48,13 +48,14 @@
 <main id="view-trade" class="layout">
   <section class="panel a-list" aria-label="銘柄リスト">
     <div class="p-head"><span>銘柄</span><select id="sec-filter" aria-label="業種で絞り込み"></select></div>
+    <div class="sort-bar" id="sort-bar" role="group" aria-label="並べ替え"><button class="ghost" data-sort="none">標準</button><button class="ghost" data-sort="px">値段</button><button class="ghost" data-sort="ch">騰落率</button><button class="ghost" id="sort-dir">降順 ▼</button></div>
     <div class="list" id="stock-list"></div>
     <p class="list-foot" id="list-foot"></p>
   </section>
   <div class="col-main">
   <section class="panel a-chart" aria-label="チャート">
     <div class="chart-head">
-      <div><div class="ch-name" id="c-name"></div><div class="ch-meta" id="c-meta"></div></div>
+      <div><div class="ch-title"><div class="ch-name" id="c-name"></div><button class="help-btn" id="f-help" aria-label="この枠の見かた（カブ先生）">?</button><button class="chart-nav" data-nav="prev" aria-label="前の銘柄"><i></i></button><button class="chart-nav" data-nav="next" aria-label="次の銘柄"><i></i></button></div><div class="ch-meta" id="c-meta"></div></div>
       <div class="ch-price"><div class="num big" id="c-price"></div><div class="num" id="c-chg"></div></div>
     </div>
     <div class="chart-tools">
@@ -63,7 +64,7 @@
       <span class="ohlc num" id="ohlc"></span>
     </div>
     <div class="legend" id="legend"></div>
-    <div class="chart-wrap"><canvas id="chart" role="img" aria-label="選んだ銘柄のローソク足チャート"></canvas></div>
+    <div class="chart-wrap"><button class="chart-nav" data-nav="prev" aria-label="前の銘柄"><i></i></button><canvas id="chart" role="img" aria-label="選んだ銘柄のローソク足チャート"></canvas><button class="chart-nav" data-nav="next" aria-label="次の銘柄"><i></i></button></div>
     <dl class="facts" id="facts"></dl>
   </section>
   <section class="panel a-news" aria-label="ニュース">
@@ -86,7 +87,7 @@
       </div>
       <div class="field" id="o-price-field" hidden>
         <label class="lab" for="o-price" id="o-price-lab">指値（円）</label>
-        <input id="o-price" type="number" inputmode="numeric">
+        <input id="o-price" type="number" inputmode="decimal" step="any">
       </div>
       <dl class="est" id="o-est"></dl>
       <button class="primary buy" id="o-submit">注文内容を確認</button>
@@ -95,7 +96,7 @@
     </div>
   </section>
   <section class="panel a-board" aria-label="板">
-    <div class="p-head"><button class="term" data-term="板">板（気配）</button><span class="muted small">値段をタップで指値に入力</span></div>
+    <div class="p-head"><span class="p-title"><button class="term" data-term="板">板（気配）</button><button class="help-btn" id="b-help" aria-label="板の見かた（カブ先生）" hidden>?</button></span><span class="muted small">値段をタップで指値に入力</span></div>
     <div id="board"></div>
   </section>
   </div>

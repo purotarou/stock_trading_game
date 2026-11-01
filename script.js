@@ -8,6 +8,7 @@ const yen = n => Math.round(n).toLocaleString('ja-JP');
 const px = n => (Math.abs(n % 1) > 1e-9 ? n.toLocaleString('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : yen(n));
 const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '±');
 const yenS = n => sgn(Math.round(n)) + Math.abs(Math.round(n)).toLocaleString('ja-JP');
+const pxS = n => { n = Math.round(n * 10) / 10; return sgn(n) + px(Math.abs(n)); };   // 値段の差（0.1円まで）
 const pctS = x => { const v = Math.round(x * 10000) / 100; return sgn(v) + Math.abs(v).toFixed(2) + '%'; };
 const cls = x => (x > 1e-9 ? 'up' : x < -1e-9 ? 'down' : 'flat');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -77,7 +78,7 @@ const DEFS = [
 const DIFF = {
   easy:   { name: 'やさしい', cash: 3e6, vol: .7, fee: 0,    tax: false, hint: 'dir',   rank: 1, desc: '初期資金300万円。値動き穏やか。ニュースの影響の向きを表示。' },
   normal: { name: 'ふつう',   cash: 1e6, vol: 1,  fee: 0,    tax: true,  hint: 'stars', rank: 3, desc: '初期資金100万円。税金あり。ニュースは信頼度★だけ表示。' },
-  hard:   { name: '本格',     cash: 5e5, vol: 1,  fee: .001, tax: true,  hint: 'none',  rank: 5, desc: '初期資金50万円。手数料0.1%・税金あり・暴落あり。ヒントなし。' },
+  hard:   { name: '本格',     cash: 5e5, vol: 1,  fee: .001, tax: true,  hint: 'none',  rank: 5, desc: '初期資金50万円。手数料0.1%・税金あり・暴落あり。ニュースの影響の向きや確かさは表示しない。' },
 };
 const SCEN = {
   month: { name: 'はじめての1か月', days: 20,  rank: 1, mu: .14, desc: '穏やかな上昇相場で売買に慣れよう。', goal: '資産をプラスで終える', clear: (r) => r > 0 },
@@ -129,7 +130,7 @@ const MISSIONS = [
   { id: 'hold3', t: '同じ株を3日以上持ち続けよう', xp: 20, rank: 1 },
   { id: 'limit', t: '指値注文を約定させよう', xp: 30, rank: 2 },
   { id: 'diverse', t: '3業種以上の株を持って1日を終えよう', xp: 30, rank: 2 },
-  { id: 'div', t: '配当を受け取ろう', xp: 40, rank: 2 },
+  { id: 'div', t: '配当を受け取ろう', xp: 40, rank: 4 },
   { id: 'big5', t: '1回の売りで+5%以上の利益を出そう', xp: 30, rank: 2 },
   { id: 'streak3', t: '3回続けて利益で売ろう', xp: 40, rank: 2 },
   { id: 'stop', t: '逆指値で損切りしよう', xp: 40, rank: 2 },
@@ -155,7 +156,7 @@ const MISSIONS = [
   { id: 'legend', t: '本格モードで1年チャレンジをクリアしよう', xp: 200, rank: 7 },
 ];
 const KIND = { mkt: '成行', lmt: '指値', stp: '逆指値', force: '強制返済' };
-const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', deny: '訂正', div: '配当', real: '報道', realReport: '観測', realRumor: 'うわさ' };
+const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', world: '社会', deny: '訂正', div: '配当', real: '報道', realReport: '観測', realRumor: 'うわさ' };
 
 /* ニュースのテンプレート（影響は対数リターン） */
 const NEWS_MACRO = [
@@ -181,6 +182,20 @@ const NEWS_SECTOR = {
   game: [['新型ゲーム機が予約開始直後に完売', .04], ['大型タイトルの発売延期が相次ぐ', -.03]],
   growth: [['新興市場に個人投資家の資金が流入', .05], ['新興株に利益確定の売りが広がる', -.05]],
 };
+// 取引できない銘柄のニュースの代わりに流す、社会全体のニュース（表示だけで株価は動かさない）
+const WORLD_RATE = 0.2;   // 見えないニュース1件につき、社会のニュースに置き換える割合
+const NEWS_WORLD = [
+  '全国的に気温が高く、冷たい飲み物やアイスがよく売れている', '週末は各地で行楽日和、観光地は多くの人でにぎわう', '大型の台風が接近、交通機関に乱れが出る見込み',
+  '政府が来年度の予算案の編成作業を開始', '国会で新年度の法案の審議が本格化', '主要国の首脳が会談、貿易や安全保障について意見を交わす',
+  '最低賃金の引き上げをめぐる議論が進む', '少子高齢化への対策として、新しい支援策が検討される', '人手不足を受け、各地で初任給を引き上げる動き',
+  '全国の有効求人倍率は横ばい', '訪日外国人客が増え、都市部のホテルは高い稼働率', '新幹線や空港は連休の帰省客で混雑',
+  '大手スーパーで、食料品の値上げに慣れた消費者の節約志向が続く', 'キャッシュレス決済の利用が広がり、現金を使わない店が増加', 'リモートワークを続ける企業が増え、オフィス需要に変化',
+  '生成AIを仕事に使う人が増え、研修を始める企業が相次ぐ', '国内でスマートフォンの買い替え期間が長くなっているとの調査', '電気代やガス代の負担軽減策の期限が近づく',
+  '大型連休の旅行予約は前年より好調', '都内の新築マンション価格が高い水準で推移', '農産物の収穫が順調、スーパーの店頭に新米が並び始める',
+  '大規模な地震を想定した防災訓練が全国で行われる', 'プロスポーツの人気が高まり、観客数が過去最高を更新', '日本人選手が国際大会で優勝、街は祝福ムードに',
+  '海外では主要な中央銀行が政策金利の見通しを議論', '原油価格は小幅な動き、産油国の会合に注目が集まる', '海外の景気は緩やかに回復、外需に期待の声',
+  '日銀の短観を前に、企業の景況感に関心が集まる', '来週は主要企業の決算発表が本格化する見通し', '年金や医療の制度見直しをめぐり、与野党が論戦',
+];
 const NEWS_IND = [
   ['{n}が{x}億円の大型受注を獲得', .06], ['{n}の新製品が大ヒット', .07], ['{n}が自社株買いを発表', .04],
   ['{n}が業績予想を上方修正', .08], ['{n}が業績予想を下方修正', -.09], ['{n}で製品の不具合が発覚、回収へ', -.08],
@@ -199,11 +214,13 @@ const GLOSS = {
   '指値注文': '「この値段以下で買う」「この値段以上で売る」と値段を決める注文。株価がそこまで来ないと約定しない。',
   '逆指値注文': '「ここまで下がったら売る」のように、株価が決めた値段に届いたら成行で注文を出す方法。損切りに使う。',
   '板': '売り注文と買い注文を値段ごとに並べた表。上が売り、下が買い。どの値段にどれだけ注文があるかがわかる。',
+  '気配値': '板に並んでいる、売りたい値段と買いたい値段のこと。売りの一番安い値段と買いの一番高い値段が「最良気配」で、取引が成立しやすい。',
+  '板が薄い': '板に並んでいる注文の株数が少ないこと。大きな注文を成行で出すと、上（下）の値段まで食い進んで、不利な値段で約定しやすい。',
   '約定': '注文が成立して、売買が実際に決まること。',
   '値幅制限': '1日に株価が動ける範囲。前日の終値をもとに決まり、急な暴騰や暴落を防ぐ。',
   'ストップ高': '値幅制限の上限まで株価が上がった状態。買いたい人が多すぎて、売り注文がほとんどない。',
   'ストップ安': '値幅制限の下限まで株価が下がった状態。売りたい人が多すぎて、買い注文がほとんどない。',
-  '呼値': '注文できる値段の刻み。3,000円以下の株は1円、5,000円以下は5円、30,000円以下は10円刻み。',
+  '呼値': '注文できる値段の刻み。1,000円以下は0.1円、3,000円以下は0.5円、1万円以下は1円、3万円以下は5円刻み（東証の大型株＝TOPIX500の銘柄のルール。それ以外の銘柄はもっと粗く、3,000円以下は1円、5,000円以下は5円刻み）。',
   '出来高': 'その日に売買が成立した株数。多いほど注目されている。',
   'ローソク足': '一定時間の始値・高値・安値・終値を1本で表した図。終値が始値より高いと赤（陽線）、低いと緑（陰線）。',
   '移動平均線': '過去の決まった本数の終値を平均してつないだ線。株価の大きな流れ（トレンド）をつかむのに使う。',
@@ -231,7 +248,7 @@ const GLOSS = {
   '譲渡益課税': '株を売ってもうけたときにかかる税金。日本では利益の20.315%。1年間の損益を合計して計算する。',
   '手数料': '証券会社に払う売買の手数料。最近は無料の会社も多い。',
   '買付余力': '今すぐ株を買うのに使えるお金。注文中の分は差し引かれる。',
-  '特別気配': '買いと売りのバランスが大きく崩れて、取引がすぐに成立しない状態。',
+  '特別気配': '買いと売りの注文が大きく偏って、釣り合う値段がなかなか決まらない状態。買いが多すぎると売り注文がなくなり、値段が上がってストップ高になる（売りが多すぎると、買い注文がなくなってストップ安）。このゲームでは、板の売り（ストップ安では買い）の列が空になり、その側の成行注文は約定しない。',
   '信頼度': 'ニュースの確かさ。★3は正式発表。★1〜2は観測記事やうわさで、外れることもある。',
   '信用取引': '証券会社にお金や株を借りて売買すること。保証金の約3.3倍まで取引でき、値下がりで利益を狙う「空売り」もできる。そのぶん損も大きくなりやすい。',
   '空売り': '持っていない株を借りて先に売り、あとで買い戻して返す取引。売った値段より安く買い戻せれば利益になる。株価が上がるほど損が増え、損に上限がない。',
@@ -251,6 +268,13 @@ const TIPS = [
     ['最初はどうやって買えばいい？', '最初から全部のお金を1社に使わず、何回かに分けて少しずつ買おう。値下がりしても買い増しで平均の値段を下げられる。'],
     ['成行と指値はどう使い分ける？', '急いでいなければ指値が安心。板の薄い銘柄を成行で大量に買うと、上の売り注文まで食ってしまい高く買うことになる（スリッページ）。'],
     ['寄り付き直後に買っても大丈夫？', '9:00すぐは夜のあいだのニュースが一気に反映されて値段が大きく動く。落ち着くまで待つのも作戦。', '「寄り付き」は、売り手と買い手が「寄り」集まって最初の値段が「付く」ことから来た言葉。'],
+  ] },
+  { name: '板の見かた', items: [
+    ['板はどう読む？', '真ん中が値段、左が売りたい株数、右が買いたい株数。上に行くほど高い売り、下に行くほど安い買いが並ぶ。売りの一番下と買いの一番上が、いま取引が成立しやすい値段。'],
+    ['板の数字が小さいとどうなる？', '注文が少ない「薄い板」。大きく買うと上の値段まで食い進んで、思ったより高く買うことになる。そんなときは指値で、板を見ながら値段を決めよう。', '板の売買の注文が多い（厚い）銘柄ほど、大きな注文でも値段が動きにくい。'],
+    ['板はどう活用する？', '①薄い板は成行を避けて指値にする。②安く買いたい（高く売りたい）ときは、板の今より下（上）の値段を指値にして待つ。③すぐ買いたい（売りたい）ときは、今の値段以上（以下）の指値にする。④大きな注文は何回かに分ける。板の形だけでは値動きは予想できない。現実の板でも注文は取り消せる（見せかけの注文もある）ので、このゲームの板と同じく、注文を出すときの目安として使おう。'],
+    ['板を見るメリットは？', '①注文の前に、成行でいくらで買える（売れる）かがわかる。②指値の値段を、板を見ながら決められる。③薄い板や特別気配のような、いつもと違う状態に先に気づける。板は1分ごとに入れ替わるので、注文を出す直前に見るのがコツ。'],
+    ['特別気配（ストップ高・安）のときは？', '買いが多すぎるストップ高では売りの列が、売りが多すぎるストップ安では買いの列が空になり、その側の成行注文は約定しない。ストップ安では売りたくても売れず、逆指値も約定しないことがある。飛びつかず、持ちすぎないのが大切。'],
   ] },
   { name: 'リスクの抑え方', items: [
     ['値下がりしたらどうすればいい？', '買う前に「ここまで下がったら売る」を決めておこう。ランク2からは逆指値注文で自動にできる。'],
@@ -274,7 +298,8 @@ const TIPS = [
 ];
 const TERM_GROUPS = [
   ['株の基本', ['株式', '証券コード', '単元株', '時価総額', '株価指数', '分散投資']],
-  ['注文と取引', ['成行注文', '指値注文', '逆指値注文', '板', '約定', 'スリッページ', '特別気配', '買付余力', '手数料']],
+  ['注文と取引', ['成行注文', '指値注文', '逆指値注文', '約定', 'スリッページ', '買付余力', '手数料']],
+  ['板（気配）', ['板', '気配値', '板が薄い', '特別気配']],
   ['取引時間と値段のルール', ['寄り付き', '大引け', '前場・後場', '値幅制限', 'ストップ高', 'ストップ安', '呼値']],
   ['チャートと指標', ['ローソク足', '出来高', '移動平均線', 'RSI', 'ボラティリティ', 'PER', 'PBR']],
   ['配当・決算・税金', ['配当', '配当利回り', '権利確定日', '権利落ち', '決算', '市場予想', '材料出尽くし', '譲渡益課税']],
@@ -285,6 +310,7 @@ const TERM_GROUPS = [
 const TRIVIA = {
   '株式': '世界で最初の株式会社は、1602年にできたオランダ東インド会社と言われている。',
   '証券コード': '日本の証券コードは長く4桁の数字だったが、2024年からは英字の入ったコードも使われ始めた。',
+  '特別気配': '本物の取引所では、特別気配のあいだ、気配の値段を少しずつ動かして、買いと売りの注文が釣り合うのを待つ。値段が一気に飛ばないようにする仕組み。',
   '単元株': '日本の株は2018年に全部の会社で100株単位にそろえられた。それまでは1株や1,000株の会社もあった。',
   '株価指数': '日経平均株価は225社の株価から計算されていて、このゲームのNTX225という名前もそこから来ている。',
   '前場・後場': '東京の取引所には11:30〜12:30の昼休みがある。世界の大きな取引所では珍しい仕組み。',
@@ -301,7 +327,7 @@ const SENSEI_SVG = `<svg viewBox="0 0 64 64" width="72" height="72" aria-hidden=
 let G = null;
 let profile = loadProfile();
 let modalOpen = false, titleOpen = true;
-const UI = { acct: 'cash', side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, vw: null, hcat: 'tip', tut: null };
+const UI = { acct: 'cash', side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, sort: { key: 'none', desc: false }, vw: null, hcat: 'tip', tut: null };
 // チャートの表示範囲。cnt = 見えるローソク足の本数、end = 右端の位置（null なら最新に追従）、yOff = 上下のずらし量（値幅に対する割合）
 function resetView() { UI.vw = { '5m': { cnt: 60, end: null }, '1d': { cnt: 60, end: null }, yOff: 0 }; }
 resetView();
@@ -332,8 +358,8 @@ function playClick() {
   a.currentTime = 0; a.play().catch(() => {});
 }
 
-function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', opts: {} }; }
-function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') return Object.assign(defProfile(), p); } catch (e) {} return defProfile(); }
+function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', opts: {}, mseen: {} }; }
+function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') { const q = Object.assign(defProfile(), p); if (!p.mseen) q.mseen = { ...q.missions }; return q; } } catch (e) {} return defProfile(); }
 function saveProfile() { try { localStorage.setItem('kabutore.profile', JSON.stringify(profile)); } catch (e) {} }
 function rank(xp = profile.xp) { let r = 1; RANKS.forEach((k, i) => { if (xp >= k.xp) r = i + 1; }); return r; }
 // ファストスターター：指値・逆指値・信用取引・リアル相場チャレンジを、ランクに関係なく使える
@@ -356,8 +382,10 @@ function timeLabel() { if (G.phase === 'pre') return `8:${String(G.preMin).padSt
 function phaseLabel() { return G.phase === 'pre' ? '寄り付き前' : G.phase === 'closed' ? '大引け' : G.minute < 150 ? '前場' : '後場'; }
 
 /* ===================== 値段のルール（東証に準拠） ===================== */
-function tickSize(p) { return p <= 3000 ? 1 : p <= 5000 ? 5 : p <= 30000 ? 10 : p <= 50000 ? 50 : 100; }
-function roundTick(p) { const t = tickSize(p); return Math.max(1, Math.round(p / t) * t); }
+// 全銘柄、東証の TOPIX500 構成銘柄の細かい呼値（1,000円以下は0.1円、3,000円以下は0.5円…）。粗い呼値（3,000円以下は1円、5,000円以下は5円…）だと、値動きの小さい銘柄の5分足が横線・十字ばかりになる
+const TICKS = [[1000, 0.1], [3000, 0.5], [10000, 1], [30000, 5], [100000, 10], [Infinity, 50]];
+function tickSize(p) { for (const [b, t] of TICKS) if (p <= b) return t; }
+function roundTick(p) { const t = tickSize(p); return Math.max(t, Math.round(Math.round(p / t) * t * 10) / 10); }   // 0.1円単位の誤差を出さない
 // 銘柄ごとの呼値と売買単位（梅山カンパニーだけ呼値1円・1株単位）
 const tickOf = (s, p) => (s.ume ? 1 : tickSize(p));
 const roundPx = (s, p) => (s.ume ? Math.max(1, Math.round(p)) : roundTick(p));
@@ -435,10 +463,10 @@ function genHistory() {
     let capO = 0, capC = 0;
     for (const s of G.stocks) {
       const pc = s.price, e = s.sig / Math.sqrt(DAYS);
-      const o = roundTick(pc * Math.exp(RNG.normal() * e * 0.3));
-      const c = roundTick(pc * Math.exp(s.beta * Md + Sd[s.sector] + s.idio / Math.sqrt(DAYS) * RNG.normal()));
-      const h = roundTick(Math.max(o, c) * Math.exp(Math.abs(RNG.normal()) * e * 0.5));
-      const l = roundTick(Math.min(o, c) * Math.exp(-Math.abs(RNG.normal()) * e * 0.5));
+      const o = roundPx(s, pc * Math.exp(RNG.normal() * e * 0.3));
+      const c = roundPx(s, pc * Math.exp(s.beta * Md + Sd[s.sector] + s.idio / Math.sqrt(DAYS) * RNG.normal()));
+      const h = roundPx(s, Math.max(o, c) * Math.exp(Math.abs(RNG.normal()) * e * 0.5));
+      const l = roundPx(s, Math.min(o, c) * Math.exp(-Math.abs(RNG.normal()) * e * 0.5));
       s.daily.push({ d: date, di: k - 60, o, h: Math.max(h, o, c), l: Math.min(l, o, c), c, v: Math.round(s.minVol * MIN_PER_DAY * Math.exp(0.35 * RNG.normal()) / 100) * 100 });
       capO += s.shares * o; capC += s.shares * c; s.price = c;
     }
@@ -455,15 +483,17 @@ function genHistory() {
 // シナリオ名・期間の表示（name / period / year / span）もここだけ。データの期間を延ばしたときは span を直す。
 //   data: 株価（CORONA2020 / RECENT。ファイルがなければ null で、そのシナリオは選べない）
 //   news: 当時のニュース（NEWS2020 / NEWS2026。なくても動く）
+//   rsigUntil: 日中の揺れの目安 rsig を計算する最後の日（この日まで）。なければデータ全期間から計算する
 const REAL_SETS = {
   real: {
     file: 'data/corona2020.js', newsFile: 'data/news2020.js', name: 'コロナショック', period: '2020年',
     data: typeof CORONA2020 !== 'undefined' ? CORONA2020 : null, news: typeof NEWS2020 !== 'undefined' ? NEWS2020 : null,
   },
   real2026: {
-    file: 'data/recent.js', newsFile: 'data/news2026.js', year: 2026, span: '1〜9月',
+    file: 'data/recent.js', newsFile: 'data/news2026.js', year: 2026, span: '1〜10月',
     get name() { return '今年の相場'; }, get period() { return `${this.year}年${this.span}`; },
     data: typeof RECENT !== 'undefined' ? RECENT : null, news: typeof NEWS2026 !== 'undefined' ? NEWS2026 : null,
+    rsigUntil: '2026-09-30',   // rsig を全期間から計算すると、データを延ばすたびに既存の日の分足・高安・出来高・指数が変わるので、延長前の最終日までで固定している
   },
 };
 // 株価の数値は選んだシナリオのデータからだけ読む。終値は実データどおり、日中の動き（始値・高値・安値・分足）は
@@ -519,8 +549,9 @@ function pushRealNews() {
 
 function makeRealStock(d) {
   const p0 = d.prices[0], price = roundTick(p0);
-  let sq = 0; for (let i = 1; i < d.prices.length; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
-  const rsig = Math.sqrt(sq / (d.prices.length - 1));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
+  const until = REAL_SETS[REAL_KEY].rsigUntil, n = until ? REAL.dates.filter(x => x <= until).length : d.prices.length;   // rsig を計算する日数
+  let sq = 0; for (let i = 1; i < n; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
+  const rsig = Math.sqrt(sq / (n - 1));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
   return {
     code: d.code, name: d.name, sector: d.sector, desc: `${REAL_SETS[REAL_KEY].period}の実際の終値で動きます`, unlock: 1, rec: [],
     shares: 1e9 / p0, div: 0,   // 株式数は実データにないので、指数が「30銘柄を同じ金額ずつ持った平均」になるようにする
@@ -674,10 +705,10 @@ function umeDay(first) {
   const R = s.r;
   if (G.dayIndex === s.listDay) {
     s.prevClose = UME.price;
-    pushNews({ day: G.dayIndex, time: '8:00', type: 'big', stars: 3, codes: [s.code], text: `【速報】${s.name}（${s.code}）が突如上場。公開価格は${yen(UME.price)}円。1株から買えるが、何の会社かは誰も知らない`, hint: '', flash: true });
+    pushNews({ day: G.dayIndex, time: '8:00', type: 'big', stars: 3, codes: [s.code], text: `【速報】${s.name}（${s.code}）が突如上場。公開価格は${px(UME.price)}円。1株から買えるが、何の会社かは誰も知らない`, hint: '', flash: true });
   } else if (!first) s.prevClose = s.price;
   const w = limitWidth(s.prevClose);
-  s.limUp = s.prevClose + w; s.limDn = Math.max(1, s.prevClose - w);
+  s.limUp = Math.round((s.prevClose + w) * 10) / 10; s.limDn = Math.max(1, Math.round((s.prevClose - w) * 10) / 10);
   s.intraday = []; s.price = s.open = s.high = s.low = s.prevClose; s.lp = Math.log(s.price); s.dayVol = 0; s.stop = null;
   s.mood = Math.floor(R.next() * 5) - 2;
   if (s.mood && R.next() < 0.4) {
@@ -720,6 +751,17 @@ function isOpen(s, r = rank()) {
 }
 function openRank(s) { for (let r = rank(); r <= RANKS.length; r++) if (isOpen(s, r)) return r; return RANKS.length; }
 function unlockedStocks() { const r = rank(); return [...G.stocks, ...(G.ume ? [G.ume] : [])].filter(s => isOpen(s, r)); }
+// 取引できない銘柄・業種だけの話は見せない（まだ関係がないので）。市場全体や社会のニュースは常に見せる
+function newsVisible(n) {
+  if (n.codes?.length) return n.codes.some(c => { const s = byCode(c); return s && isOpen(s); });
+  if (n.sector) return G.stocks.some(s => s.sector === n.sector && isOpen(s));
+  return true;
+}
+function worldNews(mode) {
+  const n = G.worldN = (G.worldN || 0) + 1;   // 乱数は使わない（相場の乱数の順番を変えない）
+  const text = NEWS_WORLD[Math.floor(hash01(`${G.seed}world${n}`) * NEWS_WORLD.length)];
+  pushNews({ day: G.dayIndex, time: mode === 'gap' ? '夜間' : minLabel(G.minute), type: 'world', stars: 3, codes: [], sector: null, text, hint: '市場への影響は小さい', flash: false });
+}
 function pushNews(item) {
   // リアル相場は1年分（約200件）の当時のニュースを全部残す。ランダム相場は今までどおり120件
   item.id = ++G.newsId; G.news.push(item); if (G.news.length > (isReal() ? NEWS_KEEP_REAL : 120)) G.news.shift();
@@ -788,13 +830,17 @@ function genNews(mode, type) {
     item.hint = `${arrow(imp)}${s.name}`;
     item.flash = Math.abs(imp) >= 0.05;
   }
+  if (!newsVisible(item)) {   // 株価への影響はそのまま。見えないニュースの一部だけ、代わりに社会のニュースを流す（多すぎないように）
+    if (hash01(`${G.seed}worldp${G.worldK = (G.worldK || 0) + 1}`) < WORLD_RATE) worldNews(mode);
+    return item;
+  }
   pushNews(item);
   return item;
 }
 function denyNews(dn) {
   const s = byCode(dn.code); const imp = -0.8 * dn.imp;
   applyStock(s, imp, 'live', false);
-  pushNews({ day: G.dayIndex, time: minLabel(G.minute), type: 'deny', stars: 3, codes: [s.code], text: `${s.name}が一部の報道について「当社が発表したものではない」とコメント`, hint: `${arrow(imp)}${s.name}`, flash: false });
+  if (isOpen(s)) pushNews({ day: G.dayIndex, time: minLabel(G.minute), type: 'deny', stars: 3, codes: [s.code], text: `${s.name}が一部の報道について「当社が発表したものではない」とコメント`, hint: `${arrow(imp)}${s.name}`, flash: false });
 }
 // 1日あたりの目安：企業1.5件、業種0.15件、うわさ0.3件、経済0.2件、為替0.06件
 const NEWS_RATE = [['ind', 1 / 200], ['sector', 1 / 2000], ['rumor', 1 / 1000], ['macro', 1 / 1500], ['fx', 1 / 5000]];
@@ -813,7 +859,7 @@ function startDay(first) {
   if (!first) { for (const s of G.stocks) s.prevClose = s.price; mk.idxPrev = mk.idx; }   // 前日の終値を確定
   for (const s of G.stocks) {
     const w = limitWidth(s.prevClose);
-    s.limUp = s.prevClose + w; s.limDn = Math.max(1, s.prevClose - w);
+    s.limUp = Math.round((s.prevClose + w) * 10) / 10; s.limDn = Math.max(1, Math.round((s.prevClose - w) * 10) / 10);
     s.intraday = []; s.price = s.open = s.high = s.low = s.prevClose; s.lp = Math.log(s.price); s.dayVol = 0; s.stop = null;
     if (isReal()) realLimits(s);
   }
@@ -878,6 +924,7 @@ function tick() {
   if (G.minute >= MIN_PER_DAY) closeMarket();
 }
 
+const divOn = () => rank() >= 4;   // 配当はカレンダーと同じランク4から（それまでは配当も権利落ちもない）
 function lastTradingDayOfMonth(iso) { return monthOf(nextTD(iso)) !== monthOf(iso); }
 
 function closeMarket() {
@@ -919,7 +966,7 @@ function closeMarket() {
   if (lastTradingDayOfMonth(G.date)) {
     const mo = monthOf(G.date);
     for (const s of G.stocks) {
-      if (!s.div || !s.rec.includes(mo)) continue;
+      if (!divOn() || !s.div || !s.rec.includes(mo)) continue;
       const per = s.div / s.rec.length;
       const q = P.pos[s.code]?.qty || 0;
       if (q > 0) { P.pendingDiv += q * per; G.dayEvents.push(`${s.name}の権利確定日。${q}株×${per}円＝${yen(q * per)}円の配当の権利を得ました（明日入金）`); }
@@ -1007,10 +1054,11 @@ function walk(s, side, qty) {
   let guard = 0;
   while (rem > 0 && guard++ < 1000) {
     const t = tickOf(s, last), L = lot(s);
-    last = side === 'buy' ? Math.min(s.limUp, last + t) : Math.max(s.limDn, last - t);
+    last = side === 'buy' ? Math.min(s.limUp, roundPx(s, last + t)) : Math.max(s.limDn, roundPx(s, last - t));
     const q = Math.min(rem, Math.max(L, Math.round(s.minVol / L) * L));
     gross += q * last; rem -= q;
   }
+  gross = Math.round(gross);   // 値段は0.1円刻み・株数は100株単位なので、代金は1円単位になる
   return { gross, avg: gross / qty, last };
 }
 
@@ -1243,20 +1291,22 @@ function palette() {
 }
 
 function buildTape() {
-  const items = unlockedStocks().map(s => `<span class="tk" data-code="${s.code}"><b>${esc(s.name)}</b><span class="num tp">${yen(s.price)}</span><span class="num tc flat">±0.00%</span></span>`).join('');
-  $('#tape').innerHTML = `<span>${items}</span><span>${items}</span>`;
+  const items = unlockedStocks().map(s => `<span class="tk" data-code="${s.code}"><b>${esc(s.name)}</b><span class="num tp">${px(s.price)}</span><span class="num tc flat">±0.00%</span></span>`).join('');
+  const tp = $('#tape'); tp.innerHTML = `<span>${items}</span><span>${items}</span>`; tp.dataset.n = unlockedStocks().length;
   updateTape();
 }
 function updateTape() {
   for (const el of $$('#tape .tk')) {
     const s = byCode(el.dataset.code); const ch = s.price / s.prevClose - 1;
-    el.querySelector('.tp').textContent = yen(s.price);
+    el.querySelector('.tp').textContent = px(s.price);
     const c = el.querySelector('.tc'); c.textContent = pctS(ch); c.className = 'num tc ' + cls(ch);
   }
 }
 
 function render() {
   if (!G) return;
+  // 帯は朝（startDay）に作る。続きから・練習の復元など、朝を通らずに始まったときや、銘柄が増えたときは、ここで作る
+  if (!$('#tape .tk') || +$('#tape').dataset.n !== unlockedStocks().length) buildTape();
   renderHeader(); updateTape();
   if (UI.view === 'trade') { renderList(); renderChartHead(); drawChart(); renderBoard(); renderOrderPanel(); renderNews(); }
   else if (UI.view === 'hold') renderHold();
@@ -1275,7 +1325,7 @@ function renderHeader() {
   const hd = $('#h-day'); hd.textContent = `${yenS(d)}円（${pctS(d / G.player.dayStart)}）`; hd.className = 'num ' + cls(d);
   const mk = G.market, ic = mk.idx / mk.idxPrev - 1;
   $('#h-idx').innerHTML = `${mk.idx.toLocaleString('ja-JP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span class="${cls(ic)}">${pctS(ic)}</span>`;
-  const r = rank(), hr = $('#h-rank'); hr.innerHTML = `<span class="rk">R${r}</span>${RANKS[r - 1].n}`; hr.classList.toggle('fast', isFast()); hr.classList.toggle('rank-legend', r >= RANKS.length);   // ファストスターターは金色
+  const r = rank(), hr = $('#h-rank'); hr.innerHTML = `<span class="rk">R${r}</span><span class="rk-n">${RANKS[r - 1].n}</span>`; hr.classList.toggle('fast', isFast()); hr.classList.toggle('rank-legend', r >= RANKS.length);   // ファストスターターは金色
   // 信用の建玉があるときは、保有株タブに維持率の色の印を付ける（追証中は赤）
   const mr = hasMargin() ? marginStat().ratio : null, hb = $('.tabbar [data-view="hold"]');
   hb.dataset.mlv = G.mcall ? 'bad' : mLevel(mr);
@@ -1288,19 +1338,51 @@ function buildFilter() {
   const r = rank(); const keys = Object.keys(isReal() ? REAL_SECTORS : SECTORS).filter(k => G.stocks.some(s => s.sector === k && isOpen(s, r)));
   if (UI.filter !== 'all' && !keys.includes(UI.filter)) UI.filter = 'all';
   $('#sec-filter').innerHTML = `<option value="all">すべての業種</option>` + keys.map(k => `<option value="${k}"${UI.filter === k ? ' selected' : ''}>${SEC(k).name}</option>`).join('');
+  fitSelect($('#sec-filter'));
+}
+// 選んでいる文字が入るぎりぎりの幅にする（select は既定だと一番長い選択肢の幅になる）
+function fitSelect(el) {
+  const cs = getComputedStyle(el), c = fitSelect.c ||= document.createElement('canvas').getContext('2d');
+  c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  el.style.width = Math.ceil(c.measureText(el.options[el.selectedIndex]?.text || '').width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 22) + 'px';   // 22 = ▼ の分
 }
 function renderList() {
   const r = rank(), P = G.player, shown = s => UI.filter === 'all' || s.sector === UI.filter;
+  const sk = UI.sort.key, sv = s => (sk === 'px' ? s.price : s.price / s.prevClose - 1);
+  $$('[data-sort]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sort === sk)));
+  const sd = $('#sort-dir'); sd.textContent = UI.sort.desc ? '降順 ▼' : '昇順 ▲'; sd.setAttribute('aria-label', UI.sort.desc ? '降順（クリックで昇順）' : '昇順（クリックで降順）');
   const row = s => {
     const ch = s.price / s.prevClose - 1;
-    return `<button class="row${s.code === G.sel ? ' sel' : ''}" data-code="${s.code}" aria-pressed="${s.code === G.sel}">
-      <span class="r-name"><span>${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}</span><small>${s.code}・${SEC(s.sector).short}</small></span>
-      <span class="r-px num">${s.stop ? `<em class="stop ${s.stop}">${s.stop === 'up' ? 'S高' : 'S安'}</em> ` : ''}${yen(s.price)}</span>
-      <span class="r-ch num ${cls(ch)}">${pctS(ch)}</span></button>`;
+    return [s.code, s.code === G.sel, {
+      n: `${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}`, sm: `${s.code}・${SEC(s.sector).short}`,
+      px: `${s.stop ? `<em class="stop ${s.stop}">${s.stop === 'up' ? 'S高' : 'S安'}</em> ` : ''}${px(s.price)}`, ch: pctS(ch), cc: cls(ch),
+    }];
   };
   // 梅山カンパニーは数に入れず、いちばん下に別枠で出す
-  $('#stock-list').innerHTML = G.stocks.filter(s => isOpen(s, r) && shown(s)).map(row).join('')
-    + (umeListed() && shown(G.ume) ? `<div class="list-sep">幻の銘柄</div>${row(G.ume)}` : '');
+  const items = G.stocks.filter(s => isOpen(s, r) && shown(s)).sort((a, b) => (UI.sort.desc ? -1 : 1) * (sk === 'none' ? G.stocks.indexOf(a) - G.stocks.indexOf(b) : sv(a) - sv(b))).map(row);
+  if (umeListed() && shown(G.ume)) items.push(['sep'], row(G.ume));
+  // ボタンも中の span も作り直さず、同じものを使い回して中身と並びだけ直す。押している途中で押した要素が消えると、離したときにクリックにならない
+  const box = $('#stock-list'), old = {};
+  for (const el of [...box.children]) old[el.dataset.code || 'sep'] = el;
+  // 押している間は並びを動かさない（値動きで順位が入れ替わると、離したときに別の銘柄の上になってクリックにならない）。離したら並べ直す
+  if (UI.listHold) { const pos = [...box.children].map(el => el.dataset.code || 'sep'); items.sort((a, b) => (pos.indexOf(a[0]) + 1 || 999) - (pos.indexOf(b[0]) + 1 || 999)); }
+  items.forEach(([k, sel, d], i) => {
+    let el = old[k]; delete old[k];
+    if (!el) {
+      el = document.createElement(k === 'sep' ? 'div' : 'button');
+      if (k === 'sep') { el.className = 'list-sep'; el.textContent = '幻の銘柄'; }
+      else { el.dataset.code = k; el.innerHTML = '<span class="r-name"><span class="r-n"></span><small></small></span><span class="r-px num"></span><span class="r-ch num"></span>'; el._p = {}; }
+    }
+    if (k !== 'sep') {
+      const c = 'row' + (sel ? ' sel' : ''); if (el.className !== c) el.className = c;
+      if (el.getAttribute('aria-pressed') !== String(sel)) el.setAttribute('aria-pressed', String(sel));
+      const set = (q, key, html) => { if (el._p[key] !== html) { el.querySelector(q).innerHTML = html; el._p[key] = html; } };
+      set('.r-n', 'n', d.n); set('small', 'sm', d.sm); set('.r-px', 'px', d.px); set('.r-ch', 'ch', d.ch);
+      const rc = 'r-ch num ' + d.cc, ce = el.querySelector('.r-ch'); if (ce.className !== rc) ce.className = rc;
+    }
+    if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+  });
+  for (const k in old) old[k].remove();
   const locked = G.stocks.filter(s => !isOpen(s, r));
   const nr = locked.length ? Math.min(...locked.map(openRank)) : 0;
   $('#list-foot').textContent = locked.length ? `ほかに${locked.length}銘柄あります。ランク${nr}で${locked.filter(s => isOpen(s, nr)).length}銘柄が解放されます。` : '全30銘柄が解放されています。';
@@ -1315,27 +1397,28 @@ function renderChartHead() {
   const s = sel(), ch = s.price - s.prevClose, r = rank();
   $('#c-name').innerHTML = `${esc(s.name)}<span class="code num">${s.code}</span>`;
   $('#c-meta').textContent = `${SEC(s.sector).name}｜${s.desc}`;
-  $('#c-price').innerHTML = `${yen(s.price)}<small>円</small>${s.stop ? ` <em class="stop ${s.stop}">${s.stop === 'up' ? 'ストップ高' : 'ストップ安'}</em>` : ''}`;
-  const cp = $('#c-chg'); cp.textContent = `前日比 ${yenS(ch)}円（${pctS(ch / s.prevClose)}）`; cp.className = 'num ' + cls(ch);
+  $('#c-price').innerHTML = `${px(s.price)}<small>円</small>${s.stop ? ` <em class="stop ${s.stop}">${s.stop === 'up' ? 'ストップ高' : 'ストップ安'}</em>` : ''}`;
+  const cp = $('#c-chg'); cp.textContent = `前日比 ${pxS(ch)}円（${pctS(ch / s.prevClose)}）`; cp.className = 'num ' + cls(ch);
   $$('[data-cm]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cm === G.chartMode)));
-  const f = (k, v) => `<div><dt>${k}</dt><dd class="num">${v}</dd></div>`;
+  const f = (k, v, c) => `<div${c ? ` class="${c}"` : ''}><dt>${k}</dt><dd class="num">${v}</dd></div>`;
   const closes = s.daily.map(d => d.c); if (G.phase === 'open') closes.push(s.price);
   const rv = rsi(closes);
   if (isReal()) {   // 実データは終値だけなので、株式数・利益・配当にもとづく数字は出さない
-    $('#facts').innerHTML = f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株') + f(term('値幅制限'), `${yen(s.limDn)}〜${yen(s.limUp)}`)
-      + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${yen(s.open)}／${yen(s.high)}／${yen(s.low)}`) + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0)) : '');
+    $('#facts').innerHTML = f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株', 'fx-vol') + f(term('値幅制限'), `${px(s.limDn)}〜${px(s.limUp)}`, 'fx-lim')
+      + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl') + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi') : '');
     return;
   }
-  let html = f(term('時価総額'), fmtCap(s.shares * s.price))
-    + f(term('PER'), s.eps > 0 ? (s.price / s.eps).toFixed(1) + '倍' : '赤字のため—')
-    + f(term('PBR'), (s.price / s.bps).toFixed(2) + '倍')
-    + f(term('配当利回り'), s.div ? (s.div / s.price * 100).toFixed(2) + '%' : 'なし')
-    + f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株')
-    + f(term('値幅制限'), `${yen(s.limDn)}〜${yen(s.limUp)}`)
-    + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${yen(s.open)}／${yen(s.high)}／${yen(s.low)}`);
+  // 上下2行に列順で並べる PC・タブレットだけ、CSS の order で PER と配当利回りの位置を入れ替える（スマホの並びは変えない）
+  let html = f(term('時価総額'), fmtCap(s.shares * s.price), 'o1 fx-cap')
+    + f(term('PER'), s.eps > 0 ? (s.price / s.eps).toFixed(1) + '倍' : '赤字のため—', 'o4 fx-per')
+    + f(term('PBR'), (s.price / s.bps).toFixed(2) + '倍', 'o3 fx-pbr')
+    + (divOn() ? f(term('配当利回り'), s.div ? (s.div / s.price * 100).toFixed(2) + '%' : 'なし', 'o2 fx-div') : '')
+    + f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株', 'fx-vol')
+    + f(term('値幅制限'), `${px(s.limDn)}〜${px(s.limUp)}`, 'fx-lim')
+    + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl');
   if (r >= 4) {
-    html += f('次の' + term('決算'), s.ume ? '社長の気分しだい' : mdLabel(addTD(G.date, s.nextEarn - G.dayIndex)) + ` 予想${s.consensus.toFixed(1)}円`);
-    html += f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0));
+    html += f('次の' + term('決算'), s.ume ? '社長の気分しだい' : mdLabel(addTD(G.date, s.nextEarn - G.dayIndex)) + ` 予想${s.consensus.toFixed(1)}円`, 'fx-earn');
+    html += f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi');
   }
   $('#facts').innerHTML = html;
 }
@@ -1413,6 +1496,8 @@ function drawChart() {
   for (let i = i0; i < i1; i++) { const c = K[i]; lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }
   [...D.ma, ...(D.bb ? [{ v: D.bb.up }, { v: D.bb.lo }] : [])].forEach(m => { for (let i = i0; i < i1; i++) { const v = m.v[i]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } });
   if (D.ref) { lo = Math.min(lo, D.ref); hi = Math.max(hi, D.ref); }
+  const ordLines = G.player.orders.filter(o => o.code === s.code && o.price && (o.type === 'lmt' || o.type === 'stp'));   // 出している指値・逆指値の価格線
+  ordLines.forEach(o => { lo = Math.min(lo, o.price); hi = Math.max(hi, o.price); });
   if (!isFinite(lo)) { lo = s.price * 0.98; hi = s.price * 1.02; }
   if (hi - lo < lo * 0.004) { const m = (hi + lo) / 2; lo = m * 0.997; hi = m * 1.003; }
   const py = (hi - lo) * 0.08; lo -= py; hi += py;
@@ -1482,11 +1567,20 @@ function drawChart() {
     ctx.closePath(); ctx.fill();
   });
   ctx.restore();
+  // 出している注文（指値・逆指値）の価格線
+  ctx.save(); ctx.beginPath(); ctx.rect(padL, padT, pw, prH); ctx.clip(); ctx.font = `10.5px ${C.body}`; ctx.textAlign = 'right';
+  ordLines.forEach(o => {
+    const y = Math.round(Y(o.price)) + 0.5, t = `${o.mg ? '信用' : ''}${o.side === 'buy' ? '買' : '売'} ${KIND[o.type]} ${px(o.price)}円 ${o.qty.toLocaleString('ja-JP')}株`, w = ctx.measureText(t).width + 10;
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.2; ctx.setLineDash([7, 4]); ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + pw, y); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+    ctx.fillStyle = C.accent; ctx.fillRect(padL + pw - w, y - 8, w, 16);
+    ctx.fillStyle = C.on; ctx.fillText(t, padL + pw - 5, y);
+  });
+  ctx.restore(); ctx.font = `11px ${C.num}`;
   // 現在値のタグ（範囲外なら上端・下端に寄せる）
   if (D.cs.length) {
     const last = D.cs.at(-1).c, y = clamp(Y(last), padT + 9, padT + prH - 9);
     ctx.fillStyle = s.price >= s.prevClose ? C.up : C.down; ctx.fillRect(padL + pw + 2, y - 9, padR - 4, 18);
-    ctx.fillStyle = C.on; ctx.textAlign = 'left'; ctx.fillText(Math.round(last).toLocaleString('ja-JP'), padL + pw + 6, y);
+    ctx.fillStyle = C.on; ctx.textAlign = 'left'; ctx.fillText(px(last), padL + pw + 6, y);
   }
   // 横軸
   ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.font = `10.5px ${C.num}`;
@@ -1514,20 +1608,22 @@ function drawChart() {
   if (!D.cs.length) { ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.font = `13px ${C.body}`; ctx.fillText(G.phase === 'pre' ? '寄り付き前です。9:00から株価が動き始めます。' : 'データがありません', padL + pw / 2, padT + prH / 2); }
   UI.geom = { padL, pw, prH, slotW, s0, cnt, follow, n: D.cs.length, mode: D.mode };
   const c = D.cs[UI.hover ?? D.cs.length - 1];
-  $('#ohlc').textContent = c ? `${c.lab}　始${yen(c.o)}　高${yen(c.h)}　安${yen(c.l)}　終${yen(c.c)}　出来高${c.v.toLocaleString('ja-JP')}株` : '';
+  $('#ohlc').textContent = c ? `${c.lab}　始${px(c.o)}　高${px(c.h)}　安${px(c.l)}　終${px(c.c)}　出来高${c.v.toLocaleString('ja-JP')}株` : '';
   $('#legend').innerHTML = D.ma.map((m, k) => `<span><i style="background:var(${k ? '--warn' : '--accent'})"></i>${m.name}</span>`).join('')
     + (D.bb ? `<span><i style="background:var(--muted)"></i>ボリンジャーバンド（20本・±2σ）</span>` : '') + (D.ha ? '<span>平均足</span>' : '')
-    + `<span><i style="background:var(--up);height:7px;width:7px;border-radius:50%"></i>ニュース</span><span>▲▼ 自分の売買</span><span class="muted">ドラッグで移動・ホイールで拡大縮小</span>`
+    + `<span><i style="background:var(--up);height:7px;width:7px;border-radius:50%"></i>ニュース</span><span>▲▼ 自分の売買</span>${ordLines.length ? '<span><i style="background:var(--accent);height:2px"></i>出している注文</span>' : ''}<span class="muted">ドラッグで移動・ホイールで拡大縮小</span>`
     + (rank() < 3 ? `<span>移動平均線はランク3で解放</span>` : '');
 }
 
 function renderBoard() {
   const el = $('#board');
+  if (UI.boardHold) return;   // 押している間は板を作り直さない（押したボタンが消えると、離したときにクリックにならない）。離したあとに描き直す
+  $('#b-help').hidden = rank() < 3;
   if (rank() < 3) { el.innerHTML = `<div class="locked"><b>ランク3で解放</b><p>板は、売りたい人と買いたい人の注文が値段ごとに並んだ表です。</p></div>`; return; }
   const s = sel(), { asks, bids } = book(s);
   const pre = G.phase === 'pre';
-  const btn = p => `<button data-px="${p}">${yen(p)}</button>`;
-  let rows = asks.slice().reverse().map(a => `<tr><td class="q qa">${a.q.toLocaleString('ja-JP')}</td><td class="p">${btn(a.p)}</td><td class="q"></td></tr>`).join('');
+  const btn = p => `<button data-px="${p}">${px(p)}</button>`;
+  let rows = asks.slice().reverse().map((a, i, v) => `<tr><td class="q qa${i === v.length - 1 ? ' best' : ''}">${a.q.toLocaleString('ja-JP')}</td><td class="p">${btn(a.p)}</td><td class="q"></td></tr>`).join('');
   if (!asks.length) rows += `<tr><td colspan="3" class="p">売り注文なし（${term('特別気配')}）</td></tr>`;
   rows += bids.map((b, i) => `<tr${i === 0 ? ' class="cur"' : ''}><td class="q"></td><td class="p">${btn(b.p)}</td><td class="q qb">${b.q.toLocaleString('ja-JP')}</td></tr>`).join('');
   if (!bids.length) rows += `<tr><td colspan="3" class="p">買い注文なし（${term('特別気配')}）</td></tr>`;
@@ -1552,7 +1648,7 @@ function orderEstimate() {
   const s = sel(), D = DIFF[G.diff];
   const L = lot(s), qty = Math.max(0, Math.round((+$('#o-qty').value || 0) / L) * L);
   let p;
-  if (UI.type === 'mkt') p = G.phase === 'open' && qty ? walk(s, UI.side, qty).avg : s.price;
+  if (UI.type === 'mkt') p = (G.phase === 'open' || UI.tut?.list === BTUT) && qty ? walk(s, UI.side, qty).avg : s.price;   // 板の講座では、寄り付き前でも板から目安を出して見せる
   else p = roundPx(s, +$('#o-price').value || s.price);
   const gross = p * qty, fee = Math.round(gross * D.fee);
   return { qty, p, gross, fee };
@@ -1566,7 +1662,7 @@ function renderOrderPanel() {
   }
   const mg = UI.acct === 'margin', mp = mg && mPos(s.code), close = mp && mp.side !== UI.side;
   const lab = { buy: mg ? mSideLabel(s.code, 'buy') : '買う', sell: mg ? mSideLabel(s.code, 'sell') : '売る' };
-  $('#o-name').textContent = s.name; $('#o-cur').textContent = yen(s.price) + '円';
+  $('#o-name').textContent = s.name; $('#o-cur').textContent = px(s.price) + '円';
   $$('#o-acct button:not(.locked)').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.acct === UI.acct)));
   $('#m-help').hidden = !mg;
   $$('[data-side]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.side === UI.side)); b.textContent = lab[b.dataset.side]; });
@@ -1599,14 +1695,15 @@ function renderOrderPanel() {
   else if (mg) { const n = close ? mp.qty : Math.max(0, Math.floor(marginRoom() / (s.price * 1.01) / 100) * 100); q.innerHTML = `<button data-q="${n}">${close ? '全部' : '建てられる最大'} ${n.toLocaleString()}株</button>`; }
   else if (UI.side === 'buy') { const maxQ = Math.max(0, Math.floor(availCash() / (s.price * (1 + D.fee) * 1.01) / L) * L); q.innerHTML = `<button data-q="${maxQ}">買える最大 ${maxQ.toLocaleString()}株</button>`; }
   else { const a = availShares(s.code); q.innerHTML = a ? `<button data-q="${a}">全部 ${a.toLocaleString()}株</button>` + (a >= 2 * L ? `<button data-q="${Math.floor(a / (2 * L)) * L}">半分</button>` : '') : ''; }
-  $('#o-list').innerHTML = P.orders.map(o => { const os = byCode(o.code); return `<li><span><b>${esc(os.name)}</b> <span class="${o.side === 'buy' ? 'up' : 'down'}">${o.mg ? '信用' : ''}${o.side === 'buy' ? '買' : '売'}</span></span><span class="num">${o.qty.toLocaleString()}株</span><button data-cancel="${o.id}">取消</button><span class="od">${KIND[o.type]}${o.type !== 'mkt' ? ` ${yen(o.price)}円` : '（寄り付きで約定）'}</span></li>`; }).join('') || '<li class="empty">注文はありません</li>';
+  $('#o-list').innerHTML = P.orders.map(o => { const os = byCode(o.code); return `<li><span><b>${esc(os.name)}</b> <span class="${o.side === 'buy' ? 'up' : 'down'}">${o.mg ? '信用' : ''}${o.side === 'buy' ? '買' : '売'}</span></span><span class="num">${o.qty.toLocaleString()}株</span><button data-cancel="${o.id}">取消</button><span class="od">${KIND[o.type]}${o.type !== 'mkt' ? ` ${px(o.price)}円` : '（寄り付きで約定）'}</span></li>`; }).join('') || '<li class="empty">注文はありません</li>';
 }
 
 function renderNews() {
   const hint = DIFF[G.diff].hint;
   $('#news-hint').textContent = isReal() ? '日付は報道が届いた朝' : hint === 'dir' ? '矢印は影響の向き' : hint === 'stars' ? '★は情報の確かさ' : '';
-  if (UI.lastNews === G.newsId) return; UI.lastNews = G.newsId;
-  $('#news').innerHTML = G.news.slice(isReal() ? -NEWS_KEEP_REAL : -50).reverse().map(n => {
+  const key = `${G.newsId}|${unlockedStocks().length}`;   // 銘柄が増えたら、それまで隠していたニュースも出す
+  if (UI.lastNews === key) return; UI.lastNews = key;
+  $('#news').innerHTML = G.news.filter(newsVisible).slice(isReal() ? -NEWS_KEEP_REAL : -50).reverse().map(n => {
     const sub = [];
     // 当時のニュース（real）は日付を出していて、すべて確かな報道なので、★と「◯日前」は省く
     if (hint === 'stars' && n.type !== 'div' && !n.type.startsWith('real')) sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
@@ -1619,7 +1716,7 @@ function renderNews() {
 // ×1〜×4 で時間を進めているあいだ、新しいニュースを右下にお知らせする（多いときは新しい2件だけ）。
 // 「〜まで進める」で飛ばしたときは出さない（loop からだけ呼ぶ）。since = 進める前の G.newsId
 function notifyNews(since) {
-  const fresh = G.news.filter(n => n.id > since).slice(-2);
+  const fresh = G.news.filter(n => n.id > since && newsVisible(n)).slice(-2);
   if (!fresh.length) return;
   const hint = DIFF[G.diff].hint, box = $('#toasts');
   for (const n of fresh) {
@@ -1633,6 +1730,7 @@ function notifyNews(since) {
 }
 
 /* ---------- 保有株 ---------- */
+const holdDays = p => (G.dayIndex > p.d ? `${G.dayIndex - p.d}日` : '今日から');   // 持ち始めた日（p.d）からの営業日数
 function renderHold() {
   const P = G.player, a = asset();
   const rows = Object.entries(P.pos).map(([c, p]) => { const s = byCode(c); const val = p.qty * s.price; return { s, p, val, pl: val - p.avg * p.qty }; }).sort((x, y) => y.val - x.val);
@@ -1652,7 +1750,7 @@ function renderHold() {
       <div><dt>${term('含み損益')}</dt><dd class="num ${cls(unreal)}">${yenS(unreal)}円</dd></div>
       <div><dt>今年の確定損益</dt><dd class="num ${cls(P.realizedYear)}">${yenS(P.realizedYear)}円</dd></div>
       <div><dt>${term('譲渡益課税', '税金')}（今年）</dt><dd class="num">${yen(P.taxYear)}円</dd></div>
-      <div><dt>受け取った配当（税引後）</dt><dd class="num">${yen(P.divTotal)}円</dd></div>
+      ${divOn() || P.divTotal ? `<div><dt>受け取った配当（税引後）</dt><dd class="num">${yen(P.divTotal)}円</dd></div>` : ''}
       ${DIFF[G.diff].fee ? `<div><dt>${term('手数料')}の合計</dt><dd class="num">${yen(P.feesTotal)}円</dd></div>` : ''}
       <div><dt>${term('最大ドローダウン')}</dt><dd class="num">${(P.maxDD * 100).toFixed(1)}%</dd></div>
     </dl>
@@ -1662,8 +1760,8 @@ function renderHold() {
     <h3>資産と指数の動き（スタートを100とする）</h3>
     <canvas id="hist-chart" role="img" aria-label="資産と指数の推移"></canvas>
   </section>
-  <section class="panel"><h2>保有株</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">株数</th><th class="r">平均取得単価</th><th class="r">現在値</th><th class="r">評価額</th><th class="r">含み損益</th></tr></thead><tbody>
-    ${rows.map(r => `<tr><td>${esc(r.s.name)} <span class="muted">${SEC(r.s.sector).short}</span></td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.avg * 10) / 10)}</td><td class="r num">${yen(r.s.price)}</td><td class="r num">${yen(r.val)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}（${pctS(r.s.price / r.p.avg - 1)}）</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ株を持っていません。取引画面で買ってみよう。</td></tr>'}
+  <section class="panel"><h2>保有株</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">株数</th><th class="r">平均取得単価</th><th class="r">保有日数</th><th class="r">現在値</th><th class="r">評価額</th><th class="r">含み損益</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${esc(r.s.name)} <span class="muted">${SEC(r.s.sector).short}</span></td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.avg * 10) / 10)}</td><td class="r num">${holdDays(r.p)}</td><td class="r num">${px(r.s.price)}</td><td class="r num">${yen(r.val)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}（${pctS(r.s.price / r.p.avg - 1)}）</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ株を持っていません。取引画面で買ってみよう。</td></tr>'}
   </tbody></table></div></section>
   ${marginSection()}
   <section class="panel"><h2>最近の売買</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>日時</th><th>銘柄</th><th>売買</th><th>種類</th><th class="r">株数</th><th class="r">約定値段</th></tr></thead><tbody>
@@ -1687,7 +1785,7 @@ function marginSection() {
       <div><dt>${term('新規建て余力')}</dt><dd class="num">${yen(marginRoom())}円</dd></div>
     </dl>`}
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th>売買</th><th class="r">株数</th><th class="r">建値</th><th class="r">現在値</th><th class="r">評価損益</th>${easy ? '' : '<th class="r">金利など</th>'}<th>${term('返済期限', '期限')}</th><th></th></tr></thead><tbody>
-    ${rows.map(r => `<tr><td>${esc(r.s.name)}</td><td class="${r.p.side === 'buy' ? 'up' : 'down'}">${r.p.side === 'buy' ? '買い建て' : '売り建て'}</td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.px * 10) / 10)}</td><td class="r num">${yen(r.s.price)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}</td>${easy ? '' : `<td class="r num">${yen(r.p.cost)}</td>`}<td class="num">${mdLabel(mDue(r.p))}</td><td><button class="ghost" data-mclose="${r.c}">返済</button></td></tr>`).join('')
+    ${rows.map(r => `<tr><td>${esc(r.s.name)}</td><td class="${r.p.side === 'buy' ? 'up' : 'down'}">${r.p.side === 'buy' ? '買い建て' : '売り建て'}</td><td class="r num">${r.p.qty.toLocaleString()}</td><td class="r num">${px(Math.round(r.p.px * 10) / 10)}</td><td class="r num">${px(r.s.price)}</td><td class="r num ${cls(r.pl)}">${yenS(r.pl)}</td>${easy ? '' : `<td class="r num">${yen(r.p.cost)}</td>`}<td class="num">${mdLabel(mDue(r.p))}</td><td><button class="ghost" data-mclose="${r.c}">返済</button></td></tr>`).join('')
       || `<tr class="empty"><td colspan="${easy ? 8 : 9}">信用の建玉はありません。取引画面の注文で「信用」を選ぶと、新規買い・新規売り（空売り）ができます。</td></tr>`}
   </tbody></table></div></section>`;
 }
@@ -1742,12 +1840,17 @@ function renderCal() {
 /* ---------- ミッション ---------- */
 function renderMissions() {
   const r = rank(), R = RANKS[r - 1], nx = RANKS[r];
+  // 達成したミッションは、はじめて見せるあいだは未達と同じ一覧に出し、この画面を離れたら「完了済み」へ移す
+  const open = MISSIONS.filter(m => m.rank <= r), seen = m => profile.missions[m.id] && profile.mseen[m.id];
+  const todo = open.filter(m => !seen(m)), fin = open.filter(seen);
+  const mItem = m => { const done = profile.missions[m.id]; return `<li><span class="chk ${done ? 'on' : ''}">${done ? '✓' : ''}</span><span>${m.t}</span><span class="xp">+${m.xp} XP</span></li>`; };
   const prog = nx ? (profile.xp - R.xp) / (nx.xp - R.xp) : 1;
   $('#view-mission').innerHTML = `<section class="panel"><div class="rank-card"><div class="rank-big">R${r}</div><div class="rank-name">${R.n}</div>
     <div class="bar"><span style="width:${(prog * 100).toFixed(1)}%"></span></div>
     <div class="muted small">${profile.xp.toLocaleString()} XP${nx ? `　次のランク「${nx.n}」まであと ${(nx.xp - profile.xp).toLocaleString()} XP（解放：${nx.unlock}）` : '　最高ランクです'}</div></div></section>
-  <section class="panel"><h2>ミッション</h2><ul class="mlist">${MISSIONS.filter(m => m.rank <= r).map(m => { const done = profile.missions[m.id]; return `<li><span class="chk ${done ? 'on' : ''}">${done ? '✓' : ''}</span><span>${m.t}</span><span class="xp">+${m.xp} XP</span></li>`; }).join('')}</ul>
+  <section class="panel"><h2>ミッション</h2><ul class="mlist">${todo.map(mItem).join('')}</ul>
     <h3>ほかにXPがもらえること</h3><ul class="ev"><li>株を持って1日を終える（+3）、1日の資産がプラス（+5）</li><li>逆指値の損切りで、損失を5%以内に抑える（+15）</li><li>5業種以上に分散して1週間（5営業日）保有する（+20）</li></ul></section>
+  ${fin.length ? `<section class="panel"><h2>完了済み（${fin.length}/${open.length}）</h2><ul class="mlist done">${fin.map(mItem).join('')}</ul></section>` : ''}
   <section class="panel"><h2>ランクと解放されるもの</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>ランク</th><th>称号</th><th class="r">必要XP</th><th>解放</th></tr></thead><tbody>${RANKS.map((k, i) => `<tr${i + 1 === r ? ' style="background:var(--accent-soft)"' : ''}><td class="num">R${i + 1}</td><td${i === RANKS.length - 1 ? ' data-legend style="user-select:none;-webkit-user-select:none"' : ''}>${k.n}</td><td class="r num">${k.xp.toLocaleString()}</td><td style="white-space:normal">${k.unlock}</td></tr>`).join('')}</tbody></table></div></section>`;
 }
 
@@ -1807,7 +1910,7 @@ function buildOrder() {
   if (type !== 'mkt') {
     price = roundPx(s, +$('#o-price').value || 0);
     if (!price) return { err: '値段を入力してください。' };
-    if (price > s.limUp || price < s.limDn) return { err: `値段は今日の値幅制限（${yen(s.limDn)}〜${yen(s.limUp)}円）の中で入力してください。` };
+    if (price > s.limUp || price < s.limDn) return { err: `値段は今日の値幅制限（${px(s.limDn)}〜${px(s.limUp)}円）の中で入力してください。` };
     if (type === 'stp' && side === 'sell' && price >= s.price) return { err: '逆指値の売りは、今の株価より低い値段にします（下がったら売る）。' };
     if (type === 'stp' && side === 'buy' && price <= s.price) return { err: '逆指値の買いは、今の株価より高い値段にします（上がったら買う）。' };
   }
@@ -1854,7 +1957,7 @@ function confirmOrder() {
     <table class="confirm-tbl">
       <tr><th>注文</th><td>${o.mg ? `信用・${KIND[o.type]}の${lab}` : `${KIND[o.type]}の${sideW}`}</td></tr>
       <tr><th>株数</th><td>${o.qty.toLocaleString()}株</td></tr>
-      ${o.type !== 'mkt' ? `<tr><th>${o.type === 'lmt' ? '指値' : '逆指値'}</th><td>${yen(o.price)}円</td></tr>` : `<tr><th>値段の目安</th><td>${px(Math.round(b.est * 10) / 10)}円</td></tr>`}
+      ${o.type !== 'mkt' ? `<tr><th>${o.type === 'lmt' ? '指値' : '逆指値'}</th><td>${px(o.price)}円</td></tr>` : `<tr><th>値段の目安</th><td>${px(Math.round(b.est * 10) / 10)}円</td></tr>`}
       ${o.mg ? `<tr><th>${b.close ? '返済する金額（目安）' : '建玉の金額（目安）'}</th><td>約${yen(b.gross)}円</td></tr>${!b.close && G.diff !== 'easy' ? `<tr><th>必要な${term('委託保証金', '保証金')}</th><td>約${yen(b.gross * MARGIN.rate)}円</td></tr>` : ''}`
         : `<tr><th>${o.side === 'buy' ? 'この注文で使うお金' : '受け取るお金（目安）'}</th><td>約${yen(o.side === 'buy' ? b.gross + b.fee : b.gross - b.fee)}円</td></tr>`}
       ${b.fee ? `<tr><th>手数料</th><td>${yen(b.fee)}円</td></tr>` : ''}
@@ -2114,10 +2217,62 @@ const MTUT = [
   { t: '信用はたくさん取引できるぶん、損も大きくなるよ。最初は少しの株数から始めよう。', at: '#o-acct', btn: 'わかった' },
   { t: '練習はおしまい！お金や株は元に戻すね。わからなくなったら「？」を押してね。', btn: 'ありがとう！' },
 ];
+// 板（気配）のミニ講座（板の「？」から）。売買はしない。also = 光らせる場所を増やす（各要素は、まとめて1つの枠で囲うセレクタの配列）
+const BTUT = [
+  { t: '板（気配）を、いっしょに見てみよう！', btn: 'おねがい！', view: 'trade' },
+  { t: '板は、「この値段で売りたい」「この値段で買いたい」という注文を、値段ごとに並べた表だよ。', at: '.a-board', btn: 'ふむふむ' },
+  { t: '真ん中が「値段」。左が「売りたい株数」、右が「買いたい株数」だよ。', at: '.board thead', btn: 'うん' },
+  { t: '上のほうは、売りたい人の注文。今の値段より高い値段で待っているよ。上に行くほど高くなるんだ。', at: '.board td.qa', btn: 'なるほど' },
+  { t: '下のほうは、買いたい人の注文。今の値段以下で待っているよ。下に行くほど安くなるんだ。', at: '.board td.qb', btn: 'へえ！' },
+  { t: '色がついた行が、今の値段だよ。売りの一番下と、買いの一番上が、いま取引が成立しやすい値段（最良気配）なんだ。', at: '.board tr.cur', btn: 'わかった' },
+  { t: '「成行」で買うと、売りの一番安いところから順に買っていくよ。そこの株数が足りないと、次に高い値段へ進むんだ。', at: '.board td.qa.best', btn: 'ふむふむ' },
+  { t: '数字が小さい（注文が少ない）板を「薄い板」というよ。たくさん買うと、高い値段まで進んでしまうから気をつけてね。', at: '.board', btn: 'きをつける' },
+  { t: '板の数字は、1分ごとに入れ替わるんだ。値段が動くと、色がついた行も上下に動くよ。だから、注文を出す直前に板を見るのがコツだよ。', at: '.board', btn: 'なるほど' },
+  { t: '次は、板の使い道を試そう。まず、100株を成行で買うとするよ。「値段の目安」は、今の値段とほとんど同じだよね。', at: '#o-cur', also: [['#o-est dt:first-of-type', '#o-est dd:first-of-type']], btn: 'うん',
+    enter: () => { UI.type = 'mkt'; UI.side = 'buy'; $('#o-qty').value = lot(sel()); renderOrderPanel(); } },
+  { t: '株数を大きくしたよ。「値段の目安」が高くなったね。売りの注文を、安いほうから順に食べていくからだよ。板を見ると、注文の前に「いくらで買えるか」がわかるんだ。', at: '#o-cur', also: [['#o-est dt:first-of-type', '#o-est dd:first-of-type']], btn: 'へえ！',
+    enter: () => { const s = sel(), L = lot(s); $('#o-qty').value = Math.max(L, Math.round(s.minVol * 40 / L) * L); renderOrderPanel(); } },
+  { t: '板が薄いときは、「成行」より「指値」がおすすめ。成行の確認画面にも、「板が薄いよ」と注意が出るんだ。', at: '.board', btn: 'ふむふむ' },
+  { t: '板の値段を押すと、「指値」の値段に入るよ。色がついた行の値段を押してみよう。', at: '.board tr.cur button', on: 'px' },
+  { t: '注文のところに、押した値段が入ったよ。「この値段で買いたい」を、板を見ながら決められるんだ。', at: '#o-price-field', btn: 'べんり！' },
+  { t: '安く買いたいときは、今の値段より下の値段を押して指値にしよう。値段が下がってくるまで待つよ。ただし、下がらなければ買えないし、注文はその日だけだよ。', at: '.board td.qb', btn: 'なるほど' },
+  { t: 'すぐ買いたいときは、今の値段以上の指値にするとすぐ買えるよ。売るときは反対で、高く売りたいなら今より上、すぐ売りたいなら今の値段以下にするんだ。', at: '.board td.qa.best', btn: 'へえ！' },
+  { t: 'たくさん買う（売る）ときは、1回で全部ではなく、何回かに分けよう。大きな注文は、自分の注文で値段が動いてしまうことがあるよ。', btn: 'わかった' },
+  { t: 'ただし、板の形だけで、これから上がるか下がるかはわからないよ。現実の板でも、注文は直前に取り消せるから、見せかけの注文もあるんだ。このゲームの板も同じで、注文を出すときの目安にしようね。', at: '.board', btn: 'はーい' },
+  { t: '板の使い方はここまで。ところで、板を見ていると、売りか買いのどちらかの列が、まるごと空っぽになることがあるんだ。', at: '.board', btn: 'えっ？' },
+  { t: 'それが「特別気配」だよ。買いたい人と売りたい人が大きく偏って、釣り合う値段がなかなか決まらない状態のことなんだ。どうして起きるのか、見ていこう。', at: '.board', btn: 'ふむふむ' },
+  { t: 'たとえば、買いたい人がものすごく多いと、売りの注文がなくなって、値段がどんどん上がるよ。1日に動ける上限（値幅制限）まで来た状態が「ストップ高」だよ。', at: '#c-price', btn: 'ふむふむ' },
+  { t: 'ストップ高になると、板の売りの列が空っぽになって、「売り注文なし（特別気配）」と出るよ。反対に、売りたい人が多すぎるストップ安では、買いの列が空っぽになるんだ。', at: '.board-note', btn: 'なるほど' },
+  { t: '空っぽの側には相手がいないから、取引が成立しないよ。ストップ高では成行の買い、ストップ安では成行の売りが、約定しなくなるんだ。', at: '.board-note', btn: 'こわい…' },
+  { t: 'ストップ安のときは、売りたくても売れないよ。「ここまで下がったら売る」の逆指値も、約定しないことがあるんだ。前の日までに、持ちすぎないようにしよう。', btn: 'きをつける' },
+  { t: 'ストップ高や安は、銘柄リストの「S高」「S安」と、チャートの値段のところで見つけられるよ。飛びつく前に、板も見ようね。', at: '#c-price', btn: 'わかった' },
+  { t: 'ストップ高や安のような変化も、板を見ていれば先に気づけるよ。ここまでの話をまとめると、板を見るメリットは3つあるんだ。', btn: 'まとめて！' },
+  { t: 'メリット①。注文を出す前に、「いくらで・どれだけ買える（売れる）か」がわかるよ。', at: '.board', btn: 'ふむふむ' },
+  { t: 'メリット②。指値の値段を、板を見ながら決められるよ。すぐ買いたいのか、安く買いたいのかで、使い分けよう。', at: '#o-price-field', btn: 'うん', enter: () => { UI.type = 'lmt'; renderOrderPanel(); } },
+  { t: 'メリット③。薄い板や、特別気配（ストップ高・安）のような、いつもと違う状態に先に気づけるよ。', at: '.board', btn: 'なるほど' },
+  { t: 'おしまい！わからなくなったら、また「？」を押してね。', btn: 'ありがとう！' },
+];
+// 銘柄の数字（チャートの下の枠）のミニ講座（銘柄名の横の「？」から）。売買はしない。skip = 今は出ない数字の説明は飛ばす
+const FTUT = [
+  { t: 'チャートの下の枠にある数字を、いっしょに見てみよう！どれも「この株を買っていいか」を考えるヒントになるよ。', at: '.facts', btn: 'おねがい！', view: 'trade' },
+  { t: '「時価総額」は、会社の大きさだよ。株の値段 × 発行している株の数で決まるんだ。大きい会社は、値動きが比べてゆるやかなことが多いよ。', at: '.facts .fx-cap', btn: 'ふむふむ', skip: () => isReal() },
+  { t: '「配当利回り」は、1年にもらえる配当が、いまの株の値段の何%かを表すよ。たとえば3%なら、10万円ぶん持っていると年に約3,000円もらえる計算だよ。高いほどおトクに見えるけど、株価が下がって高くなっているだけのこともあるから注意してね。', at: '.facts .fx-div', btn: 'なるほど', skip: () => isReal() || !divOn() },
+  { t: '「PBR」は、株の値段が、会社の持っている財産（純資産）の何倍かを表すよ。1倍なら、財産とちょうど同じ値段。1倍より小さいと「割安」と言われるけど、あまり儲かっていない会社だから安いこともあるんだ。', at: '.facts .fx-pbr', btn: 'わかった', skip: () => isReal() },
+  { t: '「PER」は、株の値段が、1株あたりの利益の何倍かを表すよ。10倍なら、いまの利益が続くと、10年で元が取れるイメージ。低いと割安、高いと「これから伸びる」と期待されているサインだよ。赤字の会社は計算できないので「—」になるんだ。', at: '.facts .fx-per', btn: 'へえ！', skip: () => isReal() },
+  { t: 'PBRもPERも、業種によって普通の高さがちがうよ。同じ業種の銘柄どうしで比べるのがコツ。安いから買い、と決めつけないでね。', at: '.facts', btn: 'きをつける', skip: () => isReal() },
+  { t: '「出来高」は、今日これまでに売り買いされた株の数だよ。多いほど人気があって、売りたいときに売りやすい。少ないと「薄い」状態で、成行で注文すると値段が動きやすいよ。板の数字とあわせて見よう。', at: '.facts .fx-vol', btn: 'ふむふむ' },
+  { t: '値段が大きく動いたとき、出来高も増えていれば、たくさんの人が参加した動きなので信頼しやすいよ。出来高が少ないのに動いたときは、一時的かもしれないね。', at: '.facts .fx-vol', btn: 'なるほど' },
+  { t: '「値幅制限」は、今日1日で動ける値段の範囲だよ。上の端まで来るとストップ高、下の端ならストップ安。会社が急に大きなニュースを出したときの、動きすぎ防止なんだ。', at: '.facts .fx-lim', btn: 'わかった' },
+  { t: '「始値／高値／安値」は、今日の最初の値段・いちばん高かった値段・いちばん安かった値段だよ。取引が始まる前は「—」。いまの値段が、今日の高いほうか安いほうかがわかるよ。', at: '.facts .fx-ohl', btn: 'ふむふむ' },
+  { t: '「次の決算」は、会社が成績を発表する日と、予想されている1株あたりの利益だよ。発表で予想より良いか悪いかで、株が大きく動くから、持ちこしには注意しようね。', at: '.facts .fx-earn', btn: 'きをつける', skip: () => isReal() || rank() < 4 },
+  { t: '「RSI」は、最近の14日間で、買われすぎか売られすぎかを0〜100で表すよ。70以上だと買われすぎ（下がるかも）、30以下だと売られすぎ（上がるかも）の目安。ただし、強い上昇のときは70以上のまま上がり続けることもあるよ。', at: '.facts .fx-rsi', btn: 'ふむふむ', skip: () => rank() < 4 },
+  { t: 'どの数字も、1つだけで決めないのがコツだよ。たとえば「PERが低い」「出来高が多い」「ニュースも良い」と重なったら、前向きに考えやすいよ。数字は、過去と今の目安で、未来を約束するものではないんだ。', at: '.facts', btn: 'わかった' },
+  { t: 'おしまい！わからなくなったら、銘柄名の横の「？」を押してね。', btn: 'ありがとう！' },
+];
 MTUT.forEach(st => { if (st.backTo) st.back = MTUT.findIndex(x => x.id === st.backTo); });
 // 戻るで前のステップに行っても、対象のある画面が開くように、光らせる場所から画面を決める
-const tutViewOf = at => (/^#m-sec/.test(at) ? 'hold' : /^(#stock-list|\[data-cm|\.chart-wrap|\.a-order|\.a-news|#o-|\.stepper|#modal-card)/.test(at) ? 'trade' : null);
-for (const L of [TUT, MTUT]) L.forEach(st => { if (st.at && !st.view && st.on !== 'view') st.view = tutViewOf(st.at) || undefined; });
+const tutViewOf = at => (/^#m-sec/.test(at) ? 'hold' : /^(#stock-list|\.facts|\[data-cm|\.chart-wrap|\.a-order|\.a-news|\.a-board|#c-price|#o-|\.stepper|#modal-card)/.test(at) ? 'trade' : null);
+for (const L of [TUT, MTUT, BTUT, FTUT]) L.forEach(st => { if (st.at && !st.view && st.on !== 'view') st.view = tutViewOf(st.at) || undefined; });
 MTUT.find(st => st.on === 'view' && st.ok('hold')).view = 'trade';
 // 練習を始める：いまの状態を丸ごと覚えておき、練習しやすいように取引中・練習用のお金100万円以上・建玉と注文なしにする
 function practiceStart(code) {
@@ -2154,9 +2309,16 @@ function practiceEnd(quiet) {
   if (!quiet) toast('練習の前の状態に戻しました');
 }
 function startMarginLesson() { if (UI.tut) return; UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, MTUT); }
+function startBoardLesson() {
+  if (UI.tut) return;
+  UI.btut = { type: UI.type, side: UI.side, qty: $('#o-qty').value, price: $('#o-price').value };   // 講座で注文欄を変えるので、終わったら元に戻す
+  UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, BTUT);
+}
+function startFactsLesson() { if (UI.tut) return; UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, FTUT); }
 function startTutorial() { if (modalOpen) closeModal(); G.speed = 0; renderHeader(); tutGo(0, TUT); }
 function tutGo(i, list = UI.tut?.list || TUT) {
   if (i >= list.length) { endTutorial(); return; }
+  if (list[i].skip?.()) { tutGo(i + 1, list); return; }   // 今は成り立たないステップは飛ばす
   UI.tut = { i, list };
   const st = list[i];
   if (UI.practice && list === MTUT) UI.practice.lvl = practiceLv(i);
@@ -2170,7 +2332,7 @@ function tutGo(i, list = UI.tut?.list || TUT) {
   tutPlace();
 }
 // 戻る：1つ前のステップへ。確認画面が開いていないと成り立たないステップや、もう条件を満たしているステップは飛ばす
-const tutSkipBack = st => (st.at && st.at.includes('#modal-card') && !modalOpen) || !!(st.done && st.done());
+const tutSkipBack = st => (st.at && st.at.includes('#modal-card') && !modalOpen) || !!(st.done && st.done()) || !!(st.skip && st.skip());
 function tutPrev(i, list) { let j = i - 1; while (j >= 0 && tutSkipBack(list[j])) j--; return j; }
 function tutBack() {
   const T = UI.tut; if (!T) return;
@@ -2187,7 +2349,8 @@ function tutBack() {
 }
 function endTutorial() {
   const first = !UI.tut || UI.tut.list === TUT;   // 信用のミニ講座では、はじめてのチュートリアルの記録は変えず、速さも元に戻す
-  UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true;
+  UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true; $$('.tut-ring2').forEach(d => { d.hidden = true; });
+  if (UI.btut) { UI.type = UI.btut.type; UI.side = UI.btut.side; $('#o-qty').value = UI.btut.qty; $('#o-price').value = UI.btut.price; UI.btut = null; buildTypes(); renderOrderPanel(); }
   practiceEnd();   // スキップしたときも、練習の前の状態に戻す
   if (first) { profile.tutorial = true; saveProfile(); }
   if (G) { G.speed = first ? 1 : UI.tutSpeed ?? 1; renderHeader(); }
@@ -2211,11 +2374,23 @@ function tutEvent(name, v) {
   if (st && st.on === name && (!st.ok || st.ok(v))) tutGo(UI.tut.i + 1);
 }
 // 毎フレーム、光らせる枠を対象に合わせ、吹き出しを対象と重ならない側（上か下）に置く
+// 2つ目以降の光る枠（st.also）。各要素のセレクタに合う要素を、まとめて1つの枠で囲う
+function tutExtraRings(st) {
+  const sets = st.also || [];
+  while ($$('.tut-ring2').length < sets.length) { const d = document.createElement('div'); d.className = 'tut-ring2'; document.body.append(d); }
+  $$('.tut-ring2').forEach((d, k) => {
+    const rs = (sets[k] || []).map(q => $(q)?.getBoundingClientRect()).filter(r => r && r.width);
+    d.hidden = !rs.length; if (!rs.length) return;
+    const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), rr = Math.max(...rs.map(r => r.right)), b = Math.max(...rs.map(r => r.bottom));
+    Object.assign(d.style, { left: l - 6 + 'px', top: t - 6 + 'px', width: rr - l + 12 + 'px', height: b - t + 12 + 'px' });
+  });
+}
 function tutPlace() {
   if (!UI.tut) return;
   const st = UI.tut.list[UI.tut.i];
   if (st.done && st.done()) { tutGo(UI.tut.i + 1); return; }
   const el = st.at && $(st.at), ring = $('#tut-ring'), box = $('#coach');
+  tutExtraRings(st);
   if (!el && st.back != null) { tutGo(st.back); return; }
   const r = el?.getBoundingClientRect();
   if (!r || !r.width) { ring.hidden = true; box.classList.remove('top'); return; }
@@ -2250,8 +2425,8 @@ function realDisclaimer(k) {
   return `リアル相場チャレンジの終値は、${rs?.period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当は出ません。${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
 }
 function showTitle() {
-  practiceEnd(true);
-  if (UI.tut) { UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true; }
+  practiceEnd(true); if (UI.view === 'mission') markMissionsSeen();
+  if (UI.tut) { UI.tut = null; $('#coach').hidden = true; $('#tut-ring').hidden = true; $$('.tut-ring2').forEach(d => { d.hidden = true; }); }
   stopBgm(); titleOpen = true; const el = $('#title'); el.hidden = false; const r = rank(), save = loadSave();
   const realLock = !realUnlocked(r);
   if (!anyReal() || realLock) pick.mode = 'random';
@@ -2322,7 +2497,12 @@ function confirmReset(all) {
 }
 function hideTitle() { titleOpen = false; $('#title').hidden = true; playBgm(); }
 
+function markMissionsSeen() {   // ミッション画面を離れたら、見せた達成済みを完了済みへ移す
+  let ch = false; for (const id in profile.missions) if (!profile.mseen[id]) { profile.mseen[id] = true; ch = true; }
+  if (ch) saveProfile();
+}
 function switchView(v) {
+  if (UI.view === 'mission' && v !== 'mission') markMissionsSeen();
   UI.view = v;
   for (const k of ['trade', 'hold', 'cal', 'mission', 'hint']) $('#view-' + k).hidden = k !== v;
   $$('.tabbar button').forEach(b => { if (b.dataset.view === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -2341,11 +2521,32 @@ function zoomChart(f, ax) {
   v.cnt = cnt; v.end = i - at * cnt + cnt;
 }
 function runUntil(cond) { let n = 0; while (!cond() && n++ < 400 && G.phase !== 'closed') tick(); render(); }
+function selectStock(code, scroll) {
+  G.sel = code; UI.acct = 'cash'; UI.hover = null; UI.vw.yOff = 0; $('#o-msg').textContent = ''; $('#o-price').value = ''; render();
+  if (scroll && window.innerWidth < 700 && !UI.tut) $('.a-chart').scrollIntoView({ behavior: 'smooth' });
+  tutEvent('select');
+}
 function bindUI() {
   document.addEventListener('pointerdown', () => { if (!titleOpen && bgm.paused) playBgm(); });
   // タッチ・マウスは押した瞬間に鳴らす。キーボード操作（pointerdown が無い click）は click で鳴らす
-  let sePressedAt = 0;
-  document.addEventListener('pointerdown', e => { const b = e.target.closest('button'); if (b) { sePressedAt = performance.now(); if (!silentButton(b)) playClick(); } }, true);
+  // タッチは指を離した時に鳴らす（押した瞬間に鳴らすと、リストのスクロールでも鳴ってしまう）。動いた・スクロールになった（pointercancel）ときは鳴らさない
+  let sePressedAt = 0, touchBtn = null, touchAt = null;
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest('button'); touchBtn = null;
+    if (!b) return;
+    sePressedAt = performance.now();
+    if (b.closest('#stock-list')) UI.listHold = true;
+    if (b.closest('#board')) UI.boardHold = true;
+    if (e.pointerType === 'touch') { touchBtn = b; touchAt = [e.clientX, e.clientY]; } else if (!silentButton(b)) playClick();
+  }, true);
+  document.addEventListener('pointermove', e => { if (touchBtn && Math.hypot(e.clientX - touchAt[0], e.clientY - touchAt[1]) > 8) touchBtn = null; }, true);
+  const listRelease = () => {
+    if (UI.listHold) { UI.listHold = false; if (G && UI.view === 'trade') renderList(); }
+    if (UI.boardHold) { UI.boardHold = false; if (G && UI.view === 'trade') renderBoard(); }
+  };
+  document.addEventListener('pointercancel', () => { touchBtn = null; listRelease(); }, true);
+  document.addEventListener('pointerup', () => setTimeout(listRelease, 0), true);   // click のあとに並べ直す
+  document.addEventListener('pointerup', e => { const b = touchBtn; touchBtn = null; if (b && e.target.closest('button') === b) { sePressedAt = performance.now(); if (!silentButton(b)) playClick(); } }, true);
   document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && performance.now() - sePressedAt > 1000 && !silentButton(b)) playClick(); }, true);
   document.addEventListener('click', e => {
     const t = e.target.closest('.term'); if (t) { e.preventDefault(); e.stopPropagation(); showTerm(t); return; }
@@ -2356,10 +2557,17 @@ function bindUI() {
     if (modalOpen) return;
     const sp = e.target.closest('[data-speed]'); if (sp) { G.speed = +sp.dataset.speed; renderHeader(); tutEvent('speed', G.speed); return; }
     if (e.target.closest('#skip-btn')) { if (G.phase === 'pre') { runUntil(() => G.phase === 'open'); tutEvent('skip'); } else if (G.phase === 'open') runUntil(() => G.phase === 'closed'); else dailyReport(); return; }
-    const row = e.target.closest('.row[data-code]'); if (row) { G.sel = row.dataset.code; UI.acct = 'cash'; UI.hover = null; UI.vw.yOff = 0; $('#o-msg').textContent = ''; $('#o-price').value = ''; render(); if (window.innerWidth < 700 && !UI.tut) $('.a-chart').scrollIntoView({ behavior: 'smooth' }); tutEvent('select'); return; }
+    const row = e.target.closest('.row[data-code]'); if (row) { selectStock(row.dataset.code, true); return; }
+    const nav = e.target.closest('[data-nav]'); if (nav) {   // チャートの左右の三角：銘柄リストに見えている順で、前・次の銘柄へ（端はぐるっと回る）
+      const codes = $$('#stock-list .row').map(b => b.dataset.code), i = codes.indexOf(G.sel);
+      if (codes.length > 1) selectStock(codes[(i + (nav.dataset.nav === 'next' ? 1 : codes.length - 1) + (i < 0 ? 1 : 0)) % codes.length], false);
+      return;
+    }
     const zm = e.target.closest('[data-zoom]'); if (zm) { if (zm.dataset.zoom === 'latest') { UI.vw[G.chartMode].end = null; UI.vw.yOff = 0; } else zoomChart(zm.dataset.zoom === 'in' ? 1 / 1.4 : 1.4); drawChart(); return; }
     const cm = e.target.closest('[data-cm]'); if (cm) { G.chartMode = cm.dataset.cm; UI.hover = null; renderChartHead(); drawChart(); tutEvent('cm', G.chartMode); return; }
     if (e.target.closest('#m-help')) { startMarginLesson(); return; }
+    if (e.target.closest('#b-help')) { startBoardLesson(); return; }
+    if (e.target.closest('#f-help')) { startFactsLesson(); return; }
     const ac = e.target.closest('[data-acct]');
     if (ac && ac.classList.contains('locked')) { const R = RANKS[MARGIN.rank - 1]; toast(`🔒 信用取引はランク${MARGIN.rank}「${R.n}」（${R.xp.toLocaleString()} XP）で解放されます。あと${(R.xp - profile.xp).toLocaleString()} XP`); return; }
     if (ac) { UI.acct = ac.dataset.acct; $('#o-msg').textContent = ''; renderOrderPanel(); return; }
@@ -2372,7 +2580,7 @@ function bindUI() {
     if (e.target.closest('#q-minus')) { const q = $('#o-qty'), L = lot(sel()); q.value = Math.max(L, (+q.value || L) - L); renderOrderPanel(); tutEvent('qty'); return; }
     if (e.target.closest('#q-plus')) { const q = $('#o-qty'), L = lot(sel()); q.value = (+q.value || 0) + L; renderOrderPanel(); tutEvent('qty'); return; }
     const qk = e.target.closest('[data-q]'); if (qk) { $('#o-qty').value = Math.max(lot(sel()), +qk.dataset.q); renderOrderPanel(); tutEvent('qty'); return; }
-    const bp = e.target.closest('[data-px]'); if (bp) { if (UI.type === 'mkt') UI.type = 'lmt'; $('#o-price').value = bp.dataset.px; renderOrderPanel(); return; }
+    const bp = e.target.closest('[data-px]'); if (bp) { if (UI.type === 'mkt') UI.type = 'lmt'; $('#o-price').value = bp.dataset.px; renderOrderPanel(); if (!UI.tut) { const o = $('.a-order'); o.style.scrollMarginTop = (($('.hdr')?.getBoundingClientRect().bottom || 0) + 12) + 'px'; o.scrollIntoView({ behavior: 'smooth', block: 'start' }); } tutEvent('px'); return; }
     if (e.target.closest('#o-submit')) { confirmOrder(); return; }
     const cc = e.target.closest('[data-cancel]'); if (cc) { const o = G.player.orders.find(x => x.id === +cc.dataset.cancel); if (o) { removeOrder(o); toast('注文を取り消しました'); render(); } return; }
     const nw = e.target.closest('[data-news]'); if (nw) {
@@ -2402,7 +2610,12 @@ function bindUI() {
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' && $('#modal-card [data-act="cancel"], #modal-card [data-act="close"]')) closeModal(); });
   window.addEventListener('scroll', hidePop, { passive: true });   // 用語の吹き出しは画面に固定しているので、スクロールしたら閉じる
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { hidePop(); if (modalOpen && $('#modal-card [data-act="cancel"], #modal-card [data-act="close"]')) closeModal(); } });
-  $('#sec-filter').addEventListener('change', e => { UI.filter = e.target.value; renderList(); });
+  $('#sec-filter').addEventListener('change', e => { UI.filter = e.target.value; fitSelect(e.target); renderList(); });
+  $('#sort-bar').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'sort-dir') UI.sort.desc = !UI.sort.desc; else if (b.dataset.sort !== UI.sort.key) { UI.sort.key = b.dataset.sort; UI.sort.desc = b.dataset.sort !== 'none'; }   // 標準は昇順（銘柄の並び順）、値段・騰落率は降順から
+    renderList();
+  });
   $('#o-qty').addEventListener('input', () => { renderOrderPanel(); tutEvent('qty'); });
   $('#o-price').addEventListener('input', () => renderOrderPanel());
   document.addEventListener('input', e => { if (e.target.id === 'dict-q') renderHint(e.target.value.trim()); });

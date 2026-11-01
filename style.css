@@ -71,7 +71,9 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .stat dt{font-size:11px;color:var(--muted);letter-spacing:.06em}
 .stat dd{margin:0;font-size:16px;font-weight:600;white-space:nowrap}
 .rank-chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line-strong);border-radius:99px;padding:4px 12px 4px 4px;cursor:pointer;font-size:12.5px;font-weight:700}
-.rank-chip .rk{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:2px 8px;font-family:var(--f-num);font-size:12px}
+.rank-chip{min-width:0;max-width:100%}
+.rank-chip .rk-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-chip .rk{flex:none;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:2px 8px;font-family:var(--f-num);font-size:12px}
 /* ファストスターターのランク表示は蛍光グリーン */
 .rank-chip.fast{border-color:var(--fast)}
 .rank-chip.fast .rk{background:var(--fast);color:var(--fast-ink)}
@@ -99,6 +101,10 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .a-list{grid-area:list}@media (min-width:1121px){.a-list{grid-area:auto;position:sticky;top:108px}}.a-chart{grid-area:chart}.a-news{grid-area:news}.a-board{grid-area:board}.a-order{grid-area:order}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:0}
 .p-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.sort-bar{display:flex;gap:4px;padding:6px 14px;border-bottom:1px solid var(--line)}
+.sort-bar button{font-size:12px;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.sort-bar button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.sort-bar #sort-dir{margin-left:auto}
 .p-head select{font:inherit;font-size:12px;font-weight:400;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
 .view{margin-top:12px;display:grid;gap:12px}
 .view .panel{padding:16px 18px}
@@ -123,6 +129,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .chart-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;padding:14px 16px 6px}
 .ch-name{font-size:19px;font-weight:700}
 .ch-name .code{font-size:12px;color:var(--muted);font-weight:500;margin-left:4px}
+.ch-title{display:flex;align-items:center;gap:8px}
 .ch-meta{font-size:12px;color:var(--muted)}
 .ch-price{text-align:right}
 .ch-price .big{font-size:26px;font-weight:600;line-height:1.1}
@@ -138,7 +145,12 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .seg button.locked{color:var(--muted);background:var(--soft);display:inline-flex;align-items:center;justify-content:center;gap:5px}
 .seg button.locked svg{flex:none;width:12px;height:12px}
 .ohlc{font-size:11.5px;color:var(--muted);min-height:1.4em;overflow-wrap:anywhere}
-.chart-wrap{padding:0 8px}
+.chart-wrap{padding:0 8px;display:flex;align-items:stretch;gap:4px}
+.chart-wrap #chart{flex:1 1 0;min-width:0;width:auto}
+.chart-nav{flex:none;width:26px;display:grid;place-items:center;background:none;border:0;border-radius:8px;cursor:pointer;padding:0;color:var(--muted)}
+.chart-nav:hover{background:var(--soft);color:var(--accent)}
+.chart-nav i{width:12px;height:18px;background:currentColor;clip-path:polygon(100% 0,100% 100%,0 50%)}
+.chart-nav[data-nav=next] i{clip-path:polygon(0 0,0 100%,100% 50%)}
 #chart{display:block;width:100%;height:340px;touch-action:none;cursor:grab}
 #chart.dragging{cursor:grabbing}
 @media (max-width:700px){#chart{height:260px}}
@@ -147,6 +159,12 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px 16px;margin:0;padding:12px 16px 16px;border-top:1px solid var(--line);margin-top:8px}
 .facts dt{font-size:11px;color:var(--muted)}
 .facts dd{margin:0;font-size:13.5px;font-weight:500}
+html:not([data-device=phone]) .facts{grid-template-columns:none;grid-template-rows:auto auto;grid-auto-flow:column;grid-auto-columns:auto;gap:10px 20px;overflow-x:auto}
+html:not([data-device=phone]) .facts .o1{order:-4}
+html:not([data-device=phone]) .facts .o2{order:-3}
+html:not([data-device=phone]) .facts .o3{order:-2}
+html:not([data-device=phone]) .facts .o4{order:-1}
+html:not([data-device=phone]) .facts dt,html:not([data-device=phone]) .facts dd{white-space:nowrap}
 
 /* terms */
 .term{background:none;border:0;padding:0;border-bottom:1px dotted currentColor;cursor:help;color:inherit;font:inherit;line-height:inherit}
@@ -254,6 +272,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .chk.on{background:var(--accent);border-color:var(--accent)}
 .mlist .xp{font-family:var(--f-num);font-size:12px;color:var(--muted)}
 .mlist li.lock{color:var(--muted)}
+.mlist.done li span:nth-child(2){color:var(--muted);text-decoration:line-through}
 .hint-tabs{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;margin-bottom:12px}
 .hint-tabs button{background:var(--panel);border:0;border-right:1px solid var(--line-strong);padding:12px;cursor:pointer;font-size:14px;font-weight:600}
 .hint-tabs button:last-child{border-right:0}
@@ -319,9 +338,9 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .result-sensei{margin:14px 0 6px}
 
 /* ===== チュートリアル ===== */
-#tut-ring{position:fixed;z-index:95;pointer-events:none;border:3px solid var(--accent);border-radius:12px;box-shadow:0 0 0 6px var(--accent-soft);animation:tut-pulse 1.4s ease-in-out infinite}
+#tut-ring,.tut-ring2{position:fixed;z-index:95;pointer-events:none;border:3px solid var(--accent);border-radius:12px;box-shadow:0 0 0 6px var(--accent-soft);animation:tut-pulse 1.4s ease-in-out infinite}
 @keyframes tut-pulse{50%{box-shadow:0 0 0 12px var(--accent-soft)}}
-@media (prefers-reduced-motion:reduce){#tut-ring{animation:none}}
+@media (prefers-reduced-motion:reduce){#tut-ring,.tut-ring2{animation:none}}
 #coach{position:fixed;z-index:96;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));width:min(520px,calc(100vw - 32px));background:var(--panel);color:var(--ink);border:2px solid var(--accent);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px}
 #coach.top{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
 #coach .sensei{grid-template-columns:56px minmax(0,1fr);gap:12px}
@@ -398,7 +417,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 
 /* toasts */
 @media (max-width:700px){#toasts{width:auto;left:16px;right:16px}.toast{padding:7px 12px;font-size:12px}}
-#toasts{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:80;display:flex;flex-direction:column;gap:8px;width:min(340px,calc(100vw - 32px));pointer-events:none}
+#toasts{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:55;display:flex;flex-direction:column;gap:8px;width:min(340px,calc(100vw - 32px));pointer-events:none}
 .toast{background:var(--ink);color:var(--paper);padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);transition:opacity .4s,transform .4s}
 .toast.xp{background:var(--accent);color:var(--accent-ink)}
 .toast.rank,.toast.mission{background:var(--warn);color:var(--on-signal)}
@@ -479,7 +498,7 @@ h2,h3,h4{text-wrap:balance;margin:0}
 [data-device="phone"] .list{max-height:380px}
 [data-device="phone"] #chart{height:260px}
 /* スマホの見出し：ランクとメニューを右の空きに置いて高さを抑える */
-[data-device="phone"] .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"brand clock clock" "ctrl ctrl ctrl" "asset day day" "idx rank menu";gap:6px 10px;padding-block:8px 6px;align-items:center}
+[data-device="phone"] .topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"brand clock clock" "ctrl ctrl ctrl" "asset day day" "idx rank menu";gap:6px 10px;padding-block:8px 6px;align-items:center}
 [data-device="phone"] .brand{grid-area:brand}
 [data-device="phone"] .exch{display:none}
 [data-device="phone"] .logo{font-size:22px}
@@ -494,10 +513,19 @@ h2,h3,h4{text-wrap:balance;margin:0}
 [data-device="phone"] .stat:nth-child(2){grid-area:day}
 [data-device="phone"] .stat:nth-child(3){grid-area:idx}
 [data-device="phone"] .stat dd{font-size:15px}
-[data-device="phone"] .rank-chip{grid-area:rank;font-size:11.5px;padding:3px 10px 3px 3px}
+[data-device="phone"] .rank-chip{grid-area:rank;justify-self:end;font-size:11.5px;padding:3px 10px 3px 3px}
+[data-device="phone"] .stat:nth-child(3) dd{white-space:nowrap}
 [data-device="phone"] .menu-btn{grid-area:menu}
 [data-device="phone"] .tabbar{gap:0;justify-content:space-around}
 [data-device="phone"] .tabbar button{padding:9px 8px;font-size:13px}
+
+.speed button,.phase{white-space:nowrap}
+/* スマホ：日付と「◯日目」は折り返さない。銘柄の前・次ボタンは、名前と「？」から少し離して見出しの行に置く（チャートの左右のものは隠す） */
+[data-device="phone"] .clock .date{white-space:nowrap}
+.ch-title .chart-nav{display:none}
+[data-device="phone"] .ch-title .chart-nav{display:grid;width:30px;height:30px}
+[data-device="phone"] .ch-title .chart-nav[data-nav=prev]{margin-left:14px}
+[data-device="phone"] .chart-wrap .chart-nav{display:none}
 
 /* 新しいニュースのお知らせ（×1〜×4 で進めているとき。全端末） */
 .toast.news{pointer-events:auto;cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line-strong);border-left:4px solid var(--accent);text-align:left;font:inherit;font-size:13px;width:100%;display:block}
@@ -511,3 +539,5 @@ button{touch-action:manipulation}
 /* 取引成績ボタンは、スマホでは右寄せにせず他のボタンと同じ並びにする */
 [data-device=phone] .go #go-shop{margin-left:0;margin-right:auto}
 [data-device=phone] .go #go-rec{margin-left:auto}
+
+.tut-ring2[hidden]{display:none}

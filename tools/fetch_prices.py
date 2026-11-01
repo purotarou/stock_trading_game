@@ -5,7 +5,7 @@
 
     pip install yfinance pandas
     python3 tools/fetch_prices.py --scenario corona2020   # data/corona2020.js（const CORONA2020）。2020年
-    python3 tools/fetch_prices.py --scenario recent       # data/recent.js（const RECENT）。2026-01-01 〜 2026-09-30
+    python3 tools/fetch_prices.py --scenario recent       # data/recent.js（const RECENT）。2026-01-01 〜 2026-10-30
 
 使う価格は Close（株式分割のみ反映・配当は反映しない）に固定している。
 
@@ -15,6 +15,12 @@
 今ある data/corona2020.js の末尾に CORONA2020.history として足す（2020年の dates / stocks / prices には触れない）。
 --history なしで実行したときも、本編のあとに過去分を取得して一緒に書き出す。
 シナリオごとの期間・出力先・変数名・銘柄名の上書き・検証の期待値は SCENARIOS にまとめてある。
+
+    python3 tools/fetch_prices.py --scenario recent --update
+
+は追記専用の更新モード。今ある出力ファイルの最後の日付より後の営業日（今日より前の分だけ）を取得して、本編の末尾に足す。
+取得結果の最後の数日が今ある値と食い違っていたら（株式分割など）、何も書かずに止まって全体の取り直しを促す。
+新しい営業日がなければ何も変えずに終わる。過去チャートと、他のファイルには触れない。
 """
 
 import argparse
@@ -23,8 +29,9 @@ import json
 import re
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     import pandas as pd
@@ -46,16 +53,18 @@ SCENARIOS = {
         "expect_first": "2020-01-06", "expect_last": "2020-12-30",
         "expect_hist_first": "2019-01-04", "expect_hist_last": "2019-12-30",
         "names": {},
+        "update": False,  # --update は recent だけ（2020年のデータは過去の確定分なので延ばさない）
         "nintendo_check": True,  # 任天堂 2020-12-30 = 6583円 / 年間最安値が3月、の検証はこのシナリオだけ
     },
     "recent": {
         "var": "RECENT",
         "out": DATA_DIR / "recent.js",
-        "start": "2026-01-01", "end": "2026-10-01", "last": "2026-09-30",
+        "start": "2026-01-01", "end": "2026-10-31", "last": "2026-10-30",
         "hist_start": "2025-01-01", "hist_last": "2025-12-31",
-        "expect_first": "2026-01-05", "expect_last": "2026-09-30",
+        "expect_first": "2026-01-05", "expect_last": "2026-10-30",
         "expect_hist_first": "2025-01-06", "expect_hist_last": "2025-12-30",
         "names": {"4689": "LINEヤフー"},
+        "update": True,
         "nintendo_check": False,
     },
 }
@@ -65,6 +74,8 @@ SCEN = None
 VAR = START = END = LAST = HIST_START = HIST_LAST = HIST_MARK = None
 OUT = None
 RETRIES = 3
+OVERLAP_DAYS = 5   # --update で、すでにある値と見比べる直近の営業日の数
+OVERLAP_FETCH_DAYS = 14   # そのために、最後の日付から何暦日さかのぼって取得するか
 PRICE_COLUMN = "Close"  # auto_adjust=False のときの Close = 分割のみ反映。Adj Close は使わない
 OHLCV = ["Open", "High", "Low", "Close", "Volume"]
 
@@ -106,7 +117,7 @@ STOCKS = BASE_STOCKS
 def use_scenario(name):
     """選ばれたシナリオの期間・出力先・変数名・銘柄名を、このファイルの定数に反映する。"""
     global SCEN, VAR, START, END, LAST, HIST_START, HIST_LAST, HIST_MARK, OUT, STOCKS
-    SCEN = SCENARIOS[name]
+    SCEN = dict(SCENARIOS[name], name=name)
     VAR, OUT = SCEN["var"], SCEN["out"]
     START, END, LAST = SCEN["start"], SCEN["end"], SCEN["last"]
     HIST_START, HIST_LAST = SCEN["hist_start"], SCEN["hist_last"]
@@ -248,6 +259,23 @@ def write_js(dates, stocks):
         )
     lines += ["  ]", "};", ""]
     OUT.write_text("\n".join(lines), encoding="utf-8")
+
+
+STOCK_LINE = re.compile(r'^(    \{ code: "(\w+)", .*?, prices: )(\[.*?\])( \},)$', re.M)
+HIST_CUT = "// 開始前の過去チャート"
+
+
+def read_js_main(head):
+    """出力ファイルの本編の部分から {dates, 各銘柄の prices} を読む。"""
+    dates = json.loads(re.search(r"^  dates: (\[.*?\]),$", head, re.M).group(1))
+    return dates, {m.group(2): json.loads(m.group(3)) for m in STOCK_LINE.finditer(head)}
+
+
+def update_main(head, dates, new_prices):
+    """本編の部分の dates 行と各銘柄の prices だけを差し替える（銘柄の並び・名前・業種の文字列はそのまま）。"""
+    dump = lambda x: json.dumps(x, ensure_ascii=False, separators=(",", ":"))
+    head = re.sub(r"^  dates: \[.*?\],$", lambda m: "  dates: " + dump(dates) + ",", head, count=1, flags=re.M)
+    return STOCK_LINE.sub(lambda m: m.group(1) + dump(new_prices[m.group(2)]) + m.group(4), head)
 
 
 def width(s):
@@ -440,16 +468,23 @@ def verify(dates, stocks, failed, fill_report):
 def parse_args():
     ap = argparse.ArgumentParser(
         description="実在銘柄の株価を取得して data/ 以下の .js に書き出す。作るものは --scenario で必ず指定する。",
-        epilog="例:\n  python3 tools/fetch_prices.py --scenario recent\n  python3 tools/fetch_prices.py --scenario recent --history",
+        epilog="例:\n  python3 tools/fetch_prices.py --scenario recent\n  python3 tools/fetch_prices.py --scenario recent --history\n  python3 tools/fetch_prices.py --scenario recent --update",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scenario", required=True, choices=list(SCENARIOS),
                     help="; ".join("%s = %s（%s 〜 %s → %s）" % (k, v["var"], v["start"], v["last"], v["out"].name) for k, v in SCENARIOS.items()))
     ap.add_argument("--history", action="store_true",
                     help="過去チャートだけを取得して、今ある出力ファイルの末尾に足す（本編には触れない）")
+    ap.add_argument("--update", action="store_true",
+                    help="追記専用: 今ある最後の日付より後の営業日（今日より前）だけを取得して足す。直近の値が食い違えば何も書かずに止まる")
     if len(sys.argv) == 1:  # 引数なしでは実行せず、使い方を出す
         ap.print_help()
         sys.exit(2)
-    return ap.parse_args()
+    args = ap.parse_args()
+    if args.update and args.history:
+        ap.error("--update と --history は同時に使えません")
+    if args.update and not SCENARIOS[args.scenario]["update"]:
+        ap.error("--update は %s では使えません" % args.scenario)
+    return args
 
 
 def main():
@@ -470,7 +505,115 @@ def report_corona_hash(scenario, before):
         before, after, "変更なし" if before == after else "★ 変わっています（要確認）"))
 
 
+def run_update():
+    """追記専用の更新。最後の日付より後で、今日より前の営業日だけを足す。
+    直近の数日が今ある値と食い違ったら、何も書かずに止まる（株式分割などで過去の値が変わった可能性）。"""
+    if not OUT.exists():
+        sys.exit("%s がありません。先に --update なしで全体を作ってください。" % OUT)
+    text = OUT.read_text(encoding="utf-8")
+    cut = text.find(HIST_CUT)
+    head, tail = (text, "") if cut < 0 else (text[:cut], text[cut:])
+    dates, old = read_js_main(head)
+    last = dates[-1]
+    today = datetime.now(ZoneInfo("Asia/Tokyo")).date().isoformat()   # 取引が終わっていない当日は入れない（today 未満だけ）
+    print("今ある最後の日付: %s / 今日（日本時間）: %s" % (last, today))
+    if today <= last:
+        print("新しい営業日はありません。何も変えていません。")
+        return
+
+    names = {c: n for c, n, _ in STOCKS}
+    start = (date.fromisoformat(last) - timedelta(days=OVERLAP_FETCH_DAYS)).isoformat()
+    print("取得: %s 〜 %s（今日は含まない）" % (start, today))
+    raw, failed = {}, []
+    for i, code in enumerate(old, 1):
+        print("[%2d/%d] %s %s ... " % (i, len(old), code, names.get(code, "")), end="", flush=True)
+        try:
+            raw[code] = fetch_one(code, start, today)
+            print("%d日分" % len(raw[code]))
+        except Exception as e:
+            failed.append((code, names.get(code, ""), str(e)))
+            print("失敗")
+        time.sleep(0.5)
+    if failed:
+        sys.exit("取得できなかった銘柄があるため、何も書かずに止まります: %s" % ", ".join("%s %s" % (c, n) for c, n, _ in failed))
+
+    # 1) 直近の営業日が、すでにある値と同じか
+    all_dates = sorted(set().union(*[set(s) for s in raw.values()]))
+    window = dates[-OVERLAP_DAYS:]
+    got = [d for d in all_dates if window[0] <= d <= last]
+    problems = []
+    if got != window:
+        problems.append("営業日の並びが違う: 今ある %s / 取得 %s" % (window, got))
+    checked = skipped = 0
+    for code, prices in old.items():
+        for d in window:
+            v = raw[code].get(d)
+            if v is None:
+                skipped += 1
+                continue
+            checked += 1
+            ex = prices[dates.index(d)]
+            if abs(round_price(v) - ex) > 0.011:
+                problems.append("%s %s  %s  今ある値 %s / 取得した値 %s" % (code, pad(names.get(code, ""), 34), d, ex, round_price(v)))
+    print("\n=== 重なりの確認（直近 %d 営業日 %s 〜 %s × %d銘柄） ===" % (len(window), window[0], last, len(old)))
+    if problems:
+        print("  [警告] 今ある値と一致しません:")
+        for m in problems:
+            print("         " + m)
+        sys.exit("\n株式分割などで過去の値が変わった可能性があります。追記せずに止まりました（ファイルは変更していません）。\n"
+                 "全体を取り直してください: python3 tools/fetch_prices.py --scenario %s" % SCEN["name"])
+    print("  [OK  ] %d件すべて一致%s" % (checked, "" if not skipped else "（取得に値がなく比べられなかった %d件）" % skipped))
+
+    # 2) 新しい営業日（last より後・今日より前）
+    new = [d for d in all_dates if last < d < today]
+    if not new:
+        print("\n新しい営業日はありません。何も変えていません。")
+        return
+    ext = [last] + new
+    new_prices, fill_report = {}, []
+    for code, prices in old.items():
+        series = dict(raw[code])
+        series[last] = prices[-1]   # 補完の起点は、すでにある最後の値
+        ps, filled = fill_gaps(ext, series)
+        new_prices[code] = prices + [round_price(v) for v in ps[1:]]
+        for d, why in filled:
+            if d != last:
+                fill_report.append((code, names.get(code, ""), d, why))
+
+    print("\n=== 追記する営業日 ===")
+    print("  %d日: %s 〜 %s" % (len(new), new[0], new[-1]))
+    print("  補完: %s" % ("なし" if not fill_report else ", ".join("%s %s %s" % (c, n, d) for c, n, d, _ in fill_report)))
+    jumps = []
+    for code, ps in new_prices.items():
+        for i in range(len(dates), len(ps)):
+            ch = (ps[i] / ps[i - 1] - 1) * 100
+            if abs(ch) > 30:
+                jumps.append((code, names.get(code, ""), (dates + new)[i], ps[i - 1], ps[i], ch))
+    for code, name, d, a, b, ch in jumps:
+        print("  [警告] 前日比 ±30%% 超 %s %s  %s  %s → %s (%+.1f%%)" % (code, pad(name, 34), d, a, b, ch))
+    if jumps:
+        sys.exit("\n前日比が大きい日があるため、追記せずに止まりました（ファイルは変更していません）。")
+    print("  [OK  ] 前日比 ±30% 超の日: なし")
+
+    # 3) 書き出して、書いたものを読み直して確かめる
+    all_new = dates + new
+    OUT.write_text(update_main(head, all_new, new_prices) + tail, encoding="utf-8")
+    d2, p2 = read_js_main(OUT.read_text(encoding="utf-8").split(HIST_CUT)[0])
+    ok = (d2 == all_new and p2 == new_prices and all(len(v) == len(all_new) for v in p2.values())
+          and all(p2[c][:len(dates)] == old[c] for c in old) and OUT.read_text(encoding="utf-8").endswith(tail))
+    if not ok:
+        sys.exit("★ 書き出したあとの読み直しが合いません。%s を確認してください（バックアップから戻せます）。" % OUT)
+    print("\n追記: %s（%d銘柄 × %d日 → %d日, %s 〜 %s）。過去分・既存の日付と値は変わっていません。" % (
+        OUT, len(old), len(dates), len(all_new), all_new[0], all_new[-1]))
+    if new[-1] > LAST:
+        print("※ 最終日が SCENARIOS の last（%s）を超えました。全体を取り直すと切り捨てられるので、"
+              "SCENARIOS の end / last / expect_last と script.js の REAL_SETS の span も合わせてください。" % LAST)
+
+
 def run(args):
+    if args.update:
+        run_update()
+        return
     if args.history:
         if not OUT.exists():
             sys.exit("%s がありません。先に --history なしで本編を作ってください。" % OUT)

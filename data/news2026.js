@@ -3,7 +3,7 @@
 // importance: 3 = その日の株価が大きく動きうる / 2 = 決算など通常 / 1 = 補足
 // type: "fact" = 実際の出来事 / "report" = 発表前の観測報道 / "rumor" = 当時実際に出回った噂
 // 見出し・本文は報道や公式発表を要約して書き直したもの。各ニュースの上に出典（2つ以上）を残す。
-// 期間は 2026-01-05 〜 2026-09-30。米国の発表は米国の日付で書く（日本では翌日の未明になる）。
+// 期間は 2026-01-05 〜 2026-10-29。米国の発表は米国の日付で書く（日本では翌日の未明になる）。
 const NEWS2026 = [
 
   /* ===================== 経済・市場 ===================== */
@@ -188,6 +188,61 @@ const NEWS2026 = [
   { date: "2026-09-18", headline: "日銀が政策金利を1.25%程度に引き上げ。前回の利上げから3カ月",
     body: "2人の委員が反対した。", codes: [], importance: 3, type: "fact" },
 
+  // https://www.zaikei.co.jp/article/20260930/871782.html
+  // https://www.niigata-nippo.co.jp/articles/-/915810
+  { date: "2026-09-30", headline: "30日の日経平均は1,272円45銭高の6万6,753円72銭。3日ぶりの上昇",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://www.mof.go.jp/policy/international_policy/reference/feio/data/monthly/20260930.html
+  // https://www.nikkei.com/article/DGXZQOUA301LU0Q6A930C2000000/
+  { date: "2026-09-30", headline: "財務省が、8月27日〜9月28日の為替介入はなかったと発表",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2041591
+  // https://www.dir.co.jp/report/research/economics/japan/20261001_026103.html
+  { date: "2026-10-01", headline: "9月の日銀短観、大企業製造業の景況感はプラス24で6期連続の改善。大企業非製造業はプラス35で5期ぶりの悪化",
+    body: "3カ月後の見通しは、大企業製造業がプラス21、大企業非製造業がプラス30。", codes: [], importance: 2, type: "fact" },
+
+  // https://www.oanda.jp/lab-education/?p=129865
+  // https://www.smd-am.co.jp/market/ichikawa/2026/10/irepo261007/
+  { date: "2026-10-06", headline: "6日の日経平均は737円12銭高の7万683円98銭。終値の7万円台は7月1日以来、約3カ月ぶり",
+    body: "", codes: [], importance: 2, type: "fact" },
+
+  // https://kumanichi.com/articles/2043510
+  // https://finance.limo.media/articles/943
+  { date: "2026-10-06", headline: "10年物国債の入札で表面利率が年3.1%に。1996年8月以来、約30年ぶりの高さ",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2044297
+  // https://www.businessinsider.jp/article/2610-news-long-bonds-hit-the-clearance-rack/
+  { date: "2026-10-07", headline: "米長期金利（10年債利回り）が一時5.3%台に上昇。2002年以来の高さ",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://www.bls.gov/news.release/archives/cpi_10142026.htm
+  // https://www.jetro.go.jp/view_interface.php?blockId=41830034
+  { date: "2026-10-14", headline: "米国の9月の消費者物価は前年同月比3.7%上昇。食品とエネルギーを除くと2.6%上昇",
+    body: "", codes: [], importance: 2, type: "fact" },
+
+  // https://kumanichi.com/articles/2046867
+  // https://finance.matsui.co.jp/news/627748/index
+  { date: "2026-10-15", headline: "15日の日経平均は3,318円34銭安の6万4,425円95銭。6日続けて下がり、下げ幅は過去3番目",
+    body: "", codes: [], importance: 3, type: "fact" },
+
+  // https://www.customs.go.jp/toukei/shinbun/trade-st/gaiyo2026_09.pdf
+  // https://www.logi-today.com/1013385
+  { date: "2026-10-21", headline: "9月の貿易収支は5,365億円の赤字。赤字は5カ月連続",
+    body: "輸出は16.7%増の10兆9,723億円、輸入は18.9%増の11兆5,088億円で、どちらも9月として過去最高。", codes: [], importance: 1, type: "fact" },
+
+  // https://www.chunichi.co.jp/article/1328496
+  // https://indexes.nikkei.co.jp/nkave/archives/data
+  { date: "2026-10-22", headline: "22日の日経平均は1,713円40銭安の6万2,907円84銭。6万3,000円を下回る",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm
+  // https://investinglive.com/central-banks/fomc-decision-oct-28/
+  { date: "2026-10-28", headline: "米FRBが政策金利を3.75〜4.00%に据え置き。2人は利上げを主張して反対",
+    body: "日本時間29日未明の発表。", codes: [], importance: 2, type: "fact" },
+
   /* ===================== 政策・社会の出来事 ===================== */
 
   // https://www.nishimura.com/sites/default/files/newsletters/file/china_competition_law_international_trade_260120_ja.pdf
@@ -335,6 +390,42 @@ const NEWS2026 = [
   { date: "2026-09-24", headline: "中国の習近平国家主席が国賓として訪米し、ホワイトハウスでトランプ大統領と会談",
     body: "AIのリスクをめぐる対話の枠組みの設置や、中国による米国産石炭の輸入で合意した。", codes: [], importance: 2, type: "fact" },
 
+  // https://internet.watch.impress.co.jp/docs/column/keyword/2148826.html
+  // https://www.trendmicro.com/ja_jp/jp-security/26/h/securitytrend-20260814-01.html
+  { date: "2026-10-01", headline: "能動的サイバー防御の関連法が施行。重大なサイバー攻撃の攻撃元のサーバーに入り、無害化する措置がとれるように",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2042949
+  // https://www.nikkei.com/article/DGXZQOUA291QJ0Z20C26A9000000/
+  // https://www.jimin.jp/news/press/214303.html
+  { date: "2026-10-05", headline: "臨時国会が召集。会期は12月12日までの69日間。高市首相が所信表明演説",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2044798
+  // https://www.oanda.jp/lab-education/market_news/kn_2026100901001120/
+  { date: "2026-10-09", headline: "政府が、飲食料品の消費税率を2027年4月から2年間1%に引き下げる法案を閣議決定",
+    body: "8月5日に基本方針、9月15日に大綱を閣議決定していた。", codes: [], importance: 2, type: "fact" },
+
+  // https://www.chunichi.co.jp/article/1324364
+  // https://www.bloomberg.com/jp/news/articles/2026-10-13/TMTK02KK3NY900
+  { date: "2026-10-13", headline: "政府が、ホルムズ海峡を通らない原油の調達を支援する法案など3法案を閣議決定",
+    body: "海峡を通らずに原油を輸入する事業者に、輸送費の増加分を交付する制度をつくる。財源は事業者が納める納付金。", codes: [], importance: 1, type: "fact" },
+
+  // https://www.chunichi.co.jp/article/1329328
+  // https://news.infoseek.co.jp/article/jiji_2026102300839/
+  { date: "2026-10-23", headline: "高市首相が、ガソリンなど燃料油への補助制度の見直しを検討するよう赤沢経済産業相に指示",
+    body: "レギュラーガソリンは1リットル170円程度を目安に抑えている。支援の単価や措置の終わり方も含めて検討し、補助は当面続ける。", codes: [], importance: 2, type: "fact" },
+
+  // https://www.kab.co.jp/news/article/17002301
+  // https://www.dlri.co.jp/report/macro/666941.html
+  { date: "2026-10-28", headline: "自民党が、ガソリン補助を段階的に縮小し、基準の価格を12月以降に毎月5円程度ずつ引き上げるよう求める提言を高市首相に提出",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://www.mofa.go.jp/mofaj/erp/erp_2/de/pageit_000001_03282.html
+  // https://www.newsweekjapan.jp/articles/-/338349
+  { date: "2026-10-28", headline: "高市首相が、来日したドイツのメルツ首相と首相官邸で会談し、首脳共同声明を発表",
+    body: "先端技術と経済安全保障の協力についての共同宣言も出した。", codes: [], importance: 1, type: "fact" },
+
   /* ===================== 暮らし・スポーツ・天気・災害 ===================== */
   // 海外で行われた大会は、現地の日付で書く
 
@@ -449,6 +540,41 @@ const NEWS2026 = [
   { date: "2026-09-27", headline: "大相撲秋場所の千秋楽。横綱大の里が大関安青錦との相星決戦を制し、6度目の優勝",
     body: "12勝3敗。", codes: [], importance: 1, type: "fact" },
 
+  // https://kumanichi.com/articles/2041174
+  // https://www.nippon.com/ja/japan-data/h02899/
+  { date: "2026-09-30", headline: "帝国データバンクの調べで、10月に値上げされる飲食料品は3,153品目。2カ月続けて3,000品目を超える",
+    body: "2026年に値上げが判明した品目は合わせて2万187品目で、2年続けて2万品目を超えた。", codes: [], importance: 1, type: "fact" },
+
+  // https://www.tus.ac.jp/today/archive/20261007_3541.html
+  // https://www.nippon.com/ja/japan-data/h02923/
+  { date: "2026-10-07", headline: "ノーベル化学賞に、東京理科大学名誉教授の硤合（そあい）憲三氏ら2人",
+    body: "日本人の化学賞の受賞は2年続けて。", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2049640
+  // https://weathernews.jp/news/202610/230061/
+  { date: "2026-10-23", headline: "大型で非常に強い台風30号が先島諸島に接近。気象庁は、宮古島地方と八重山地方で線状降水帯が発生するおそれがあると発表",
+    body: "気象庁は、暴風や高波、土砂災害、高潮に厳重な警戒を呼びかけた。", codes: [], importance: 1, type: "fact" },
+
+  // https://kumanichi.com/articles/2049663
+  // https://www.dlri.co.jp/report/macro/666835.html
+  { date: "2026-10-23", headline: "9月の全国の消費者物価（生鮮食品を除く）は前年同月比2.1%上昇。2%台は9カ月ぶり",
+    body: "コメ類は20.6%下落し、比べられる1971年以降で最大の下げ幅。", codes: [], importance: 2, type: "fact" },
+
+  // https://www.cas.go.jp/jp/siryou/koshitsutempan/index.html
+  // https://kumanichi.com/articles/2017170
+  { date: "2026-10-24", headline: "改正皇室典範が施行",
+    body: "女性皇族が結婚後も皇族の身分を保てるようにすることと、旧11宮家の男系男子を養子に迎える制度が柱。7月24日に公布されていた。", codes: [], importance: 1, type: "fact" },
+
+  // https://www.data.jma.go.jp/osaka/topics/R08/20261028_kogarashi.pdf
+  // https://news.web.nhk/newsweb/na/nd-20261028de66801
+  { date: "2026-10-28", headline: "気象庁が、東京地方と近畿地方で木枯らし1号が吹いたと発表。いずれも昨年より6日早い",
+    body: "", codes: [], importance: 1, type: "fact" },
+
+  // https://npb.jp/nippons/2026/dailyreport_1028.html
+  // https://npb.jp/bis/scores/nipponseries/boxscore2026_4.html
+  { date: "2026-10-28", headline: "プロ野球の日本シリーズで、ソフトバンクがDeNAに4連勝し、2年連続13度目の日本一",
+    body: "", codes: [], importance: 1, type: "fact" },
+
   /* ===================== 業界ニュース ===================== */
 
   // https://www.logi-today.com/917532
@@ -501,6 +627,26 @@ const NEWS2026 = [
   // https://www.nippon.com/ja/japan-data/h02895/
   { date: "2026-09-16", headline: "8月の訪日客は309万8,900人で、前年同月比9.6%減。中国からは59.0%減",
     body: "日本政府観光局の推計。韓国、マレーシアなど14の市場では8月として過去最多。", codes: ["9202", "9201", "9603"], importance: 2, type: "fact" },
+
+  // https://www.aviationwire.jp/?p=352486
+  // https://www.travelvoice.jp/20261016-160688
+  { date: "2026-10-15", headline: "日本航空と全日空が、11〜12月発券分の国際線の燃油サーチャージを引き上げると発表",
+    body: "欧米線は片道6万2,000円。政府の航空燃料への補助を反映した額。", codes: ["9202", "9201"], importance: 1, type: "fact" },
+
+  // https://www.travelvoice.jp/20261021-160712
+  // https://honichi.com/news/2026/10/21/inbound202609/
+  { date: "2026-10-21", headline: "9月の訪日客は310万3,700人で、前年同月比5.0%減。中国からは44.5%減",
+    body: "日本政府観光局の推計。2カ月続けて前年を下回った。韓国、台湾など7つの市場では9月として過去最多。", codes: ["9202", "9201", "9603"], importance: 2, type: "fact" },
+
+  // https://www.ryutsuu.biz/sales/s102648.html
+  // https://honichi.com/news/2026/10/30/department_202609/
+  { date: "2026-10-23", headline: "日本百貨店協会の発表で、9月の全国の百貨店売上高は前年同月比4.2%増。9カ月続けての増加",
+    body: "免税売上高は25.3%増の約496億円で、9月として過去最高。", codes: ["3099", "8233"], importance: 1, type: "fact" },
+
+  // https://www.jfnet.or.jp/wp/wp-content/uploads/2026/10/getujidata-2026-9.pdf
+  // https://news.shoninsha.co.jp/statistics/322387
+  { date: "2026-10-26", headline: "日本フードサービス協会の調べで、9月の外食の売上高は前年同月比7.3%増",
+    body: "客単価は4.9%上がった。", codes: ["3197"], importance: 1, type: "fact" },
 
   /* ===================== 企業ニュース（1）：9202〜4911 ===================== */
   // 決算の数字は会社の決算短信・決算資料のとおり。純利益は親会社株主（所有者）に帰属する利益
@@ -609,6 +755,16 @@ const NEWS2026 = [
   { date: "2026-08-05", headline: "資生堂の1〜6月期は、純利益が前年同期の3.1倍の296億円",
     body: "通期の予想は変えていない。", codes: ["4911"], importance: 2, type: "fact" },
 
+  // https://www.nikkei.com/article/DGXZQOUB139LQ0T11C26A0000000/
+  // https://news.shoninsha.co.jp/financial/321193
+  { date: "2026-10-15", headline: "高島屋が通期の業績予想を上方修正。営業利益の予想は575億円から590億円に",
+    body: "3〜8月期の営業利益は16%増の275億円。", codes: ["8233"], importance: 2, type: "fact" },
+
+  // https://www.jiji.com/jc/article?k=2026102900979&g=eco
+  // https://finance.biggo.jp/news/JP_4661.T_2026-10-30
+  { date: "2026-10-29", headline: "オリエンタルランドの4〜9月期は、売上高が10.3%増の3,487億円、営業利益が15%増の784億円。いずれも中間期として過去最高",
+    body: "入園者数は6.9%増の1,310万人。通期の業績予想を引き上げた。", codes: ["4661"], importance: 2, type: "fact" },
+
   /* ===================== 企業ニュース（2）：8306〜9843 ===================== */
 
   // https://www2.jpx.co.jp/disc/72030/081220260730503849_tse-qcedifsm-72030-20260804372030-ixbrl.htm
@@ -685,6 +841,16 @@ const NEWS2026 = [
   { date: "2026-08-07", headline: "ニトリホールディングスの4〜6月期は、売上収益が2.3%減の2,263億円、営業利益が1.1%減の365億円",
     body: "通期の予想は変えていない。", codes: ["9843"], importance: 1, type: "fact" },
 
+  // https://kumanichi.com/articles/2040803
+  // https://www.timeslive.co.za/motoring/2026-09-29-toyota-august-sales-production-fall-for-second-straight-month/
+  { date: "2026-09-29", headline: "トヨタ自動車の8月の世界販売は、前年同月比6.4%減の79万743台。2カ月続けて前年を下回る",
+    body: "", codes: ["7203"], importance: 1, type: "fact" },
+
+  // https://www.niigata-nippo.co.jp/articles/-/933343
+  // https://www.daily.co.jp/society/main/2026/10/29/0020979690.shtml
+  { date: "2026-10-29", headline: "トヨタ自動車の4〜9月の世界販売は、前年同期比4.0%減の505万台。上半期としては2年ぶりの前年割れ",
+    body: "中国は25.1%減の68万台。", codes: ["7203"], importance: 1, type: "fact" },
+
   /* ===================== 企業ニュース（3）：9722・8698〜9104 ===================== */
 
   // https://s.kabutan.jp/news/k202608060164/
@@ -743,6 +909,16 @@ const NEWS2026 = [
   { date: "2026-08-05", headline: "日本郵船の4〜6月期は、経常利益が27.3%増の712億円",
     body: "", codes: ["9101"], importance: 1, type: "fact" },
 
+  // https://www.chugai-pharm.co.jp/news/detail/20261027170000_1629.html
+  { date: "2026-10-27", headline: "中外製薬の1〜9月期は、Core営業利益が19.0%増の5,361億円",
+    body: "Coreベースの売上収益は17.2%増の1兆681億円。通期の予想を上回る見込みとした。", codes: ["4519"], importance: 2, type: "fact" },
+
+  // https://www.advantest.com/ja/news/2026/mpd9kn0000000ger-att/J_FR_FY2026_2Q.pdf
+  // https://www.advantest.com/ja/news/2026/mpd9kn0000000gf6-att/J_Info_20261028_01.pdf
+  // https://www.sbbit.jp/article/st/187869
+  { date: "2026-10-28", headline: "アドバンテストが今期の業績予想を上方修正。営業利益の予想は8,460億円から9,670億円に",
+    body: "4〜9月期は、売上高が60.5%増の8,452億円、営業利益が96.5%増の4,568億円。上限2,800億円の自社株買いも決めた。", codes: ["6857"], importance: 3, type: "fact" },
+
   /* ===================== 観測報道（正式な発表の前に実際にあった報道） ===================== */
   // 報道があった日付で入れる。報じられた内容は確定した事実ではない
 
@@ -790,6 +966,16 @@ const NEWS2026 = [
   // https://www.sakigake.jp/news/article/20260818CO0048/
   { date: "2026-08-18", headline: "米中首脳が9月24日に会談する方向と米メディアが報じる",
     body: "", codes: [], importance: 1, type: "report" },
+
+  // https://kumanichi.com/articles/2043966
+  // https://www.oanda.jp/lab-education/?p=129951
+  { date: "2026-10-07", headline: "政府が、災害の復旧などに充てる2026年度の第2次補正予算を、限られた規模で編成する方向と共同通信が報じる",
+    body: "", codes: [], importance: 1, type: "report" },
+
+  // https://media.crefty.jp/column/boj-october-2026-rate-hold-outlook/
+  // https://txbiz.tv-tokyo.co.jp/txn/news_txn/post_351027
+  { date: "2026-10-22", headline: "日銀が10月29〜30日の金融政策決定会合で、政策金利を据え置く方向と日本経済新聞などが報じる",
+    body: "", codes: [], importance: 2, type: "report" },
 
   /* ===================== 当時実際に出回った噂と、その公式な否定・注意喚起 ===================== */
   // 噂の date は、出回っていたことを資料で確認できる最初の日付
