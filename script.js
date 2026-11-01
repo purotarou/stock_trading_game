@@ -75,6 +75,51 @@ const DEFS = [
   ['K604','パワーエッグス','growth',1620,45,0,[],4,1.0,'大型の蓄電池を開発するベンチャー。'],
   ['K605','メルカル','growth',288,120,0,[],4,.9,'フリマアプリを運営。'],
 ];
+// 追加銘柄（ランダム相場だけ）。ランク7に到達したあとに始めたゲームから出る（profile.r7）。G.stocks には入れず G.extra に持ち、
+// 乱数は銘柄ごとの専用のもの（s.r）だけを使う。市場・業種の動きは30銘柄で引いた値を読むだけなので、30銘柄・指数・ニュースは変わらない
+// shares = 発行済株式数(百万株)、dy = 配当利回り、rec = 権利確定月、sm = 値動きの倍率、kind = 種類（KINDS）
+// p = 種類の既定値（KINDS[kind].p）を、この銘柄だけ上書きするもの（loss = 赤字、per = PER の基準値も使える）、perk = 株主優待 { m: 権利確定月, yen: 1回の現金相当（100株以上の現物）, text: 内容 }
+// mg = 信用取引の設定 { short: 空売りできるか, rate: 委託保証金率, lend: 貸株料の年率 }（ないものは MARGIN の値）、
+// fin = 財務 { na: 純資産(億円), er: 自己資本比率, gc: 継続企業の前提に関する注記 }（表示と、あとの倒産の仕組み用）
+// ipo = 新規上場 { from: 前身の銘柄（廃止されたら上場を前倒し）, lo〜hi: 通常の上場日の範囲（営業日目） }。price は使わない（公開価格は ipoPlan）
+const XRANK = 7;
+// 種類ごとの性格。bm = 業種の市場ベータにかける倍率（暴落・市場ニュースへの感応度）、ssm = 業種の動きと業種ニュースにかける倍率、
+// esd = 決算の驚きの大きさ（標準偏差。ないものは新興 .2・それ以外 .06）、liq = 流動性（出来高・板の厚さ）の倍率。ないものは 1
+const KINDS = {
+  normal: { name: '普通', p: {} },
+  growth: { name: '新興', p: {} },
+  div:    { name: '高配当', p: { bm: .6, ssm: .8, esd: .03, liq: 1 } },
+  cyc:    { name: '景気敏感', p: { bm: 1.25, ssm: 1.4, esd: .10, liq: 1.3 } },
+  perk:   { name: '優待', p: { bm: 1, ssm: 1, esd: .06, liq: .6 } },
+  penny:  { name: '低位', p: { esd: .12 } },   // 低位株：呼値1円（s.tick1）。流動性・信用の設定は銘柄ごと
+  ipo:    { name: '新規', p: { esd: .2, liq: 1.5 } },   // 新規上場：上場日・公開価格・初値は ipoPlan
+};
+const PERK_LOT = 100, PERK_DROP = 0.5;   // 優待に必要な株数（現物）、権利落ちで下がる分（優待相当額の何割を配当の下げに足すか）
+const XDEFS = [
+  { code: 'X701', name: 'NEG', sector: 'tech', price: 2650, shares: 270, dy: .012, rec: [3, 9], sm: 1.0, kind: 'normal', desc: '通信機器とITシステムの老舗。' },
+  { code: 'X702', name: 'ホンタ技研', sector: 'auto', price: 1580, shares: 1300, dy: .035, rec: [3, 9], sm: 1.05, kind: 'normal', desc: 'バイクと自動車のメーカー。' },
+  { code: 'X703', name: '東京海土HD', sector: 'bank', price: 3150, shares: 600, dy: .03, rec: [3, 9], sm: .9, kind: 'normal', desc: '損害保険の大手。' },
+  { code: 'X704', name: 'アサビGHD', sector: 'food', price: 2060, shares: 500, dy: .022, rec: [6, 12], sm: .9, kind: 'normal', desc: 'ビールと清涼飲料のメーカー。' },
+  { code: 'X705', name: 'バンダイナムゴ', sector: 'game', price: 3420, shares: 650, dy: .016, rec: [3, 9], sm: 1.0, kind: 'normal', desc: 'おもちゃとゲーム・アニメのグッズをつくる。' },
+  { code: 'X706', name: 'マネーフォワート', sector: 'growth', price: 4180, shares: 55, dy: 0, rec: [], sm: 1.0, kind: 'growth', desc: '家計簿アプリと会計ソフト。黒字になったばかり。' },
+  { code: 'X707', name: 'コナニG', sector: 'game', price: 5240, shares: 135, dy: .012, rec: [3, 9], sm: 1.05, kind: 'normal', desc: 'ゲームとスポーツクラブを運営する。' },
+  // ステップB：高配当2・景気敏感4・優待3
+  { code: 'X708', name: 'ケイディー通信', sector: 'tech', price: 2720, shares: 2200, dy: .042, rec: [3, 9], sm: .65, kind: 'div', p: { bm: .5 }, desc: '携帯電話とネット回線の大手。配当が安定している。' },
+  { code: 'X709', name: 'オリクス', sector: 'bank', price: 2240, shares: 1100, dy: .051, rec: [3, 9], sm: .75, kind: 'div', desc: 'リース・保険・不動産などを手がける金融グループ。配当が手厚い。' },
+  { code: 'X710', name: 'コマッツ', sector: 'auto', price: 4050, shares: 950, dy: .03, rec: [3, 9], sm: 1.4, kind: 'cyc', desc: '建設機械の大手。世界の景気で業績が大きく変わる。' },
+  { code: 'X711', name: 'ニッポン製鋼', sector: 'auto', price: 2380, shares: 950, dy: .034, rec: [3, 9], sm: 1.3, kind: 'cyc', desc: '鉄をつくる大手。景気と鉄の値段で業績が上下する。' },
+  { code: 'X712', name: 'ムラタ電子', sector: 'tech', price: 3860, shares: 640, dy: .022, rec: [3, 9], sm: 1.3, kind: 'cyc', desc: 'スマホや車に使う電子部品の大手。需要の波が大きい。' },
+  { code: 'X713', name: '大輪証券G', sector: 'bank', price: 1180, shares: 1400, dy: .026, rec: [3, 9], sm: 1.5, kind: 'cyc', desc: '大手の証券会社。株式相場が良いと儲かる。' },
+  { code: 'X714', name: 'ゼンショク', sector: 'food', price: 2980, shares: 150, dy: .009, rec: [3, 9], sm: 1.1, kind: 'perk', perk: { m: [3, 9], yen: 2200, text: '食事券2,200円分' }, desc: '牛丼やファミレスのチェーンを運営。株主優待は食事券。' },
+  { code: 'X715', name: 'オリエンタルワールド', sector: 'game', price: 3850, shares: 1800, dy: .006, rec: [3, 9], sm: 1.0, kind: 'perk', perk: { m: [9], yen: 5800, text: 'テーマパーク入場券5,800円分' }, desc: 'テーマパークを運営。株主優待は入場券。' },
+  { code: 'X716', name: 'イオソ', sector: 'food', price: 2150, shares: 830, dy: .011, rec: [2, 8], sm: .9, kind: 'perk', perk: { m: [2, 8], yen: 1500, text: '買い物優待1,500円分' }, desc: '全国にスーパーを持つ小売の大手。株主優待は買い物券。' },
+  // ステップC：低位株2
+  { code: 'X717', name: 'ジャパンディスプレ', sector: 'tech', price: 48, shares: 1500, dy: 0, rec: [], sm: 3.6, kind: 'penny', p: { liq: .3, loss: true }, mg: { short: false, rate: .5 }, fin: { na: -35, er: -.04, gc: true }, desc: 'スマホや車の液晶パネルをつくる。赤字が続き、再建中。' },
+  { code: 'X718', name: 'KLub', sector: 'game', price: 88, shares: 600, dy: 0, rec: [], sm: 2.6, kind: 'penny', p: { liq: .4, per: 45 }, mg: { short: true, rate: .5, lend: .03 }, fin: { na: 120, er: .38, gc: false }, desc: 'スマホゲームの開発会社。わずかに黒字。' },
+  // ステップD2：新規上場2（X717・X718 の後継枠。倒産しない）
+  { code: 'X719', name: 'ペクシャ・テクノロジー', sector: 'growth', price: 0, shares: 32, dy: 0, rec: [], sm: 1.0, kind: 'ipo', p: { per: 80 }, ipo: { from: 'X717', lo: 60, hi: 140 }, desc: 'AIで企業の業務を自動化するソフトをつくる。黒字になったばかり。' },
+  { code: 'X720', name: 'カヴァー', sector: 'game', price: 0, shares: 60, dy: 0, rec: [], sm: 1.6, kind: 'ipo', p: { per: 40 }, ipo: { from: 'X718', lo: 120, hi: 200 }, desc: 'VTuber のプロダクションを運営。ライブやグッズで急成長。' },
+];
 const DIFF = {
   easy:   { name: 'やさしい', cash: 3e6, vol: .7, fee: 0,    tax: false, hint: 'dir',   rank: 1, desc: '初期資金300万円。値動き穏やか。ニュースの影響の向きを表示。' },
   normal: { name: 'ふつう',   cash: 1e6, vol: 1,  fee: 0,    tax: true,  hint: 'stars', rank: 3, desc: '初期資金100万円。税金あり。ニュースは信頼度★だけ表示。' },
@@ -117,10 +162,10 @@ const RANKS = [
   { n: '株デビュー', xp: 0, unlock: '3銘柄・成行注文' },
   { n: '見習いトレーダー', xp: 100, unlock: '10銘柄・指値注文・逆指値注文' },
   { n: '一人前トレーダー', xp: 300, unlock: '20銘柄・板・移動平均線・難易度ふつう・嵐の四半期' },
-  { n: '中級トレーダー', xp: 700, unlock: '全30銘柄・決算カレンダー・RSI・1年チャレンジ' },
+  { n: '中級トレーダー', xp: 700, unlock: '30銘柄・決算カレンダー・RSI・1年チャレンジ' },
   { n: '上級トレーダー', xp: 1500, unlock: '本格モード・リアル相場チャレンジ' },
   { n: 'プロトレーダー', xp: 3000, unlock: '信用取引' },
-  { n: '伝説の相場師', xp: 6000, unlock: '称号' },
+  { n: '伝説の相場師', xp: 6000, unlock: `追加の${XDEFS.length}銘柄（このランクになったあとに始めたランダム相場から）・称号` },
 ];
 // ランクに上がるまで画面に出さない。ランクが足りないうちは達成にもならない
 const MISSIONS = [
@@ -155,7 +200,7 @@ const MISSIONS = [
   { id: 'm3', t: '信用の建玉を3銘柄持って1日を終えよう', xp: 100, rank: 6 },
   { id: 'legend', t: '本格モードで1年チャレンジをクリアしよう', xp: 200, rank: 7 },
 ];
-const KIND = { mkt: '成行', lmt: '指値', stp: '逆指値', force: '強制返済' };
+const KIND = { mkt: '成行', lmt: '指値', stp: '逆指値', force: '強制返済', delist: '上場廃止で決済' };
 const TAG = { macro: '経済', fx: '為替', sector: '業種', ind: '企業', rumor: 'うわさ', earn: '決算', big: '速報', world: '社会', deny: '訂正', div: '配当', real: '報道', realReport: '観測', realRumor: 'うわさ' };
 
 /* ニュースのテンプレート（影響は対数リターン） */
@@ -230,11 +275,20 @@ const GLOSS = {
   '配当利回り': '株価に対して1年間にもらえる配当の割合。株価2,000円で配当60円なら3%。',
   '権利確定日': 'この日に株を持っていると配当を受け取れる日。このゲームでは月末の最終取引日。',
   '権利落ち': '権利確定日の翌営業日に、配当の分だけ株価が下がりやすくなること。',
+  '新規上場': '会社の株が、はじめて取引所で売買できるようになること（IPO）。上場の前に「上場承認」が発表され、上場日の寄り付きで最初の値段（初値）が決まる。',
+  '公開価格': '新規上場の前に、会社が株を売り出した値段。初値はこの値段より高くなることが多いが、下回ること（公募割れ）もある。',
+  '初値': '新規上場した株に、はじめてついた値段。人気があると、公開価格の何割も上で決まる。',
+  '気配': 'まだ売買が成立していないときに、買いたい人・売りたい人の注文から見込まれる値段。買いが多いと「買い気配」。',
+  '監理銘柄': '上場廃止になるおそれがあると、取引所が投資家に注意をうながすために指定する銘柄。売買はふつうにできる。',
+  '整理銘柄': '上場廃止が決まった銘柄。上場廃止までの短い期間（このゲームでは5営業日）だけ売買できる。このゲームでは信用の新規建てはできない。',
+  '上場廃止': '取引所で売買できなくなること。会社の倒産などで起きる。このゲームでは、最終売買日の終値で、持っている株と信用の建玉を決済する。',
+  '低位株': '株価がおおむね100円以下の株。少ないお金で100株買えるが、1円動くだけで数%動くので値動きが荒く、板も薄いことが多い。業績が悪い会社も多いので注意。',
+  '株主優待': '株を持っている人に、会社が商品券・食事券・割引券などを贈る、日本独特の仕組み。多くは100株以上を権利確定日に持っていることが条件。このゲームでは現金相当の額を翌朝に受け取れる（課税なし・現物だけ）。',
   '決算': '会社が3か月ごとに業績（売上や利益）を発表すること。株価が大きく動くきっかけになる。',
   '市場予想': 'アナリストたちが予想した業績の平均。決算がこれより良いか悪いかで株価が動く。',
   '材料出尽くし': '良いニュースがすでに株価に織り込まれていて、発表されたとたんに逆に売られること。',
   '時価総額': '株価×発行済株式数。会社の規模を表す。',
-  '株価指数': '市場全体の値動きを1つの数字にしたもの。このゲームのNTX225は全30社の時価総額から計算する。',
+  '株価指数': '市場全体の値動きを1つの数字にしたもの。このゲームのNTX225は30社の時価総額から計算する（ランク7で増える追加銘柄は含まない）。',
   '損切り': '損が大きくなる前に株を売って、損を確定させること。小さな損で止めるのが長く続けるコツ。',
   '含み損益': 'まだ売っていない株を、今売ったらいくらの損益になるか。',
   'ボラティリティ': '株価の変動の大きさ。大きいほどよく動き、もうけも損も大きくなりやすい。',
@@ -297,12 +351,12 @@ const TIPS = [
   ] },
 ];
 const TERM_GROUPS = [
-  ['株の基本', ['株式', '証券コード', '単元株', '時価総額', '株価指数', '分散投資']],
+  ['株の基本', ['株式', '証券コード', '単元株', '時価総額', '株価指数', '分散投資', '低位株', '新規上場', '公開価格', '初値', '気配', '監理銘柄', '整理銘柄', '上場廃止']],
   ['注文と取引', ['成行注文', '指値注文', '逆指値注文', '約定', 'スリッページ', '買付余力', '手数料']],
   ['板（気配）', ['板', '気配値', '板が薄い', '特別気配']],
   ['取引時間と値段のルール', ['寄り付き', '大引け', '前場・後場', '値幅制限', 'ストップ高', 'ストップ安', '呼値']],
   ['チャートと指標', ['ローソク足', '出来高', '移動平均線', 'RSI', 'ボラティリティ', 'PER', 'PBR']],
-  ['配当・決算・税金', ['配当', '配当利回り', '権利確定日', '権利落ち', '決算', '市場予想', '材料出尽くし', '譲渡益課税']],
+  ['配当・決算・税金', ['配当', '配当利回り', '権利確定日', '権利落ち', '株主優待', '決算', '市場予想', '材料出尽くし', '譲渡益課税']],
   ['損益とリスク', ['損切り', '含み損益', '最大ドローダウン', '信頼度']],
   ['信用取引', ['信用取引', '空売り', '建玉', '返済', '委託保証金', '新規建て余力', '保証金維持率', '追証', '信用金利・貸株料', '返済期限']],
 ];
@@ -310,6 +364,7 @@ const TERM_GROUPS = [
 const TRIVIA = {
   '株式': '世界で最初の株式会社は、1602年にできたオランダ東インド会社と言われている。',
   '証券コード': '日本の証券コードは長く4桁の数字だったが、2024年からは英字の入ったコードも使われ始めた。',
+  '株主優待': '株主優待は、海外にはあまりない日本独特の文化。個人投資家に長く持ってもらうために、多くの会社が実施している。',
   '特別気配': '本物の取引所では、特別気配のあいだ、気配の値段を少しずつ動かして、買いと売りの注文が釣り合うのを待つ。値段が一気に飛ばないようにする仕組み。',
   '単元株': '日本の株は2018年に全部の会社で100株単位にそろえられた。それまでは1株や1,000株の会社もあった。',
   '株価指数': '日経平均株価は225社の株価から計算されていて、このゲームのNTX225という名前もそこから来ている。',
@@ -327,7 +382,7 @@ const SENSEI_SVG = `<svg viewBox="0 0 64 64" width="72" height="72" aria-hidden=
 let G = null;
 let profile = loadProfile();
 let modalOpen = false, titleOpen = true;
-const UI = { acct: 'cash', side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, sort: { key: 'none', desc: false }, vw: null, hcat: 'tip', tut: null };
+const UI = { acct: 'cash', side: 'buy', type: 'mkt', view: 'trade', hover: null, filter: 'all', geom: null, lastNews: -1, sort: { key: 'none', desc: false }, kind: 'all', vw: null, hcat: 'tip', tut: null };
 // チャートの表示範囲。cnt = 見えるローソク足の本数、end = 右端の位置（null なら最新に追従）、yOff = 上下のずらし量（値幅に対する割合）
 function resetView() { UI.vw = { '5m': { cnt: 60, end: null }, '1d': { cnt: 60, end: null }, yOff: 0 }; }
 resetView();
@@ -358,9 +413,10 @@ function playClick() {
   a.currentTime = 0; a.play().catch(() => {});
 }
 
-function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', bgm: '', opts: {}, mseen: {} }; }
-function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') { const q = Object.assign(defProfile(), p); if (!p.mseen) q.mseen = { ...q.missions }; return q; } } catch (e) {} return defProfile(); }
-function saveProfile() { try { localStorage.setItem('kabutore.profile', JSON.stringify(profile)); } catch (e) {} }
+// r7 = ランク7に到達したことがある（以後の新規のランダム相場に追加銘柄を出す。データのリセットで消える）
+function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', bgm: '', opts: {}, mseen: {}, r7: false }; }
+function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') { const q = Object.assign(defProfile(), p); if (!p.mseen) q.mseen = { ...q.missions }; if (rank(q.xp) >= XRANK) q.r7 = true; return q; } } catch (e) {} return defProfile(); }
+function saveProfile() { try { localStorage.setItem('kabutore.profile', JSON.stringify(profile)); } catch (e) { if (isQuota(e)) toast('ブラウザの保存領域がいっぱいで、経験値などを保存できませんでした', 'warn'); } }
 function rank(xp = profile.xp) { let r = 1; RANKS.forEach((k, i) => { if (xp >= k.xp) r = i + 1; }); return r; }
 // ファストスターター：指値・逆指値・信用取引・リアル相場チャレンジを、ランクに関係なく使える
 const isFast = () => !!profile.fast;
@@ -386,33 +442,56 @@ function phaseLabel() { return G.phase === 'pre' ? '寄り付き前' : G.phase =
 const TICKS = [[1000, 0.1], [3000, 0.5], [10000, 1], [30000, 5], [100000, 10], [Infinity, 50]];
 function tickSize(p) { for (const [b, t] of TICKS) if (p <= b) return t; }
 function roundTick(p) { const t = tickSize(p); return Math.max(t, Math.round(Math.round(p / t) * t * 10) / 10); }   // 0.1円単位の誤差を出さない
-// 銘柄ごとの呼値と売買単位（梅山カンパニーだけ呼値1円・1株単位）
-const tickOf = (s, p) => (s.ume ? 1 : tickSize(p));
-const roundPx = (s, p) => (s.ume ? Math.max(1, Math.round(p)) : roundTick(p));
+// 銘柄ごとの呼値と売買単位（梅山カンパニーは呼値1円・1株単位、低位株は呼値1円・100株単位）
+const tickOf = (s, p) => (s.ume || s.tick1 ? 1 : tickSize(p));   // 梅山カンパニーと低位株（tick1）は1円
+const roundPx = (s, p) => (s.ume || s.tick1 ? Math.max(1, Math.round(p)) : roundTick(p));
 const lot = s => (s.ume ? 1 : 100);
 const LIMITS = [[100, 30], [200, 50], [500, 80], [700, 100], [1000, 150], [1500, 300], [2000, 400], [3000, 500], [5000, 700], [7000, 1000], [10000, 1500], [15000, 3000], [20000, 4000], [30000, 5000], [50000, 7000], [70000, 10000], [100000, 15000], [Infinity, 30000]];
 function limitWidth(p) { for (const [b, w] of LIMITS) if (p < b) return w; return 30000; }
 
 /* ===================== 銘柄の生成 ===================== */
-function makeStock(d, i) {
+// R = 使う乱数（追加銘柄は専用のもの）
+function makeStock(d, i, R = RNG, o = {}) {   // o = 種類ごとの性格（bm・ssm・esd・liq）。追加銘柄だけ
   const [code, name, sector, price, sharesM, dy, rec, unlock, sm, desc] = d;
   const sec = SECTORS[sector];
-  const sig = sec.sig * sm, beta = sec.beta * (0.85 + RNG.next() * 0.3);
-  const idio = Math.sqrt(Math.max(0.05 ** 2, sig * sig - beta * beta * MKT_SIG ** 2 - sec.ss ** 2));
-  const per = sec.per * (0.8 + RNG.next() * 0.45);
-  const loss = code === 'K601' || code === 'K602';
-  const eps = loss ? -price * 0.03 * (0.8 + RNG.next() * 0.5) : price / per;
+  const sig = sec.sig * sm, beta = sec.beta * (0.85 + R.next() * 0.3) * (o.bm ?? 1);
+  const idio = Math.sqrt(Math.max(0.05 ** 2, sig * sig - beta * beta * MKT_SIG ** 2 - (sec.ss * (o.ssm ?? 1)) ** 2));   // 業種の揺れは ssm 倍で効くので、その分も引く（全体の揺れが sig になる）
+  const per = (o.per ?? sec.per) * (0.8 + R.next() * 0.45);
+  const loss = code === 'K601' || code === 'K602' || !!o.loss;
+  const eps = loss ? -price * 0.03 * (0.8 + R.next() * 0.5) : price / per;
   return {
     code, name, sector, desc, unlock, rec, shares: sharesM * 1e6, div: Math.round(price * dy),
     sig, beta, idio, mu: sec.mu, kappa: sector === 'growth' ? 0.25 : sector === 'food' ? 1.2 : 0.7,
     jump: sec.jump, jsize: sector === 'growth' ? 0.10 : 0.045,
     price, lp: Math.log(price), prevClose: price, open: price, high: price, low: price, dayVol: 0,
-    V: price, h: 1, eps, bps: price / (sec.pbr * (0.8 + RNG.next() * 0.4)),
+    V: price, h: 1, eps, bps: price / (sec.pbr * (0.8 + R.next() * 0.4)),
     consensus: 0, nextEarn: 6 + ((i * 7) % 54),
-    minVol: Math.max(300, sharesM * 1e6 * (sector === 'growth' ? 0.012 : 0.004) / MIN_PER_DAY),
+    minVol: Math.max(300, sharesM * 1e6 * (sector === 'growth' ? 0.012 : 0.004) / MIN_PER_DAY * (o.liq ?? 1)),
     shock: 0, gap: 0, pend: [], intraday: [], daily: [], pins: [], limUp: price, limDn: price, stop: null,
   };
 }
+// 追加銘柄（k = XDEFS の何番目か）。乱数はシードと銘柄コードから作る専用のもので、銘柄を足しても既存の銘柄の値動きは変わらない
+function makeExtra(x, k, seed) {
+  const R = rngOn({ s: (hash01(`${seed}/x/${x.code}`) * 4294967296) | 0, spare: null });
+  const o = { ...KINDS[x.kind].p, ...x.p };   // 種類の既定値を、銘柄ごとの p で上書きする
+  const ip = x.ipo ? ipoPlan(seed, x) : null;   // 新規上場：公開価格で作る（初期値の抽選は今、値動きの乱数は上場日から）
+  const s = makeStock([x.code, x.name, x.sector, ip ? ip.px : x.price, x.shares, x.dy, x.rec, XRANK, x.sm, x.desc], DEFS.length + k, R, o);
+  s.consensus = (s.eps / 4) * (1 + s.mu / 4 + R.normal() * 0.02);
+  Object.assign(s, { extra: true, kind: x.kind, r: R });
+  if (o.ssm != null) s.ssm = o.ssm;
+  if (o.esd != null) s.esd = o.esd;
+  if (x.perk) s.perk = { ...x.perk };
+  if (x.kind === 'penny') s.tick1 = true;   // 呼値1円
+  if (x.mg) s.mg = { ...x.mg };
+  if (x.fin) s.fin = { ...x.fin };
+  s.dl = dlPlan(seed, x.code);   // 倒産・上場廃止の日程（倒産しうる銘柄だけ。ほかは null）
+  if (ip) s.ipo = ip;
+  return s;
+}
+// 乱数の状態 { s, spare } に、RNG と同じ関数を付ける（保存すると関数は消えるので、読み込むたびに付け直す）
+function rngOn(r) { return Object.assign(r, { next: RNG.next, normal: RNG.normal, pick: RNG.pick }); }
+// 30銘柄と追加銘柄（梅山カンパニーは別）。共通の乱数（RNG）を引く処理では使わず、G.stocks だけを回す
+const allStocks = () => (G.extra?.length ? G.stocks.concat(G.extra) : G.stocks);
 
 function newGame(scen, diff, seed, cash, mode) {
   RNG.s = seed | 0; RNG.spare = null;
@@ -427,15 +506,16 @@ function newGame(scen, diff, seed, cash, mode) {
     v: 1, mode: real ? 'real' : 'random', seed, scen, base: real ? base : null, diff, dayIndex: 0, date: real ? REAL.dates[0] : START_DATE, phase: 'pre', preMin: 0, minute: 0, clock: 0, speed: 1,
     sel: real ? REAL.stocks[0].code : 'K201', chartMode: '5m', mkMu: S.mu,
     market: { hM: 1, shock: 0, secShock: {}, gapM: 0, secGap: {}, idx: IDX_BASE, idxPrev: IDX_BASE, idxOpen: IDX_BASE, idxHigh: IDX_BASE, idxLow: IDX_BASE, idxDaily: [], capBase: 1, crashLeft: 0, crashMin: 0 },
-    stocks: real ? REAL.stocks.map(makeRealStock) : DEFS.map(makeStock), news: [], denials: [], newsId: 0, orderSeq: 0,
-    player: { cash: cash0, pos: {}, mpos: {}, orders: [], trades: [], sells: [], realizedYear: 0, taxYear: 0, taxTotal: 0, year: real ? +REAL.dates[0].slice(0, 4) : 2026, divTotal: 0, pendingDiv: 0, hist: [], peak: cash0, maxDD: 0, dayStart: cash0, start: cash0, startIdx: 0, feesTotal: 0 },
-    crashDay: -1, crashStart: 0, crashCheck: -1, div5: 0, ended: false, dayXP: 0, dayEvents: [], last: null, mcall: null, mwarn: -1,
+    stocks: real ? REAL.stocks.map(makeRealStock) : DEFS.map((d, i) => makeStock(d, i)), extra: [], news: [], denials: [], newsId: 0, orderSeq: 0,
+    player: { cash: cash0, pos: {}, mpos: {}, orders: [], trades: [], sells: [], realizedYear: 0, taxYear: 0, taxTotal: 0, year: real ? +REAL.dates[0].slice(0, 4) : 2026, divTotal: 0, pendingDiv: 0, pendingPerk: 0, perkTotal: 0, hist: [], peak: cash0, maxDD: 0, dayStart: cash0, start: cash0, startIdx: 0, feesTotal: 0 },
+    crashDay: -1, crashStart: 0, crashCheck: -1, div5: 0, dlog: [], ended: false, dayXP: 0, dayEvents: [], last: null, mcall: null, mwarn: -1,
   };
   if (!real) {   // 暴落イベントと決算の市場予想はランダム相場だけ
     if (S.crash) G.crashDay = 22 + Math.floor(RNG.next() * 14);
     else if (diff === 'hard' && scen !== 'month' && RNG.next() < 0.7) G.crashDay = 50 + Math.floor(RNG.next() * 150);
     for (const s of G.stocks) s.consensus = (s.eps / 4) * (1 + s.mu / 4 + RNG.normal() * 0.02);
     if (isFast()) G.ume = makeUme(seed);   // G.stocks には入れない（ほかの30銘柄と指数の乱数の順番を変えない）
+    if (profile.r7) G.extra = XDEFS.map((x, k) => makeExtra(x, k, seed));   // 追加銘柄も G.stocks には入れない
   }
   afterLoad();
   if (real) realStart(); else genHistory();
@@ -445,7 +525,11 @@ function newGame(scen, diff, seed, cash, mode) {
 }
 function afterLoad() {
   if (G.mode === 'real') useReal(realKeyOf(G));   // 保存データ・練習からの復元でも、そのシナリオのデータに切り替える
-  G._map = Object.fromEntries(G.stocks.map(s => [s.code, s])); G.player.mpos ||= {};   // 信用取引より前のセーブには mpos がない
+  G.extra ||= [];   // 追加銘柄より前のセーブには extra がない（30銘柄のまま続ける）
+  G.dlog ||= [];    // 上場廃止の記録（倒産より前のセーブにはない。日程 s.dl のない銘柄は倒産しない）
+  for (const s of G.extra) rngOn(s.r);
+  G._map = Object.fromEntries(allStocks().map(s => [s.code, s])); G.player.mpos ||= {};   // 信用取引より前のセーブには mpos がない
+  G.player.pendingPerk ||= 0; G.player.perkTotal ||= 0;   // 株主優待より前のセーブにはない
   // 梅山カンパニーの乱数は状態を G.ume.r に持つ（保存すると関数は消えるので、読み込むたびに付け直す）
   if (G.ume) { G._map[G.ume.code] = G.ume; Object.assign(G.ume.r, { next: RNG.next, normal: RNG.normal, pick: RNG.pick }); }
 }
@@ -461,22 +545,35 @@ function genHistory() {
     const Md = G.mkMu / DAYS + MKT_SIG / Math.sqrt(DAYS) * RNG.normal();
     const Sd = {}; for (const key in SECTORS) Sd[key] = SECTORS[key].ss / Math.sqrt(DAYS) * RNG.normal();
     let capO = 0, capC = 0;
-    for (const s of G.stocks) {
-      const pc = s.price, e = s.sig / Math.sqrt(DAYS);
-      const o = roundPx(s, pc * Math.exp(RNG.normal() * e * 0.3));
-      const c = roundPx(s, pc * Math.exp(s.beta * Md + Sd[s.sector] + s.idio / Math.sqrt(DAYS) * RNG.normal()));
-      const h = roundPx(s, Math.max(o, c) * Math.exp(Math.abs(RNG.normal()) * e * 0.5));
-      const l = roundPx(s, Math.min(o, c) * Math.exp(-Math.abs(RNG.normal()) * e * 0.5));
-      s.daily.push({ d: date, di: k - 60, o, h: Math.max(h, o, c), l: Math.min(l, o, c), c, v: Math.round(s.minVol * MIN_PER_DAY * Math.exp(0.35 * RNG.normal()) / 100) * 100 });
-      capO += s.shares * o; capC += s.shares * c; s.price = c;
-    }
+    for (const s of G.stocks) { const b = histBar(s, date, k, Md, Sd, RNG); capO += s.shares * b.o; capC += s.shares * b.c; }
+    for (const s of G.extra) if (!s.ipo) histBar(s, date, k, Md, Sd, s.r);   // 追加銘柄は指数に入れない。新規上場は過去チャートなし
     if (k === 0) mk.capBase = capO;
     const io = IDX_BASE * capO / mk.capBase, ic = IDX_BASE * capC / mk.capBase;
     mk.idxDaily.push({ d: date, o: io, c: ic, h: Math.max(io, ic) * 1.003, l: Math.min(io, ic) * 0.997 });
   });
-  for (const s of G.stocks) { s.lp = Math.log(s.price); s.prevClose = s.price; s.V = s.price * (0.93 + RNG.next() * 0.14); }
+  for (const s of G.stocks) histEnd(s, RNG);
+  for (const s of G.extra) { if (s.ipo) continue; if (s.tick1) histAnchor(s); histEnd(s, s.r); }   // 新規上場は、上場日まで乱数を引かない
   mk.idx = mk.idxPrev = mk.idxDaily.at(-1).c;
 }
+/** 過去データの1日分の足（Md = 市場、Sd = 業種の動き。R = 使う乱数） */
+function histBar(s, date, k, Md, Sd, R) {
+  const pc = s.price, e = s.sig / Math.sqrt(DAYS);
+  const o = roundPx(s, pc * Math.exp(R.normal() * e * 0.3));
+  const c = roundPx(s, pc * Math.exp(s.beta * Md + Sd[s.sector] + s.idio / Math.sqrt(DAYS) * R.normal()));
+  const h = roundPx(s, Math.max(o, c) * Math.exp(Math.abs(R.normal()) * e * 0.5));
+  const l = roundPx(s, Math.min(o, c) * Math.exp(-Math.abs(R.normal()) * e * 0.5));
+  const b = { d: date, di: k - 60, o, h: Math.max(h, o, c), l: Math.min(l, o, c), c, v: Math.round(s.minVol * MIN_PER_DAY * Math.exp(0.35 * R.normal()) / 100) * 100 };
+  s.daily.push(b); s.price = c;
+  return b;
+}
+// 低位株は値動きが荒く、過去60日のあいだに表の値段から大きく離れる（100円を超えたり、1円に近づいたり）ので、
+// 過去チャートの形はそのままに、値段全体を伸び縮みさせて、開始時の値段を表の値段（XDEFS の price）にそろえる（乱数は使わない）
+function histAnchor(s) {
+  const p0 = XDEFS.find(x => x.code === s.code).price, f = p0 / s.price;
+  for (const b of s.daily) { b.o = roundPx(s, b.o * f); b.h = roundPx(s, b.h * f); b.l = roundPx(s, b.l * f); b.c = roundPx(s, b.c * f); }
+  s.price = p0;
+}
+function histEnd(s, R) { s.lp = Math.log(s.price); s.prevClose = s.price; s.V = s.price * (0.93 + R.next() * 0.14); }
 
 /* ===================== リアル相場（data/ 以下の実データ） ===================== */
 // リアル相場のシナリオごとの情報は、この REAL_SETS に1か所でまとめる（キーは SCEN のキーと同じ）。
@@ -615,7 +712,8 @@ function setPrice(s, lp) {
   lp = clamp(lp, Math.log(s.limDn), Math.log(s.limUp));
   s.lp = lp;
   s.price = clamp(roundPx(s, Math.exp(lp)), s.limDn, s.limUp);
-  s.stop = s.price >= s.limUp ? 'up' : s.price <= s.limDn ? 'down' : null;
+  // 下限が前日終値と同じ（1円の株）ときは、それ以上下がれないだけでストップ安ではない（売買できる）
+  s.stop = s.price >= s.limUp ? 'up' : s.price <= s.limDn && s.limDn < s.prevClose ? 'down' : null;
 }
 function updateIndex(open) {
   const mk = G.market; let cap = 0; for (const s of G.stocks) cap += s.shares * s.price;
@@ -638,24 +736,34 @@ function stepMinute() {
   mk.shock = 0;
   const S = {};
   for (const k in SECTORS) { S[k] = SECTORS[k].ss * Math.sqrt(DT) * im * dv * RNG.normal() + (mk.secShock[k] || 0); mk.secShock[k] = 0; }
-  for (const s of G.stocks) {
-    const prev = s.price;
-    const eps1 = s.idio * Math.sqrt(s.h * DT) * im * dv;
-    let e = eps1 * RNG.normal();
-    if (RNG.next() < s.jump * DT) e += RNG.normal() * s.jsize;                    // ジャンプ
-    s.dayZ = (s.dayZ || 0) + e;
-    let r = s.mu * DT + s.beta * M + S[s.sector] + e + s.kappa * Math.log(s.V / prev) * DT;
-    if (s.pend.length) { for (const p of s.pend) { const a = p.left * 0.035; r += a; p.left -= a; } s.pend = s.pend.filter(p => Math.abs(p.left) > 2e-4); }
-    r += s.shock; s.shock = 0;
-    setPrice(s, s.lp + r);
-    minuteBar(s, prev, r, eps1);
-  }
+  for (const s of G.stocks) stockStep(s, M, S, im, dv, RNG);
+  for (const s of G.extra) { if (!live(s)) continue; if (dlStopLow(s)) stopLowStep(s); else { if (s.dl) s.shock += dlDrift(s); stockStep(s, M, S, im, dv, s.r); } }   // 市場・業種の動き（M・S）は読むだけ
   if (G.ume) umeStep(im);
   updateIndex(false);
   processOrders();
   // うわさの否定
   for (const dn of [...G.denials]) if (dn.at <= G.clock) { G.denials.splice(G.denials.indexOf(dn), 1); denyNews(dn); }
   maybeNews();
+  if (G.extra.length) xNewsMinute();
+}
+/** 1銘柄の1分ぶん（M = 市場、S = 業種の動き。R = 使う乱数） */
+function stockStep(s, M, S, im, dv, R) {
+  const prev = s.price;
+  const eps1 = s.idio * Math.sqrt(s.h * DT) * im * dv;
+  let e = eps1 * R.normal();
+  if (R.next() < s.jump * DT) e += R.normal() * s.jsize;                    // ジャンプ
+  s.dayZ = (s.dayZ || 0) + e;
+  let r = s.mu * DT + s.beta * M + S[s.sector] * (s.ssm ?? 1) + e + s.kappa * Math.log(s.V / prev) * DT;
+  if (s.pend.length) { for (const p of s.pend) { const a = p.left * 0.035; r += a; p.left -= a; } s.pend = s.pend.filter(p => Math.abs(p.left) > 2e-4); }
+  r += s.shock; s.shock = 0;
+  setPrice(s, s.lp + r);
+  minuteBar(s, prev, r, eps1, R);
+}
+// 倒産のあとのストップ安：値幅の下限に張り付き、買い手がいないので出来高はない（乱数は使わない）。open = 寄り付き
+function stopLowStep(s, open) {
+  const p = s.limDn; s.lp = Math.log(p); s.price = p; s.stop = 'down'; s.shock = 0; s.pend = [];
+  if (open) { s.open = s.high = s.low = p; s.gap = 0; return; }
+  s.intraday.push({ o: p, h: p, l: p, c: p, v: 0 }); s.low = Math.min(s.low, p);
 }
 // リアル相場の1分：実データの終値へ向かうだけ。作りもののニュースは流さない
 function stepMinuteReal(im) {
@@ -671,16 +779,200 @@ function stepMinuteReal(im) {
   updateIndex(false);
   processOrders();
 }
+const WICK1 = 3;   // 低位株（呼値1円）の分足のひげの倍率
 /** 1分足（高値・安値・出来高）を記録する。R = 使う乱数（梅山カンパニーだけ専用のもの） */
 function minuteBar(s, prev, r, eps1, R = RNG) {
   const late = G.minute >= 270, early = G.minute < 30, L = lot(s);
   const o = prev, c = s.price;
-  const ext = Math.abs(R.normal()) * eps1 * 0.6 * prev;
+  const ext = Math.abs(R.normal()) * eps1 * 0.6 * prev * (s.tick1 ? WICK1 : 1);   // ひげ。低位株は1円の呼値で横線ばかりにならないよう長くする（指値の約定判定も、この高値・安値を使う）
   const hi = Math.max(o, c, Math.min(s.limUp, roundPx(s, Math.max(o, c) + ext)));
   const lo = Math.min(o, c, Math.max(s.limDn, roundPx(s, Math.min(o, c) - ext)));
   const v = Math.max(L, Math.round(s.minVol * (early || late ? 1.9 : 0.78) * (1 + Math.abs(r) / (eps1 + 1e-9) * 0.25) * Math.exp(0.4 * R.normal()) / L) * L);
   s.intraday.push({ o, h: hi, l: lo, c, v });
   s.high = Math.max(s.high, hi); s.low = Math.min(s.low, lo); s.dayVol += v;
+}
+
+/* ===================== 倒産・上場廃止（追加銘柄のうち DL_P の銘柄だけ） ===================== */
+// 流れ：前兆（観測記事）F → 監理銘柄 M → 倒産のお知らせ B（その日の寄り付きから k 日ストップ安）→ 整理銘柄 S〜L（5営業日。L = 最終売買日）
+//      → L の引けで、保有分と建玉を終値（1円以上）で決済 → D（L の翌営業日）の朝に上場廃止のお知らせ。
+// 抽選は hash01 だけで、共通の乱数もその銘柄の専用乱数も使わない。開始から DL_GRACE 営業日は起きない。
+// 状態は日数と日程から決まる（dlStage）ので保存しなくてよい。保存するのは日程 s.dl と、決済したあとの旗 s.delisted だけ
+const DL_P = { X717: .40, X718: .15 }, DL_GRACE = 20;   // 1年（245営業日）あたりの確率（難易度では変えない）
+// 日程。F を渡すと、その日に前兆が始まる日程を作る（forceDelist 用）
+function dlPlan(seed, code, F) {
+  const h = k => hash01(`${seed}/dl/${code}/${k}`);
+  if (F == null) {
+    const p = DL_P[code]; if (!p) return null;
+    F = DL_GRACE + Math.floor(DAYS * Math.log(1 - h('t')) / Math.log(1 - p));   // 猶予のあと1年以内に始まる確率が、ちょうど p
+  }
+  const B = F + 5 + Math.floor(h('lead') * 11), M = F + Math.max(2, Math.round((B - F) * 0.6)), k = 2 + Math.floor(h('k') * 3), S = B + 1, L = S + 4;
+  return { F, M, B, k, S, L, D: L + 1 };
+}
+// normal / sign（前兆）/ watch（監理）/ fail（倒産のお知らせの日）/ seiri（整理）/ delisted
+function dlStage(s, d = G.dayIndex) {
+  const x = s.dl; if (!x) return 'normal';
+  if (s.delisted || d >= x.D) return 'delisted';
+  return d >= x.S ? 'seiri' : d >= x.B ? 'fail' : d >= x.M ? 'watch' : d >= x.F ? 'sign' : 'normal';
+}
+// 前兆・監理のあいだの下げの流れ（1分ぶん。前兆は1日 −1.5%、監理は1日 −3%）。乱数は使わない
+const DL_DRIFT = { sign: -0.015, watch: -0.03 };
+const dlDrift = s => (DL_DRIFT[dlStage(s)] || 0) / MIN_PER_DAY;
+const dlStopLow = s => !!s.dl && !s.delisted && G.dayIndex >= s.dl.B && G.dayIndex < s.dl.B + s.dl.k;   // ストップ安に張り付く日
+// ゲームのできごとの通知（D2 の後継上場・D3 の破産の判定が受け取る）。今は上場廃止（'delist'）だけ
+const GAME_EV = {};
+function onGame(ev, f) { (GAME_EV[ev] ||= []).push(f); }
+function emitGame(ev, d) { for (const f of GAME_EV[ev] || []) f(d); }
+const DL_TEXT = {
+  sign: { X717: '観測記事：{n}の資金繰りが悪化か。取引銀行に返済の猶予を求めていると報道', X718: '観測記事：{n}、主力ゲームの不振で手元資金が急減。資金調達を検討と報道' },
+  fail: { X717: '【速報】{n}（{c}）が民事再生法の適用を申請。株価はストップ安の売り気配', X718: '【速報】{n}（{c}）が破産手続き開始を申し立て。株価はストップ安の売り気配' },
+};
+// 朝：その日の段階のお知らせと、値動きの変化（前兆・監理の窓、ストップ安のあとの理論価格）
+function dlDay() {
+  const P = G.player, d = G.dayIndex, t = '8:00';
+  for (const s of G.extra) {
+    const x = s.dl; if (!x) continue;
+    const N = s.name, C = s.code, has = !!(P.pos[C] || P.mpos[C]), own = m => { if (has) G.dayEvents.push(m); };
+    const news = (text, o = {}) => pushNews({ day: d, time: t, type: 'big', stars: 3, codes: [C], text, hint: '', flash: false, ...o });
+    if (d === x.D && s.delisted) {
+      news(`${N}（${C}）が上場廃止。最終売買日の終値${px(s.dlPx)}円で決済しました`, { flash: true });
+      if (G.sel === C) G.sel = unlockedStocks()[0]?.code || G.stocks[0].code;   // 選んでいた銘柄が消えたら、リストの先頭へ
+      continue;
+    }
+    if (s.delisted) continue;
+    if (d === x.F) {   // 前兆：観測記事だけは、難易度でヒントの出し方が変わる（ほかの観測記事と同じ）
+      s.gap += Math.log(0.92); s.V *= 0.7;
+      pushNews({ day: d, time: t, type: 'rumor', stars: 2, codes: [C], text: (DL_TEXT.sign[C] || DL_TEXT.sign.X717).replace('{n}', N), hint: `↓${N}`, flash: false });
+      own(`保有中の${N}に、資金繰りの悪化を伝える観測記事が出ました。ほんとうなら、上場廃止になることもあります`);
+    }
+    if (d === x.M) {
+      s.gap += Math.log(0.9); s.V *= 0.7;
+      news(`【監理銘柄】東証、${N}（${C}）を監理銘柄（審査中）に指定。上場廃止のおそれ`);
+      own(`保有中の${N}が監理銘柄に指定されました。上場廃止になると、最終売買日の終値で強制的に決済されます`);
+    }
+    if (d === x.B) {
+      news((DL_TEXT.fail[C] || DL_TEXT.fail.X717).replace('{n}', N).replace('{c}', C), { flash: true });
+      own(`保有中の${N}が倒産しました。今日から数日はストップ安で、売りたくても買い手がいない状態が続きます`);
+    }
+    if (d === x.B + x.k) s.V = s.prevClose;   // ストップ安が終わったら、その安い値段で取引される（元の値段へは戻ろうとしない）
+    if (d === x.S) {
+      news(`【整理銘柄】東証、${N}を整理銘柄に指定。最終売買日は${mdLabel(addTD(G.date, x.L - d))}、翌営業日に上場廃止`);
+      own(`保有中の${N}が整理銘柄になりました。信用の新規建てはできません。現物の売買と、信用の返済はできます`);
+    }
+    if (d === x.L) {
+      news(`本日は${N}の最終売買日。持っている株と信用の建玉は、本日の終値で決済されます`);
+      own(`今日は${N}の最終売買日です。持っている株と信用の建玉は、今日の終値で決済されます`);
+    }
+  }
+}
+// 最終売買日の引け：注文の取り消し、保有分と建玉の決済（終値。1円以上）、上場廃止の旗、記録と通知
+function delistSettle(s) {
+  const P = G.player, C = s.code, x = Math.max(1, s.price);
+  const ord = P.orders.filter(o => o.code === C);
+  if (ord.length) { P.orders = P.orders.filter(o => o.code !== C); G.dayEvents.push(`${s.name}の注文${ord.length}件を、上場廃止のため取り消しました`); }
+  const q = P.pos[C]?.qty;
+  if (q) { const avg = P.pos[C].avg; fill(s, 'sell', q, Math.round(x * q), x, 'delist', false); G.dayEvents.push(`${s.name}の上場廃止にともない、${q.toLocaleString()}株を${px(x)}円で決済しました（損益 ${yenS(x * q - avg * q)}円）`); }
+  const mp = P.mpos[C];
+  if (mp) {
+    const n = P.sells.length; mfill(s, mp.side === 'buy' ? 'sell' : 'buy', mp.qty, x * mp.qty, x, 'delist');
+    G.dayEvents.push(`${s.name}の上場廃止にともない、信用の${mp.side === 'buy' ? '買い建て' : '売り建て'}${mp.qty.toLocaleString()}株を${px(x)}円で返済しました（損益 ${yenS(P.sells[n]?.pnl || 0)}円）`);
+  }
+  if (P.cash < 0) G.dayEvents.push(`保証金を超える損が出たため、現金が${yen(-P.cash)}円のマイナス（借金）になりました`);
+  s.delisted = true; s.dlPx = x; s.stop = null;
+  const e = { type: 'delist', code: C, day: G.dayIndex, date: G.date, px: x, cash: P.cash, asset: netAsset() };   // asset = 決済したあとの総資産（D3 の破産の判定用）
+  G.dlog.push(e); emitGame('delist', e);
+}
+// 注文パネルの注意（倒産・上場廃止と、新規上場の信用の制限・上場日の成行）
+function stockWarn(s) {
+  const w = [dlWarn(s)];
+  if (s.ipo && !s.delisted) {
+    if (ipoStage(s) === 'first' && G.phase === 'pre' && UI.type === 'mkt') w.push('上場日の成行は、初値で約定します。初値は気配と大きく違うことがあります。');
+    if (UI.acct === 'margin') { const p = mPos(s.code), close = p && p.side !== UI.side; if (!close) w.push(ipoMgMsg(s, UI.side)); }
+  }
+  return w.filter(Boolean).join(' ');
+}
+// 最終売買日の前日・当日に、保有・建玉がある銘柄の注意（注文パネル）
+function dlWarn(s) {
+  if (s.delisted) return `${s.name}は上場廃止になりました（最終売買日の終値${px(s.dlPx)}円で決済）。取引はできません。`;
+  const x = s.dl, P = G.player; if (!x) return '';
+  const has = P.pos[s.code] || P.mpos[s.code];
+  if (G.dayIndex === x.L - 1 && has) return '明日が最終売買日です。保有分と建玉は終値で決済されます。';
+  if (G.dayIndex === x.L) return has ? '今日が最終売買日です。保有分と建玉は今日の終値で決済されます。' : '今日が最終売買日です（明日、上場廃止）。';
+  if (dlStage(s) === 'seiri') return '整理銘柄です。信用の新規建てはできません。';
+  return '';
+}
+
+/* ===================== 新規上場（追加銘柄のうち ipo のある銘柄） ===================== */
+// 日程は hash01 だけで決める（共通の乱数も専用乱数も使わない）。上場前は隠し、各ループでとばし、専用乱数も引かない。
+// 前身（ipo.from）が上場廃止になったら、廃止日の5〜15営業日後に前倒しする（通常の上場日のほうが早ければそのまま）。
+// 上場日：8:00 に速報、寄り付き前は気配（公開価格の0.75〜2.3倍）、9:00 に初値が決まり、その日は初値を基準に通常の値幅制限。
+// 保存するのは s.ipo だけ（状態は日数から決まる：ipoStage）
+const IPO_NEW = 5, IPO_MG_BUY = 5, IPO_MG_SELL = 20, IPO_ANN = 10;   // 「新規上場」の表示の日数、信用買い・空売りができるまでの営業日、承認のお知らせを何営業日前に出すか
+function ipoPlan(seed, x) {
+  const h = k => hash01(`${seed}/ipo/${x.code}/${k}`);
+  const day = x.ipo.lo + Math.floor(h('day') * (x.ipo.hi - x.ipo.lo + 1));
+  const px0 = Math.round((1000 + h('px') * 1500) / 10) * 10;   // 公開価格 1,000〜2,500円（10円単位）
+  const r = h('up') < 0.8 ? 0.10 + h('r') * 0.70 : -(0.02 + h('r') * 0.13);   // 初値：8割は +10〜+80%、2割は −2〜−15%（公募割れ）
+  return { day, base: day, ann: day - IPO_ANN, px: px0, open: roundTick(px0 * (1 + r)), early: false, from: x.ipo.from };
+}
+const preIpo = s => !!s.ipo && G.dayIndex < s.ipo.day;
+const live = s => !s.delisted && !preIpo(s);   // 上場していて、廃止されていない
+// none / pre（上場前）/ first（上場日）/ new（上場から5営業日）/ listed
+function ipoStage(s, d = G.dayIndex) {
+  const x = s.ipo; if (!x) return 'none';
+  return d < x.day ? 'pre' : d === x.day ? 'first' : d < x.day + IPO_NEW ? 'new' : 'listed';
+}
+// 前身の上場廃止を受けて、上場を前倒しする（最終売買日の引けに呼ばれる。廃止日は翌営業日）
+function ipoAdvance(e) {
+  for (const s of G.extra) {
+    const x = s.ipo; if (!x || x.from !== e.code || G.dayIndex >= x.day) continue;
+    const day = ipoEarlyDay(G.seed, s.code, e.day + 1);
+    if (day >= x.day) continue;
+    const told = G.dayIndex >= x.ann;   // 承認のお知らせを、もう出していたか
+    Object.assign(x, { day, early: true, ann: Math.max(day - IPO_ANN, G.dayIndex + 1), chg: told });
+  }
+}
+onGame('delist', ipoAdvance);
+const ipoEarlyDay = (seed, code, D) => D + 5 + Math.floor(hash01(`${seed}/ipo/${code}/early`) * 11);   // 廃止日 D の5〜15営業日後
+// 日程の関数だけで求めた上場日（前身が自然に廃止になる場合の前倒しを含む。分布の集計と確認用）
+function ipoSchedule(seed, code) {
+  const x = XDEFS.find(d => d.code === code), ip = ipoPlan(seed, x), dp = dlPlan(seed, x.ipo.from);
+  const e = dp ? ipoEarlyDay(seed, code, dp.D) : Infinity, early = !!dp && dp.L < ip.day && e < ip.day;
+  return { ...ip, day: early ? e : ip.day, early };
+}
+// 朝：承認（または上場日の変更）のお知らせ、上場日の速報
+function ipoDay() {
+  const d = G.dayIndex, P = G.player;
+  for (const s of G.extra) {
+    const x = s.ipo; if (!x) continue;
+    const news = (text, o = {}) => pushNews({ day: d, time: '8:00', type: 'big', stars: 3, codes: [s.code], text, hint: '', flash: false, ...o });
+    const when = mdLabel(addTD(G.date, x.day - d));
+    if (d === x.ann && d < x.day) news(x.chg ? `【上場日の変更】東証、${s.name}の新規上場日を${when}に変更（前倒し）` : `【上場承認】東証、${s.name}の新規上場を承認。上場日は${when}`);
+    if (d === x.day) news(`【新規上場】${s.name}（${s.code}）が本日、東証グロースに新規上場。公開価格${px(x.px)}円${x.early ? `（上場廃止になった${byCode(x.from)?.name || x.from}の後継として、上場を前倒し）` : ''}`, { flash: true });
+  }
+}
+// 上場日の寄り付き：初値で始まり、その日は初値を基準に通常の値幅制限。値動きの乱数はここから引く
+function ipoOpen(s) {
+  const x = s.ipo, o = x.open, w = limitWidth(o);
+  s.limUp = Math.round((o + w) * 10) / 10; s.limDn = Math.max(1, Math.round((o - w) * 10) / 10);
+  s.lp = Math.log(o); s.price = s.open = s.high = s.low = o; s.stop = null; s.gap = 0; s.pend = []; s.shock = 0;
+  s.V = o; s.h = 2;   // 上場したては値動きが荒い（GARCH の h。日がたつと元に戻る）
+  x.date = G.date;
+  const r = o / x.px - 1;
+  pushNews({ day: G.dayIndex, time: '9:00', type: 'big', stars: 3, codes: [s.code], text: `【初値】${s.name}の初値は${px(o)}円（公開価格比 ${pctS(r)}）${r < 0 ? '。公募割れのスタート' : ''}`, hint: '', flash: Math.abs(r) >= 0.3 });
+}
+// 上場日の寄り付き前の気配（10分ごとに6段階で、公開価格から初値へ近づく。乱数なし）
+function ipoQuote(s) {
+  if (ipoStage(s) !== 'first' || G.phase !== 'pre') return null;
+  const x = s.ipo, f = Math.min(6, Math.floor(G.preMin / 10) + 1) / 6;
+  return { p: roundPx(s, x.px + (x.open - x.px) * f), side: x.open >= x.px ? '買い気配' : '売り気配' };
+}
+// 信用の新規建ての制限（上場から5営業日は不可、20営業日までは買いだけ）。できるなら ''
+function ipoMgMsg(s, side) {
+  const x = s.ipo; if (!x) return '';
+  const k = G.dayIndex - x.day;
+  if (k < IPO_MG_BUY) return `${s.name}は上場から${IPO_MG_BUY}営業日は信用取引ができません（あと${IPO_MG_BUY - k}営業日。現物の売買はできます）。`;
+  if (side === 'sell' && k < IPO_MG_SELL) return `${s.name}の空売り（信用の新規売り）は、上場から${IPO_MG_SELL}営業日後からです（あと${IPO_MG_SELL - k}営業日）。`;
+  return '';
 }
 
 /* ===================== 梅山カンパニー（ファストスターターの幻の銘柄） ===================== */
@@ -745,16 +1037,18 @@ function umeClose() {
 /* ===================== ニュース ===================== */
 // 取引できる銘柄か（r = ランク）。ファストスターターで、ランクで開く銘柄が足りないあいだは FAST_CODES の5銘柄だけ。梅山カンパニーは上場した日から
 function isOpen(s, r = rank()) {
+  if (s.delisted) return false;   // 上場廃止（データは残す。閲覧だけできる）
+  if (preIpo(s)) return false;     // 上場前
   if (s.ume) return umeListed();
   if (isReal()) return !isFast() || r >= SCEN.real.rank || FAST_CODES.real.includes(s.code);
   return s.unlock <= r || (isFast() && FAST_CODES.random.includes(s.code));
 }
 function openRank(s) { for (let r = rank(); r <= RANKS.length; r++) if (isOpen(s, r)) return r; return RANKS.length; }
-function unlockedStocks() { const r = rank(); return [...G.stocks, ...(G.ume ? [G.ume] : [])].filter(s => isOpen(s, r)); }
+function unlockedStocks() { const r = rank(); return [...allStocks(), ...(G.ume ? [G.ume] : [])].filter(s => isOpen(s, r)); }
 // 取引できない銘柄・業種だけの話は見せない（まだ関係がないので）。市場全体や社会のニュースは常に見せる
 function newsVisible(n) {
-  if (n.codes?.length) return n.codes.some(c => { const s = byCode(c); return s && isOpen(s); });
-  if (n.sector) return G.stocks.some(s => s.sector === n.sector && isOpen(s));
+  if (n.codes?.length) return n.codes.some(c => { const s = byCode(c); return s && (isOpen(s) || s.delisted || !!s.ipo); });   // 上場廃止の銘柄の過去のお知らせ、上場前の承認のお知らせも見せる
+  if (n.sector) return G.stocks.some(s => s.sector === n.sector && isOpen(s));   // 30銘柄だけで決める（追加銘柄で、社会のニュースへの置き換えが変わらないように）
   return true;
 }
 function worldNews(mode) {
@@ -762,9 +1056,11 @@ function worldNews(mode) {
   const text = NEWS_WORLD[Math.floor(hash01(`${G.seed}world${n}`) * NEWS_WORLD.length)];
   pushNews({ day: G.dayIndex, time: mode === 'gap' ? '夜間' : minLabel(G.minute), type: 'world', stars: 3, codes: [], sector: null, text, hint: '市場への影響は小さい', flash: false });
 }
+const newsKeep = () => (isReal() ? NEWS_KEEP_REAL : G.extra?.length ? 200 : 120);
+const newsShow = () => (isReal() ? NEWS_KEEP_REAL : G.extra?.length ? 80 : 50);   // 画面の一覧に出す件数
 function pushNews(item) {
-  // リアル相場は1年分（約200件）の当時のニュースを全部残す。ランダム相場は今までどおり120件
-  item.id = ++G.newsId; G.news.push(item); if (G.news.length > (isReal() ? NEWS_KEEP_REAL : 120)) G.news.shift();
+  // リアル相場は1年分（約200件）の当時のニュースを全部残す。ランダム相場は120件、追加銘柄のある50銘柄のゲームは200件
+  item.id = ++G.newsId; G.news.push(item); if (G.news.length > newsKeep()) G.news.shift();
 }
 function pinFor(s, imp, mode) { s.pins.push({ d: G.dayIndex, m: mode === 'gap' ? 0 : G.minute, dir: Math.sign(imp) }); if (s.pins.length > 160) s.pins.shift(); }
 function applyStock(s, imp, mode, real) {
@@ -776,8 +1072,8 @@ function applySector(k, imp, mode, real) {
   const mk = G.market;
   if (mode === 'gap') mk.secGap[k] = (mk.secGap[k] || 0) + imp;
   else mk.secShock[k] = (mk.secShock[k] || 0) + 0.6 * imp;
-  for (const s of G.stocks) if (s.sector === k) {
-    if (mode !== 'gap') s.pend.push({ left: 0.4 * imp });
+  for (const s of allStocks()) if (s.sector === k && live(s)) {
+    if (mode !== 'gap') s.pend.push({ left: 0.4 * imp * (s.ssm ?? 1) });
     if (real) s.V *= Math.exp(0.5 * imp);
     if (Math.abs(imp) >= 0.01) pinFor(s, imp, mode);
   }
@@ -785,7 +1081,7 @@ function applySector(k, imp, mode, real) {
 function applyMarket(imp, mode) {
   const mk = G.market;
   if (mode === 'gap') mk.gapM += imp;
-  else { mk.shock += 0.6 * imp; for (const s of G.stocks) s.pend.push({ left: 0.4 * imp * s.beta }); }
+  else { mk.shock += 0.6 * imp; for (const s of allStocks()) if (live(s)) s.pend.push({ left: 0.4 * imp * s.beta }); }
 }
 function arrow(x) { return x > 0 ? '↑' : '↓'; }
 // 解放済みの銘柄は2倍出やすい（ニュースが1社に集中しすぎないように）
@@ -837,10 +1133,90 @@ function genNews(mode, type) {
   pushNews(item);
   return item;
 }
+/* ===== 追加銘柄のニュース ===== */
+// 追加銘柄（G.extra）の個別ニュース。30銘柄のニュース（maybeNews・genNews）とは別枠で、抽選は hash01 だけ（共通の乱数も専用乱数 s.r も引かない）。
+// 銘柄ごと・日ごとに XN_P の確率で1件。キーに銘柄コードが入るので、銘柄を増やしてもほかの銘柄の抽選は変わらない。
+// XN_GAP は夜間（寄り付きの窓 s.gap）、残りは場中のある1分（s.shock・s.pend・s.V。genNews と同じ足し方）。
+// 出さないのは、上場前と上場日・上場廃止のあと、倒産しうる銘柄の前兆（s.dl.F）の日から先（倒産のお知らせだけにする）。初日も出さない
+// XN_MUL = 種類ごとの影響の倍率（新興・低位・新規は大きく、高配当は小さく）。XN_PCUT = 優待のニュースのうち、廃止を選べる日の割合（廃止が出るのは1年チャレンジの1割弱）
+const XN_P = 12 / 245, XN_GAP = .35, XN_RUMOR = .15, XN_MUL = { growth: 1.4, penny: 1.4, ipo: 1.4, div: .5 }, XN_PCUT = .06;
+let XN_FX = 1;   // 効果の倍率（確認用。0 にすると、ニュースは出るが株価・配当・優待は動かない）
+let XN_SKIP = null, XN_FORCE = null;   // 確認用：この銘柄のニュースを出さない / 次の1件をこの変化（dup など）のテンプレートにする
+// [文面, 影響の基準値, データの変化]。変化：dup = 増配、dcut = 減配、pup = 優待の拡充、pchg = 優待の内容の変更、pcut = 優待の廃止
+const XNEWS = {
+  div: [['{n}が増配を発表、年間配当を{x}%引き上げ', .05, 'dup'], ['{n}が減配を発表', -.08, 'dcut'], ['{n}が配当を毎年減らさない方針を表明', .04],
+    ['{n}の業績が会社の計画を上回って推移', .04], ['{n}が業績予想を下方修正、配当は据え置き', -.04], ['{n}が自社株買いを発表', .04]],
+  cyc: [['{n}が海外の大型案件を{x}億円で受注', .07], ['{n}の受注残高が過去最高に', .05], ['{n}の主力製品の市況が上昇', .05],
+    ['{n}の主力製品の市況が悪化、値下がりが続く', -.06], ['{n}が業績予想を上方修正', .08], ['{n}が業績予想を下方修正', -.09], ['{n}が海外工場の稼働を一時停止', -.05]],
+  perk: [['{n}が株主優待の拡充を発表（{o}→{p}）', .05, 'pup'], ['{n}が株主優待の内容を変更（{o}→{p}）', -.01, 'pchg'], ['{n}が株主優待の廃止を発表', -.10, 'pcut'],
+    ['{n}の既存店の売上高が前年比{y}%増', .03], ['{n}の既存店の売上高が前年比{y}%減', -.03], ['{n}が新しい形の店を出店、客足は好調', .03]],
+  penny: [['{n}が第三者割当増資で{z}億円を調達（1株の価値が薄まる）', -.08], ['{n}が新株予約権の発行を発表（1株の価値が薄まる）', -.06], ['{n}が大手企業と資本業務提携', .10],
+    ['{n}が新しい事業への参入を発表', .06], ['{n}が業績予想を下方修正', -.09], ['{n}が業績予想を上方修正、赤字幅が縮小', .07]],
+  ipo: [['{n}が大口の受注を獲得', .07], ['{n}が大手企業と業務提携', .06], ['{n}が公募増資を発表（1株の価値が薄まる）', -.08],
+    ['{n}の月次の売上高が前年比{y}%増', .04], ['{n}が業績予想を上方修正', .08], ['{n}の大株主が保有株の売り出しを発表', -.06]],
+};
+const XRUMOR = {
+  div: [['観測記事：{n}が増配を検討か', .04], ['観測記事：{n}の利益が会社の計画を下回る見通しか', -.04]],
+  cyc: [['観測記事：{n}が大型受注を獲得へ', .05], ['観測記事：{n}が減産を検討か', -.05]],
+  perk: [['観測記事：{n}が株主優待の拡充を検討か', .04], ['観測記事：{n}が株主優待の見直しを検討か', -.04]],
+  penny: [['観測記事：{n}に大手企業が出資を検討か', .07], ['観測記事：{n}が大規模な増資を検討か', -.06]],
+  ipo: [['観測記事：{n}が大手企業と提携へ', .05], ['観測記事：{n}の大株主が株の売却を検討か', -.05]],
+};
+const xh = (s, k) => hash01(`${G.seed}/xn/${s.code}/${G.dayIndex}/${k}`);
+const xpick = (s, k, a) => a[Math.min(a.length - 1, Math.floor(xh(s, k) * a.length))];
+// 今日ニュースを出せる銘柄か
+const xnOK = s => s.code !== XN_SKIP && live(s) && !['pre', 'first'].includes(ipoStage(s)) && !(s.dl && G.dayIndex >= s.dl.F);
+// 今日のニュースの予定（null = なし、-1 = 夜間、0〜299 = 場中の分）
+function xnPlan(s) { if (G.dayIndex < 1 || xh(s, 'p') >= XN_P) return null; return xh(s, 'g') < XN_GAP ? -1 : Math.floor(xh(s, 'm') * MIN_PER_DAY); }
+// 今日がこの銘柄の配当・優待（廃止したものを含む）の権利確定日か（その日は配当・優待を変えるニュースを出さない＝変更は次の権利確定から）
+function recDay(s) { if (!lastTradingDayOfMonth(G.date)) return false; const mo = monthOf(G.date); return s.rec.includes(mo) || !!s.perk?.m.includes(mo) || !!s.perkGone?.m.includes(mo); }
+// 優待の文面の金額を差し替える（「食事券2,200円分」→「食事券3,300円分」）
+const perkText = (t, y) => (/[\d,]+円/.test(t) ? t.replace(/[\d,]+円/, `${yen(y)}円`) : `${t}（${yen(y)}円相当）`);
+function xNews(s, mode) {
+  const rumor = !XN_FORCE && xh(s, 'r') < XN_RUMOR, pool = s.kind === 'normal' || s.kind === 'growth';
+  const rd = recDay(s), sc = 0.6 + xh(s, 'sc') * 0.8, f = 1.1 + Math.floor(xh(s, 'f') * 11) / 100;
+  // 選べるテンプレート：配当のない銘柄に配当の話、優待のない銘柄（廃止後）に優待の話は出さない。優待の廃止は1ゲームに1社1回まで。
+  // 配当・優待を変える話は1社につき1年（DAYS 営業日）に1回まで（s.xnChg = 最後に変えた日）
+  const ok = ([t, , c]) => !(c && (rd || G.dayIndex - (s.xnChg ?? -DAYS) < DAYS)) && !(['dup', 'dcut'].includes(c) && !s.div) && !(['pup', 'pchg', 'pcut'].includes(c) && !s.perk) && !(c === 'pcut' && (G.xnPerkCut || (!XN_FORCE && xh(s, 'pc') >= XN_PCUT))) && !(s.kind === 'perk' && !s.perk && /優待/.test(t));
+  let list;
+  if (rumor) list = pool ? NEWS_RUMOR.slice(0, 3) : XRUMOR[s.kind];   // 30銘柄と同じうわさ（「不正のうわさ」は除く）
+  else if (pool) list = (s.kind === 'growth' && xh(s, 'gw') < 0.35 ? NEWS_GROWTH : NEWS_IND).map(([t, v]) => [t, v, t.includes('増配') ? 'dup' : null]);
+  else list = XNEWS[s.kind];
+  list = list.filter(x => rumor || ok(x));
+  if (!s.perk && s.kind === 'perk' && rumor) list = list.filter(([t]) => !/優待/.test(t)).concat([['観測記事：{n}の業績が会社の計画を上回る見通しか', .04]]);
+  if (XN_FORCE) { const f = XNEWS[s.kind].filter(x => x[2] === XN_FORCE && ok(x)); if (f.length) list = f; XN_FORCE = null; }
+  const [tpl, base, chg] = xpick(s, 'k', list);
+  const imp = base * sc * 0.42 * (XN_MUL[s.kind] || 1) * XN_FX;
+  const real = !rumor || xh(s, 'real') < 0.7;
+  const P = G.player, held = !!(P.pos[s.code] || P.mpos[s.code]);
+  let text = tpl.replace('{n}', s.name).replace('{x}', chg === 'dup' ? Math.round((f - 1) * 100) : 50 + Math.floor(xh(s, 'x') * 40) * 10)
+    .replace('{y}', 2 + Math.floor(xh(s, 'y') * 9)).replace('{z}', 5 + Math.floor(xh(s, 'z') * 26));
+  // データの変化（効果が0の確認のときは変えない）。反映は次の権利確定から（権利確定日にはこの種類を出さない）
+  if (chg && XN_FX) s.xnChg = G.dayIndex;
+  if (chg && s.perk) {
+    const o = s.perk.text, y = chg === 'pup' ? Math.round(s.perk.yen * 1.5 / 100) * 100 : s.perk.yen;
+    const nt = chg === 'pup' ? perkText(o, y) : chg === 'pchg' ? `選べるギフト${yen(y)}円分` : '';
+    text = text.replace('{o}', o).replace('{p}', nt);
+    if (XN_FX) {
+      if (chg === 'pcut') { s.perkGone = { m: s.perk.m, text: o }; s.perk = null; G.xnPerkCut = s.code; if (held) G.dayEvents.push(`保有中の${s.name}が株主優待をやめます。次の権利確定日から、優待は付きません`); }
+      else { s.perk = { ...s.perk, yen: y, text: nt }; if (held) G.dayEvents.push(`保有中の${s.name}の株主優待が「${nt}」になります（次の権利確定から）`); }
+    }
+  } else if (chg && s.div && XN_FX) {
+    const old = s.div; s.div = Math.round(s.div * (chg === 'dup' ? f : 0.7) * 10) / 10;
+    if (held) G.dayEvents.push(`保有中の${s.name}の年間配当が1株${old}円から${s.div}円になります（次の権利確定から）`);
+  }
+  const item = { day: G.dayIndex, time: mode === 'gap' ? '夜間' : minLabel(G.minute), type: rumor ? 'rumor' : 'ind', stars: rumor ? 2 : 3, codes: [s.code], sector: null, text, hint: `${arrow(base)}${s.name}`, flash: Math.abs(imp) >= 0.05, xn: true };
+  applyStock(s, imp, mode, real);
+  if (!real) G.denials.push({ at: G.clock + 40 + Math.floor(xh(s, 'dn') * 160), code: s.code, imp, xn: true });
+  pushNews(item);
+}
+// 夜間の分（startDay）と、場中の分（stepMinute。maybeNews のあと）
+function xNewsDay() { for (const s of G.extra) if (xnOK(s) && xnPlan(s) === -1) xNews(s, 'gap'); }
+function xNewsMinute() { for (const s of G.extra) if (xnPlan(s) === G.minute && xnOK(s)) xNews(s, 'live'); }
 function denyNews(dn) {
   const s = byCode(dn.code); const imp = -0.8 * dn.imp;
   applyStock(s, imp, 'live', false);
-  if (isOpen(s)) pushNews({ day: G.dayIndex, time: minLabel(G.minute), type: 'deny', stars: 3, codes: [s.code], text: `${s.name}が一部の報道について「当社が発表したものではない」とコメント`, hint: `${arrow(imp)}${s.name}`, flash: false });
+  if (isOpen(s)) pushNews({ day: G.dayIndex, time: minLabel(G.minute), type: 'deny', stars: 3, codes: [s.code], text: `${s.name}が一部の報道について「当社が発表したものではない」とコメント`, hint: `${arrow(imp)}${s.name}`, flash: false, ...(dn.xn ? { xn: true } : {}) });
 }
 // 1日あたりの目安：企業1.5件、業種0.15件、うわさ0.3件、経済0.2件、為替0.06件
 const NEWS_RATE = [['ind', 1 / 200], ['sector', 1 / 2000], ['rumor', 1 / 1000], ['macro', 1 / 1500], ['fx', 1 / 5000]];
@@ -856,12 +1232,15 @@ function startDay(first) {
   resetView();   // 日が変わったらチャートは最新の位置に戻す
   UI.acct = 'cash';   // 信用の注文を間違えて出さないよう、毎朝「現物」に戻す
   const y = +G.date.slice(0, 4); if (y !== P.year) { P.year = y; P.realizedYear = 0; P.taxYear = 0; }
-  if (!first) { for (const s of G.stocks) s.prevClose = s.price; mk.idxPrev = mk.idx; }   // 前日の終値を確定
-  for (const s of G.stocks) {
+  if (!first) { for (const s of allStocks()) if (live(s)) s.prevClose = s.price; mk.idxPrev = mk.idx; }   // 前日の終値を確定
+  for (const s of allStocks()) {
+    if (!live(s)) continue;   // 上場前と上場廃止の銘柄はとばす
     const w = limitWidth(s.prevClose);
     s.limUp = Math.round((s.prevClose + w) * 10) / 10; s.limDn = Math.max(1, Math.round((s.prevClose - w) * 10) / 10);
+    if (s.tick1) { s.limUp = Math.floor(s.prevClose + w); s.limDn = Math.max(1, Math.ceil(s.prevClose - w)); }   // 低位株は境界も1円刻み
     s.intraday = []; s.price = s.open = s.high = s.low = s.prevClose; s.lp = Math.log(s.price); s.dayVol = 0; s.stop = null;
     if (isReal()) realLimits(s);
+    if (ipoStage(s) === 'first') { s.limUp = roundPx(s, s.ipo.px * 2.3); s.limDn = roundPx(s, s.ipo.px * 0.75); }   // 上場日：初値が決まるまでの気配は公開価格の0.75〜2.3倍
   }
   mk.idx = mk.idxPrev;
   if (P.pendingDiv > 0) {
@@ -870,12 +1249,19 @@ function startDay(first) {
     pushNews({ day: G.dayIndex, time: '8:00', type: 'div', stars: 3, codes: [], text: `配当金 ${yen(net)}円が入金されました（実際の株では約3か月後に入金されます）`, hint: '' });
     complete('div');
   }
+  if (P.pendingPerk > 0) {   // 株主優待は現金相当をそのまま入れる（課税なし）
+    P.cash += P.pendingPerk; P.perkTotal += P.pendingPerk;
+    pushNews({ day: G.dayIndex, time: '8:00', type: 'div', stars: 3, codes: [], text: `株主優待 ${yen(P.pendingPerk)}円相当が入金されました（実際の株では、優待は商品券や食事券などで届きます。ここでは現金相当で入れます）`, hint: '' });
+    P.pendingPerk = 0;
+  }
   if (!first && !isReal()) {
     const x = RNG.next(), n = x < 0.45 ? 0 : x < 0.85 ? 1 : 2;
     for (let i = 0; i < n; i++) genNews('gap');
+    if (G.extra.length) xNewsDay();
   }
   if (isReal()) pushRealNews();
   if (G.ume) umeDay(first);
+  if (G.extra.length) { dlDay(); ipoDay(); }
   if (G.dayIndex === G.crashDay) {
     mk.gapM -= 0.045; mk.hM = Math.max(mk.hM, 4.5); mk.crashLeft = -0.05; mk.crashMin = 220;
     G.crashStart = asset(); G.crashCheck = G.dayIndex + 5;
@@ -899,18 +1285,21 @@ function openGaps() {
   const mk = G.market;
   const gM = mk.gapM + MKT_SIG * Math.sqrt(mk.hM / DAYS) * 0.35 * RNG.normal(); mk.gapM = 0;
   const gS = {}; for (const k in SECTORS) { gS[k] = (mk.secGap[k] || 0) + SECTORS[k].ss / Math.sqrt(DAYS) * 0.3 * RNG.normal(); mk.secGap[k] = 0; }
-  for (const s of G.stocks) {
-    const r = s.beta * gM + gS[s.sector] + s.idio * Math.sqrt(s.h / DAYS) * 0.35 * RNG.normal() + s.gap; s.gap = 0;
-    setPrice(s, Math.log(s.prevClose) + r);
-    s.open = s.high = s.low = s.price;
-  }
+  for (const s of G.stocks) gapOpen(s, gM, gS, RNG);
+  for (const s of G.extra) { if (!live(s)) continue; if (dlStopLow(s)) { stopLowStep(s, true); continue; } if (ipoStage(s) === 'first') { ipoOpen(s); continue; } gapOpen(s, gM, gS, s.r); }   // 窓の市場・業種の分（gM・gS）は読むだけ
   if (G.ume) umeOpen();
+}
+function gapOpen(s, gM, gS, R) {
+  const r = s.beta * gM + gS[s.sector] * (s.ssm ?? 1) + s.idio * Math.sqrt(s.h / DAYS) * 0.35 * R.normal() + s.gap; s.gap = 0;
+  setPrice(s, Math.log(s.prevClose) + r);
+  s.open = s.high = s.low = s.price;
 }
 function lunchBreak() {
   const mk = G.market;
   if (!isReal()) {
     mk.shock += MKT_SIG * Math.sqrt(mk.hM / DAYS) * 0.1 * RNG.normal();
     for (const s of G.stocks) s.shock += s.idio * Math.sqrt(s.h / DAYS) * 0.12 * RNG.normal();
+    for (const s of G.extra) if (live(s)) s.shock += s.idio * Math.sqrt(s.h / DAYS) * 0.12 * s.r.normal();
   }
   toast('11:30 昼休み。12:30から後場が始まります');
 }
@@ -927,12 +1316,14 @@ function tick() {
 const divOn = () => rank() >= 4;   // 配当はカレンダーと同じランク4から（それまでは配当も権利落ちもない）
 function lastTradingDayOfMonth(iso) { return monthOf(nextTD(iso)) !== monthOf(iso); }
 
+const BK_WARN = 0.2;   // 総資産が初期資金のこの割合を切ったら、引けに注意を出す（破産の前ぶれ）
 function closeMarket() {
   G.phase = 'closed';
   const mk = G.market, P = G.player, D = DIFF[G.diff];
   const r0 = rank();
   // 日足と、ボラティリティの更新（GARCH型）
-  for (const s of G.stocks) {
+  for (const s of allStocks()) {
+    if (!live(s)) continue;
     s.daily.push({ d: G.date, di: G.dayIndex, o: s.open, h: s.high, l: s.low, c: s.price, v: s.dayVol });
     if (s.daily.length > dailyKeep()) s.daily.shift();
     const z = (s.dayZ || 0) / (s.idio * D.vol / Math.sqrt(DAYS)); s.dayZ = 0;   // 大きく動いた翌日ほど荒れやすい
@@ -944,38 +1335,37 @@ function closeMarket() {
   if (G.ume) umeClose();
   mk.idxDaily.push({ d: G.date, o: mk.idxOpen, h: mk.idxHigh, l: mk.idxLow, c: mk.idx });
   if (mk.idxDaily.length > dailyKeep()) mk.idxDaily.shift();
+  // 最終売買日の銘柄：注文を取り消し、保有分と建玉を終値で決済する（注文の失効より前に、銘柄ごとに知らせる）
+  for (const s of G.extra) if (s.dl && !s.delisted && G.dayIndex === s.dl.L) delistSettle(s);
   // 失効
   if (P.orders.length) { G.dayEvents.push(`未約定の注文${P.orders.length}件は、当日限りのため大引けで失効しました`); P.orders = []; }
-  // 決算発表（引け後）
-  for (const s of G.stocks) {
-    if (s.nextEarn !== G.dayIndex) continue;
-    const cons = s.consensus, sd = s.sector === 'growth' ? 0.2 : 0.06;
-    const act = cons + Math.abs(cons) * RNG.normal() * sd;
-    const sur = (act - cons) / Math.abs(cons);
-    const imp = clamp(sur * (s.sector === 'growth' ? 0.4 : 0.6) - 0.005 + RNG.normal() * 0.01, -0.15, 0.15);
-    s.gap += imp; s.V *= Math.exp(imp * 0.8);
-    s.eps = s.eps + (act - cons) * 2;
-    const word = sur > 0.03 ? `予想を${Math.round(sur * 100)}%上回る` : sur < -0.03 ? `予想を${Math.round(-sur * 100)}%下回る` : 'ほぼ予想通り';
-    pushNews({ day: G.dayIndex, time: '15:30', type: 'earn', stars: 3, codes: [s.code], text: `決算：${s.name}の四半期の1株利益は${act.toFixed(1)}円（市場予想${cons.toFixed(1)}円）。${word}`, hint: `明日の寄り付き${arrow(imp)}`, flash: Math.abs(imp) > 0.05 });
-    s.pins.push({ d: G.dayIndex + 1, m: 0, dir: Math.sign(imp) });
-    if (P.pos[s.code]) { G.dayEvents.push(`保有中の${s.name}が決算を発表（${word}）。明日の寄り付きで株価に反映されます`); complete('earn'); }
-    s.consensus = (s.eps / 4) * (1 + s.mu / 4 + RNG.normal() * 0.02);
-    s.nextEarn += 60;
-  }
+  // 決算発表（引け後）。追加銘柄は30銘柄のあとに、専用の乱数で
+  for (const s of G.stocks) if (s.nextEarn === G.dayIndex) earnings(s, RNG);
+  for (const s of G.extra) if (s.nextEarn === G.dayIndex) { if (!live(s) || ipoStage(s) === 'first' || ['fail', 'seiri'].includes(dlStage(s))) s.nextEarn += 60; else earnings(s, s.r); }   // 上場前・上場日と、倒産したあとは決算を出さない
   // 配当の権利確定
   if (lastTradingDayOfMonth(G.date)) {
     const mo = monthOf(G.date);
-    for (const s of G.stocks) {
-      if (!divOn() || !s.div || !s.rec.includes(mo)) continue;
-      const per = s.div / s.rec.length;
-      const q = P.pos[s.code]?.qty || 0;
-      if (q > 0) { P.pendingDiv += q * per; G.dayEvents.push(`${s.name}の権利確定日。${q}株×${per}円＝${yen(q * per)}円の配当の権利を得ました（明日入金）`); }
-      // 信用の建玉は配当と同じ額をやりとりする（買い建ては受け取り、売り建ては支払う）
-      const mp = P.mpos[s.code];
-      if (mp?.side === 'buy') { P.pendingDiv += mp.qty * per; G.dayEvents.push(`信用で買い建て中の${s.name}の権利確定日。配当と同じ額（${yen(mp.qty * per)}円）を受け取ります（明日入金）`); }
-      else if (mp) { P.cash -= mp.qty * per; G.dayEvents.push(`信用で売り建て中の${s.name}の権利確定日。配当と同じ額（${yen(mp.qty * per)}円）を支払いました`); }
-      s.gap += Math.log(1 - per / s.price);   // 権利落ち
-      s.V *= 1 - per / s.price;
+    for (const s of allStocks()) {
+      if (!live(s)) continue;
+      if (s.perkGone?.m.includes(mo) && (P.pos[s.code]?.qty || 0) > 0) G.dayEvents.push(`${s.name}の権利確定日。優待がなくなったため、優待は付きません`);
+      const dv = divOn() && s.div && s.rec.includes(mo), pk = s.perk && s.perk.m.includes(mo);
+      if (!dv && !pk) continue;
+      const per = dv ? s.div / s.rec.length : 0;
+      const q = P.pos[s.code]?.qty || 0, mp = P.mpos[s.code];
+      if (dv) {
+        if (q > 0) { P.pendingDiv += q * per; G.dayEvents.push(`${s.name}の権利確定日。${q}株×${per}円＝${yen(q * per)}円の配当の権利を得ました（明日入金）`); }
+        // 信用の建玉は配当と同じ額をやりとりする（買い建ては受け取り、売り建ては支払う）
+        if (mp?.side === 'buy') { P.pendingDiv += mp.qty * per; G.dayEvents.push(`信用で買い建て中の${s.name}の権利確定日。配当と同じ額（${yen(mp.qty * per)}円）を受け取ります（明日入金）`); }
+        else if (mp) { P.cash -= mp.qty * per; G.dayEvents.push(`信用で売り建て中の${s.name}の権利確定日。配当と同じ額（${yen(mp.qty * per)}円）を支払いました`); }
+      }
+      // 株主優待：権利確定日の引けに、現物を100株以上持っていれば確定（現金相当を翌朝入金。課税なし）。信用の買い建てには付かない
+      if (pk) {
+        if (q >= PERK_LOT) { P.pendingPerk += s.perk.yen; G.dayEvents.push(`${s.name}の権利確定日。株主優待（${s.perk.text}）の権利を得ました。現金相当の${yen(s.perk.yen)}円を明日受け取ります`); }
+        else if (mp?.side === 'buy') G.dayEvents.push(`信用で買い建て中の${s.name}は、株主優待（${s.perk.text}）の対象外です。優待がもらえるのは、現物を${PERK_LOT}株以上持っているときだけです`);
+      }
+      const drop = per + (pk ? s.perk.yen / PERK_LOT * PERK_DROP : 0);   // 権利落ち：配当の分に、優待相当額の一部を足す
+      s.gap += Math.log(1 - drop / s.price);
+      s.V *= 1 - drop / s.price;
     }
   }
   marginDayEnd();
@@ -1003,7 +1393,10 @@ function closeMarket() {
   if (done === 20 && a > P.start && P.maxDD <= 0.10) complete('dd10');
   if (G.crashCheck === G.dayIndex && a >= G.crashStart * 0.9) complete('crash');
   const S = SCEN[G.scen];
-  if (S.days && done >= S.days) G.ended = true;
+  // 破産：引けのあと（追証・強制決済・上場廃止の決済のあと）に総資産が0以下。現金がマイナスなだけでは判定せず、場中も見ない。信用の練習中は判定しない
+  if (!UI.practice && a <= 0) { G.bankrupt = true; G.ended = true; G.dayEvents.push('総資産が0円以下になりました。破産です'); }
+  else if (!UI.practice && a < P.start * BK_WARN) { const m = `総資産が${yen(a)}円になりました（初めの資金の${Math.max(0, a / P.start * 100).toFixed(0)}%）。これ以上減ると、破産でゲームが終わります`; G.dayEvents.push(m); toast(m, 'warn'); }
+  if (!G.bankrupt && S.days && done >= S.days) G.ended = true;
   if (G.ended) {
     const win = a > P.start, hard = G.diff === 'hard';
     if (hard && win) { complete('hard'); if (P.feesTotal <= (a - P.start) * 0.1) complete('fee'); }
@@ -1011,10 +1404,27 @@ function closeMarket() {
     if (hard && G.scen === 'year' && a / P.start - 1 >= 0.10) complete('legend');
   }
   G.last.xp = G.dayXP; G.last.events = [...G.dayEvents]; G.last.rankUp = rank() > r0;
-  saveGame();
+  if (G.bankrupt) clearSave(); else saveGame();
   saveProfile();
   render();
   dailyReport();
+}
+
+/** 決算発表（引け後）。驚きの分は翌日の寄り付きの窓になる。R = 使う乱数 */
+function earnings(s, R) {
+  const P = G.player;
+  const cons = s.consensus, sd = s.esd ?? (s.sector === 'growth' ? 0.2 : 0.06);
+  const act = cons + Math.abs(cons) * R.normal() * sd;
+  const sur = (act - cons) / Math.abs(cons);
+  const imp = clamp(sur * (s.sector === 'growth' ? 0.4 : 0.6) - 0.005 + R.normal() * 0.01, -0.15, 0.15);
+  s.gap += imp; s.V *= Math.exp(imp * 0.8);
+  s.eps = s.eps + (act - cons) * 2;
+  const word = sur > 0.03 ? `予想を${Math.round(sur * 100)}%上回る` : sur < -0.03 ? `予想を${Math.round(-sur * 100)}%下回る` : 'ほぼ予想通り';
+  pushNews({ day: G.dayIndex, time: '15:30', type: 'earn', stars: 3, codes: [s.code], text: `決算：${s.name}の四半期の1株利益は${act.toFixed(1)}円（市場予想${cons.toFixed(1)}円）。${word}`, hint: `明日の寄り付き${arrow(imp)}`, flash: Math.abs(imp) > 0.05 });
+  s.pins.push({ d: G.dayIndex + 1, m: 0, dir: Math.sign(imp) });
+  if (P.pos[s.code]) { G.dayEvents.push(`保有中の${s.name}が決算を発表（${word}）。明日の寄り付きで株価に反映されます`); complete('earn'); }
+  s.consensus = (s.eps / 4) * (1 + s.mu / 4 + R.normal() * 0.02);
+  s.nextEarn += 60;
 }
 
 function nextDay() {
@@ -1026,10 +1436,12 @@ function nextDay() {
 }
 
 /* ===================== 売買 ===================== */
-function asset() { const P = G.player; let v = P.cash; for (const c in P.pos) v += P.pos[c].qty * byCode(c).price; if (hasMargin()) { const m = marginStat(); v += m.u - m.cost; } return v; }
+// 総資産 = 現金 ＋ 現物の時価 ＋ 信用の評価損益 − 未精算の費用。翌朝に入金される配当・優待は含めない。画面の総資産・上場廃止の記録（G.dlog）・破産の判定はすべてこれを使う
+function netAsset() { const P = G.player; let v = P.cash; for (const c in P.pos) v += P.pos[c].qty * byCode(c).price; if (hasMargin()) { const m = marginStat(); v += m.u - m.cost; } return v; }
+const asset = netAsset;
 function reservedCash() { return G.player.orders.reduce((a, o) => a + (o.reserve || 0), 0); }
-// 信用の建玉があるときは、必要な保証金（建玉の30%）と、評価損・未精算の費用の分は現物の買いに使えない
-function availCash() { let v = G.player.cash - reservedCash(); if (hasMargin()) { const m = marginStat(); v -= MARGIN.rate * m.n - Math.min(0, m.u) + m.cost; } return v; }
+// 信用の建玉があるときは、必要な保証金（建玉の30%。低位株などは銘柄ごとの率）と、評価損・未精算の費用の分は現物の買いに使えない
+function availCash() { let v = G.player.cash - reservedCash(); if (hasMargin()) { const m = marginStat(); v -= m.req - Math.min(0, m.u) + m.cost; } return v; }
 function availShares(code) { const q = G.player.pos[code]?.qty || 0; return q - G.player.orders.filter(o => o.code === code && o.side === 'sell' && !o.mg).reduce((a, o) => a + o.qty, 0); }
 function removeOrder(o) { const i = G.player.orders.indexOf(o); if (i >= 0) G.player.orders.splice(i, 1); }
 
@@ -1037,8 +1449,9 @@ function removeOrder(o) { const i = G.player.orders.indexOf(o); if (i >= 0) G.pl
 function book(s) {
   const t = tickOf(s, s.price), L = lot(s), key = `${s.code}:${G.dayIndex}:${G.minute}:${G.phase}`;
   const asks = [], bids = [];
+  const gap = s.tick1 && hash01(key + 'sp') < 0.35 ? 1 : 0;   // 低位株は、ときどき売りの一番手が1円空く（スプレッド2円）
   for (let k = 0; k < 8; k++) {
-    const pa = roundPx(s, s.price + (k + 1) * t), pb = roundPx(s, s.price - k * t);
+    const pa = roundPx(s, s.price + (k + 1 + gap) * t), pb = roundPx(s, s.price - k * t);
     const qa = Math.max(L, Math.round(s.minVol * (0.5 + 2.2 * hash01(key + 'a' + k)) * (1 + k * 0.18) / L) * L);
     const qb = Math.max(L, Math.round(s.minVol * (0.5 + 2.2 * hash01(key + 'b' + k)) * (1 + k * 0.18) / L) * L);
     if (pa <= s.limUp && s.stop !== 'up') asks.push({ p: pa, q: qa });
@@ -1046,26 +1459,30 @@ function book(s) {
   }
   return { asks, bids };
 }
-/** 成行で板を上から順に食っていく */
+// 成行で食える深さ：板の8本の先に、1呼値ずつ（1刻みに minVol 株）WALK_EXT 刻みまで。既存30銘柄は最も浅い銘柄でも
+// 約1,850万円分あり（ふつうの初期資金100万円の約18倍）、全額を成行で買っても部分約定にならない。低位株は部分約定になりうる
+const WALK_EXT = 8;
+/** 成行で板を上から順に食っていく。深さ（WALK_EXT）か値幅制限まで食って足りない分は約定しない（left = 取り消す株数） */
 function walk(s, side, qty) {
   const { asks, bids } = book(s); const lv = side === 'buy' ? asks : bids;
   let rem = qty, gross = 0, last = s.price;
   for (const l of lv) { const q = Math.min(rem, l.q); gross += q * l.p; rem -= q; last = l.p; if (!rem) break; }
-  let guard = 0;
-  while (rem > 0 && guard++ < 1000) {
-    const t = tickOf(s, last), L = lot(s);
-    last = side === 'buy' ? Math.min(s.limUp, roundPx(s, last + t)) : Math.max(s.limDn, roundPx(s, last - t));
+  for (let k = 0; rem > 0 && k < WALK_EXT; k++) {
+    const t = tickOf(s, last), L = lot(s), nx = side === 'buy' ? roundPx(s, last + t) : roundPx(s, last - t);
+    if (side === 'buy' ? nx > s.limUp : nx < s.limDn) break;   // ストップ高・安の値段より先には、相手がいない
+    last = nx;
     const q = Math.min(rem, Math.max(L, Math.round(s.minVol / L) * L));
     gross += q * last; rem -= q;
   }
   gross = Math.round(gross);   // 値段は0.1円刻み・株数は100株単位なので、代金は1円単位になる
-  return { gross, avg: gross / qty, last };
+  const filled = qty - rem;
+  return { gross, avg: filled ? gross / filled : s.price, last, filled, left: rem };
 }
 
 function fill(s, side, qty, gross, avgPx, kind, mg) {
   if (mg) { mfill(s, side, qty, gross, avgPx, kind); return; }
-  const P = G.player, D = DIFF[G.diff];
-  const fee = Math.round(gross * D.fee);
+  const P = G.player, D = DIFF[G.diff], dl = kind === 'delist';
+  const fee = dl ? 0 : Math.round(gross * D.fee);   // 上場廃止の決済は手数料なし
   if (side === 'buy') {
     P.cash -= gross + fee;
     const p = P.pos[s.code] || { qty: 0, avg: 0 };
@@ -1074,9 +1491,9 @@ function fill(s, side, qty, gross, avgPx, kind, mg) {
   } else {
     const p = P.pos[s.code]; const cost = p.avg * qty, proceeds = gross - fee, pnl = proceeds - cost;
     P.cash += proceeds; p.qty -= qty; if (p.qty <= 0) delete P.pos[s.code];
-    P.sells.push({ code: s.code, name: s.name, pnl, pct: pnl / cost, d: G.date, buyAvg: cost / qty, sellAvg: avgPx, qty });
+    P.sells.push({ code: s.code, name: s.name, pnl, pct: pnl / cost, d: G.date, buyAvg: cost / qty, sellAvg: avgPx, qty, ...(dl ? { dl: true } : {}) });
     realize(pnl);
-    sellMissions(pnl, pnl / cost, false, G.dayIndex - p.d, false);
+    if (!dl) sellMissions(pnl, pnl / cost, false, G.dayIndex - p.d, false);   // 上場廃止の決済はミッションに数えない
   }
   P.feesTotal += fee;
   P.trades.push({ code: s.code, side, qty, px: avgPx, d: G.dayIndex, m: G.minute, kind });
@@ -1086,7 +1503,7 @@ function fill(s, side, qty, gross, avgPx, kind, mg) {
 }
 // 売り・返済で損益が確定したときのミッション判定（p.d = 持ち始めた日）
 function sellMissions(pnl, pct, mg, hold, short) {
-  const S = G.player.sells, tail = n => S.length >= n && S.slice(-n).every(x => x.pnl > 0);
+  const S = G.player.sells.filter(x => !x.dl), tail = n => S.length >= n && S.slice(-n).every(x => x.pnl > 0);   // 上場廃止の決済は連勝に数えない
   if (pnl > 0) {
     complete('profit');
     if (pct >= 0.05) complete('big5');
@@ -1108,15 +1525,20 @@ function realize(pnl) {
 function marketTrade(s, side, qty, kind, mg) {
   if (side === 'buy' && s.stop === 'up') { toast(`${s.name}はストップ高のため、買い注文が約定しませんでした`, 'warn'); return false; }
   if (side === 'sell' && s.stop === 'down') { toast(`${s.name}はストップ安のため、売り注文が約定しませんでした`, 'warn'); return false; }
+  if (!mg && side === 'sell' && qty > availShares(s.code)) { toast('売れる株数が足りません', 'warn'); return false; }
   if (mg) qty = mFit(s, side, qty, q => walk(s, side, q).gross);
-  let w = walk(s, side, qty), fee = Math.round(w.gross * DIFF[G.diff].fee);
+  let w = walk(s, side, qty);
+  // 板の深さ・値幅制限までで足りない分は取り消す（部分約定）
+  const cut = w.left; if (cut) { qty = w.filled; w = walk(s, side, qty); }
+  if (!qty) { cancelNotice(`${s.name}の成行の${side === 'buy' ? '買い' : '売り'}は、板に相手がいないため約定せず、${cut.toLocaleString()}株すべてを取り消しました`); return false; }
+  let fee = Math.round(w.gross * DIFF[G.diff].fee);
   const me = mg && mCheck(s, side, qty, w.gross);
   if (me) { cancelNotice(`${s.name}の信用の注文を取り消しました。${me}`); return false; }
   // 寄り付きなどで値上がりして足りなくなったら、買える株数まで減らす
   while (!mg && side === 'buy' && qty > lot(s) && w.gross + fee > availCash() + 0.5) { qty -= lot(s); w = walk(s, side, qty); fee = Math.round(w.gross * DIFF[G.diff].fee); }
   if (!mg && side === 'buy' && w.gross + fee > availCash() + 0.5) { cancelNotice(`お金が足りないため、${s.name}の買い注文を取り消しました`); return false; }
-  if (!mg && side === 'sell' && qty > availShares(s.code)) { toast('売れる株数が足りません', 'warn'); return false; }
   fill(s, side, qty, w.gross, w.avg, kind, mg);
+  if (cut) cancelNotice(`${s.name}の成行の${side === 'buy' ? '買い' : '売り'}は、板が薄く${s.stop || w.last === (side === 'buy' ? s.limUp : s.limDn) ? '値幅制限に届いた' : '相手が足りなかった'}ため、${qty.toLocaleString()}株だけ約定し、残りの${cut.toLocaleString()}株は取り消しました`);
   if (w.last !== s.price) {   // マーケットインパクト：自分の大口注文で株価が動く
     setPrice(s, Math.log(s.price + (w.last - s.price) * 0.6));
     s.high = Math.max(s.high, s.price); s.low = Math.min(s.low, s.price);
@@ -1161,21 +1583,28 @@ const hasMargin = () => Object.keys(G.player.mpos).length > 0;
 const mPL = (p, s) => (s.price - p.px) * p.qty * (p.side === 'buy' ? 1 : -1);
 const mPct = r => (r * 100).toFixed(1) + '%';
 // 1営業日ぶんの費用（買い建て = 金利、売り建て = 貸株料）。返済のときにまとめて精算する。逆日歩を足すときはここだけ変える
-function marginCostDay(p) { return p.qty * p.px * (p.side === 'buy' ? MARGIN.buyRate : MARGIN.lendRate) / DAYS; }
-// n = 建玉の金額の合計、u = 評価損益、cost = 未精算の費用、eq = 実質の保証金、ratio = 保証金維持率（建玉がなければ null）
+function marginCostDay(p, s) { return p.qty * p.px * (p.side === 'buy' ? MARGIN.buyRate : mLend(s)) / DAYS; }
+// 銘柄ごとの信用の設定（XDEFS の mg。ないものは MARGIN の値）：委託保証金率、貸株料の年率、空売りできるか
+const mRate = s => s?.mg?.rate ?? MARGIN.rate;
+const mLend = s => s?.mg?.lend ?? MARGIN.lendRate;
+const canShort = s => s?.mg?.short !== false;
+const DL_NO_MARGIN = s => `${s.name}は整理銘柄のため、信用の新規建てはできません（返済はできます）。`;
+const NO_SHORT = s => `${s.name}は空売り（信用の新規売り）ができません。貸借銘柄ではないため、信用では買いだけができます。`;
+// n = 建玉の金額の合計、req = 必要な保証金（建玉ごとに銘柄の委託保証金率をかけた合計）、u = 評価損益、cost = 未精算の費用、
+// eq = 実質の保証金、ratio = 保証金維持率（建玉がなければ null）
 function marginStat() {
-  const P = G.player; let n = 0, u = 0, cost = 0;
-  for (const c in P.mpos) { const p = P.mpos[c]; n += p.qty * p.px; u += mPL(p, byCode(c)); cost += p.cost; }
+  const P = G.player; let n = 0, req = 0, u = 0, cost = 0;
+  for (const c in P.mpos) { const p = P.mpos[c], s = byCode(c); n += p.qty * p.px; req += mRate(s) * p.qty * p.px; u += mPL(p, s); cost += p.cost; }
   const eq = P.cash + u - cost;
-  return { n, u, cost, eq, ratio: n ? eq / n : null };
+  return { n, req, u, cost, eq, ratio: n ? eq / n : null };
 }
 // 値上がりに備えた上乗せ（寄り付き前の成行は窓、逆指値は約定が上の値段になりやすいため）。現物の買いの確保と信用の注文中の新規で使う
 const orderBuf = (type, phase) => (type === 'lmt' ? 1 : type === 'stp' ? 1.05 : phase === 'pre' ? 1.1 : 1);
 // 新しく建てられる金額（現物の買い注文で確保した現金と、注文中の新規の分を除く。注文中の新規は上乗せ込みで見込み、寄り付きで先の注文が余力不足で消えないようにする）
-function marginRoom() {
+function marginRoom(s) {   // s = 建てる銘柄（その銘柄の委託保証金率で割る。省略すると標準の30%）
   const m = marginStat(); if (m.eq < MARGIN.min) return 0;
-  const pend = G.player.orders.reduce((a, o) => a + (o.mg && o.open ? o.qty * (o.price || byCode(o.code).price) * orderBuf(o.type, G.phase) : 0), 0);
-  return Math.max(0, (m.eq - reservedCash()) / MARGIN.rate - m.n - pend);
+  const pend = G.player.orders.reduce((a, o) => { if (!(o.mg && o.open)) return a; const os = byCode(o.code); return a + mRate(os) * o.qty * (o.price || os.price) * orderBuf(o.type, G.phase); }, 0);
+  return Math.max(0, (m.eq - reservedCash() - m.req - pend) / mRate(s));
 }
 const mLevel = r => (r == null ? '' : r < MARGIN.warn ? 'bad' : r < 0.4 ? 'warn' : 'ok');   // ゲージの色：緑 / 黄 / 赤
 function mGauge(r) { return r == null ? 'なし' : `<span class="mgauge" data-lv="${mLevel(r)}" role="img" aria-label="保証金維持率 ${mPct(r)}"><i style="width:${clamp(r, 0, 1) * 100}%"></i></span> <b class="num">${mPct(r)}</b>`; }
@@ -1185,25 +1614,28 @@ function mDue(p) { const left = MARGIN.days - 1 - (G.dayIndex - p.d); return isR
 // 信用の新規が約定するとき、寄り付きの窓などで余力が足りなくなっていたら、建てられる株数まで減らす（現物の買いと同じ。amt = 株数→金額）
 function mFit(s, side, qty, amt) {
   const p = mPos(s.code), L = lot(s); if (p && p.side !== side) return qty;
-  while (qty > L && amt(qty) > marginRoom() + 0.5) qty -= L;
+  while (qty > L && amt(qty) > marginRoom(s) + 0.5) qty -= L;
   return qty;
 }
 // 信用の注文が通るか。だめなら理由を返す（通るときは ''）
 function mCheck(s, side, qty, amt) {
   const p = mPos(s.code);
   if (p && p.side !== side) return qty > p.qty ? `返済できるのは${p.qty.toLocaleString()}株までです。` : '';
+  if (side === 'sell' && !canShort(s)) return NO_SHORT(s);
+  if (dlStage(s) === 'seiri') return DL_NO_MARGIN(s);
+  const im = ipoMgMsg(s, side); if (im) return im;   // 新規上場：上場から5営業日は不可、20営業日までは買いだけ
   if (marginStat().eq < MARGIN.min) return `信用で新しく建てるには、保証金（現金＋建玉の評価損益）が${yen(MARGIN.min)}円以上必要です。`;
-  if (amt > marginRoom() + 0.5) return `新規建て余力が足りません（必要 約${yen(amt)}円／余力 ${yen(marginRoom())}円）。`;
+  if (amt > marginRoom(s) + 0.5) return `新規建て余力が足りません（必要 約${yen(amt)}円／余力 ${yen(marginRoom(s))}円）。`;
   return '';
 }
 function mfill(s, side, qty, gross, avgPx, kind) {
-  const P = G.player, fee = Math.round(gross * DIFF[G.diff].fee), p = P.mpos[s.code], lab = mSideLabel(s.code, side);
+  const P = G.player, dl = kind === 'delist', fee = dl ? 0 : Math.round(gross * DIFF[G.diff].fee), p = P.mpos[s.code], lab = mSideLabel(s.code, side);
   if (p && p.side !== side) {   // 返済：損益（手数料と金利などを引く）をここで確定する
     const share = p.cost * qty / p.qty, pnl = (p.side === 'buy' ? gross - p.px * qty : p.px * qty - gross) - fee - share;
     P.cash += pnl; p.cost -= share; p.qty -= qty; if (p.qty <= 0) delete P.mpos[s.code];
-    P.sells.push({ code: s.code, name: s.name, pnl, pct: pnl / (p.px * qty), d: G.date, buyAvg: p.side === 'buy' ? p.px : avgPx, sellAvg: p.side === 'buy' ? avgPx : p.px, qty });
+    P.sells.push({ code: s.code, name: s.name, pnl, pct: pnl / (p.px * qty), d: G.date, buyAvg: p.side === 'buy' ? p.px : avgPx, sellAvg: p.side === 'buy' ? avgPx : p.px, qty, ...(dl ? { dl: true } : {}) });
     realize(pnl);
-    sellMissions(pnl, pnl / (p.px * qty), true, G.dayIndex - p.d, p.side === 'sell');
+    if (!dl) sellMissions(pnl, pnl / (p.px * qty), true, G.dayIndex - p.d, p.side === 'sell');
   } else {   // 新規：お金は動かさない。手数料は費用として返済のときに精算する
     const q0 = p ? p.qty : 0;
     P.mpos[s.code] = { side, qty: q0 + qty, px: ((p ? p.px * q0 : 0) + gross) / (q0 + qty), d: p ? p.d : G.dayIndex, cost: (p ? p.cost : 0) + fee };
@@ -1226,7 +1658,7 @@ function marginWatch() {
 function marginDayEnd() {
   const P = G.player;
   for (const c in P.mpos) {
-    const p = P.mpos[c]; p.cost += marginCostDay(p);
+    const p = P.mpos[c]; p.cost += marginCostDay(p, byCode(c));
     if (G.dayIndex - p.d + 1 >= MARGIN.days) { mSettle(c); G.dayEvents.push(`${byCode(c).name}の信用の建玉が返済期限（6か月）を迎えたため、引けの値段で返済しました`); }
   }
   const m = marginStat();
@@ -1242,6 +1674,7 @@ function addXP(n, why, quiet) {
   const before = rank(); profile.xp += n; if (G) G.dayXP += n;
   if (!quiet) toast(`+${n} XP　${why}`, 'xp');
   const after = rank();
+  if (after >= XRANK) profile.r7 = true;
   if (after > before) {
     const R = RANKS[after - 1];
     toast(`ランクアップ！「${R.n}」に昇格。${R.unlock}が使えます${MISSIONS.some(m => m.rank === after) ? '。新しいミッションも追加されました' : ''}`, 'rank');
@@ -1260,13 +1693,24 @@ function complete(id) {
 }
 
 /* ===================== 保存 ===================== */
+function saveText() { G.rng = { s: RNG.s, spare: RNG.spare }; return JSON.stringify(G, (k, v) => (k === '_map' ? undefined : k === 'intraday' ? [] : v)); }
+const SAVE_WARN = 4e6;   // 保存データがこの文字数を超えたら注意する（ブラウザの保存の上限は約5MB）
+let saveWarnAt = '';     // 注意を出した日（1日1回まで）
 function saveGame() {
   if (UI.practice) return;   // 練習中の状態は保存しない
-  try {
-    G.rng = { s: RNG.s, spare: RNG.spare };
-    localStorage.setItem('kabutore.save', JSON.stringify(G, (k, v) => (k === '_map' ? undefined : k === 'intraday' ? [] : v)));
-  } catch (e) {}
+  let str;
+  try { str = saveText(); localStorage.setItem('kabutore.save', str); }
+  catch (e) { if (isQuota(e)) saveNotice('ブラウザの保存領域がいっぱいで、ゲームを保存できませんでした。ほかのサイトのデータを消すか、ゲームを最後まで遊んで終えてください'); return; }
+  if (str.length > SAVE_WARN && saveWarnAt !== G.date) { saveWarnAt = G.date; saveNotice(`保存データが大きくなっています（約${(str.length / 1e6).toFixed(1)}MB）。ブラウザの保存の上限（約5MB）を超えると保存できなくなります`); }
 }
+// 保存の警告：トーストと、1日のまとめの「今日のできごと」に残す（引けのあとは、もう作ったまとめにも足す）
+function saveNotice(msg) {
+  toast(msg, 'warn');
+  if (!G.dayEvents.includes(msg)) G.dayEvents.push(msg);
+  if (G.phase === 'closed' && G.last?.date === G.date && !G.last.events.includes(msg)) G.last.events.push(msg);
+}
+// localStorage の容量オーバーか（ブラウザで名前とコードがちがう）
+function isQuota(e) { return e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014); }
 // 保存データを続きから遊べるか。使えないものは消さずに出さないだけにする（データファイルを戻せば、また出る）。
 // リアル相場は、そのシナリオのデータがあり、保存した日がそのデータの同じ営業日であるときだけ（データが差し替わっていたら株価がずれるので出さない）
 function saveUsable(g) {
@@ -1292,7 +1736,9 @@ function palette() {
 
 function buildTape() {
   const items = unlockedStocks().map(s => `<span class="tk" data-code="${s.code}"><b>${esc(s.name)}</b><span class="num tp">${px(s.price)}</span><span class="num tc flat">±0.00%</span></span>`).join('');
-  const tp = $('#tape'); tp.innerHTML = `<span>${items}</span><span>${items}</span>`; tp.dataset.n = unlockedStocks().length;
+  const tp = $('#tape'), n = unlockedStocks().length; tp.innerHTML = `<span>${items}</span><span>${items}</span>`; tp.dataset.n = n;
+  // 30銘柄より多いときは、流れる速さが変わらないよう1周の時間を銘柄数に合わせて延ばす（30銘柄までは CSS の 70秒のまま）
+  tp.style.animationDuration = n > DEFS.length ? `${(70 * n / DEFS.length).toFixed(1)}s` : '';
   updateTape();
 }
 function updateTape() {
@@ -1307,6 +1753,7 @@ function render() {
   if (!G) return;
   // 帯は朝（startDay）に作る。続きから・練習の復元など、朝を通らずに始まったときや、銘柄が増えたときは、ここで作る
   if (!$('#tape .tk') || +$('#tape').dataset.n !== unlockedStocks().length) buildTape();
+  const on = unlockedStocks().length; if (UI.openN !== on) { UI.openN = on; buildFilter(); }   // 新規上場・上場廃止で銘柄が増減したら、業種・種類の絞り込みも作り直す
   renderHeader(); updateTape();
   if (UI.view === 'trade') { renderList(); renderChartHead(); drawChart(); renderBoard(); renderOrderPanel(); renderNews(); }
   else if (UI.view === 'hold') renderHold();
@@ -1335,11 +1782,20 @@ function renderHeader() {
 }
 
 function buildFilter() {
-  const r = rank(); const keys = Object.keys(isReal() ? REAL_SECTORS : SECTORS).filter(k => G.stocks.some(s => s.sector === k && isOpen(s, r)));
+  const r = rank(); const keys = Object.keys(isReal() ? REAL_SECTORS : SECTORS).filter(k => allStocks().some(s => s.sector === k && isOpen(s, r)));
   if (UI.filter !== 'all' && !keys.includes(UI.filter)) UI.filter = 'all';
   $('#sec-filter').innerHTML = `<option value="all">すべての業種</option>` + keys.map(k => `<option value="${k}"${UI.filter === k ? ' selected' : ''}>${SEC(k).name}</option>`).join('');
   fitSelect($('#sec-filter'));
+  // 種類の絞り込み：解放されている銘柄に、高配当・景気敏感・優待があるときだけ出す
+  const kinds = Object.keys(KIND_BADGE).filter(k => allStocks().some(s => kindOf(s) === k && isOpen(s, r)));
+  if (UI.kind !== 'all' && !kinds.includes(UI.kind)) UI.kind = 'all';
+  const kf = $('#kind-filter'); kf.hidden = !kinds.length;
+  kf.innerHTML = `<option value="all">すべての種類</option>` + kinds.map(k => `<option value="${k}"${UI.kind === k ? ' selected' : ''}>${KINDS[k].name}</option>`).join('');
+  if (kinds.length) fitSelect(kf);
 }
+const DL_BADGE = { watch: ' <b class="kb kb-dl">監理</b>', fail: ' <b class="kb kb-dl">監理</b>', seiri: ' <b class="kb kb-dl">整理</b>' };   // 倒産の途中の銘柄
+const kindOf = s => (s.kind === 'perk' && !s.perk ? 'normal' : s.kind);   // 表示の種類（優待をやめた銘柄は普通）
+const KIND_BADGE = { div: '高配当', cyc: '景気敏感', perk: '優待', penny: '低位', ipo: '新規' };   // 銘柄リストに出す種類のバッジ（普通・新興は出さない）
 // 選んでいる文字が入るぎりぎりの幅にする（select は既定だと一番長い選択肢の幅になる）
 function fitSelect(el) {
   const cs = getComputedStyle(el), c = fitSelect.c ||= document.createElement('canvas').getContext('2d');
@@ -1347,19 +1803,20 @@ function fitSelect(el) {
   el.style.width = Math.ceil(c.measureText(el.options[el.selectedIndex]?.text || '').width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 22) + 'px';   // 22 = ▼ の分
 }
 function renderList() {
-  const r = rank(), P = G.player, shown = s => UI.filter === 'all' || s.sector === UI.filter;
+  const r = rank(), P = G.player, shown = s => (UI.filter === 'all' || s.sector === UI.filter) && (UI.kind === 'all' || kindOf(s) === UI.kind);
   const sk = UI.sort.key, sv = s => (sk === 'px' ? s.price : s.price / s.prevClose - 1);
   $$('[data-sort]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sort === sk)));
   const sd = $('#sort-dir'); sd.textContent = UI.sort.desc ? '降順 ▼' : '昇順 ▲'; sd.setAttribute('aria-label', UI.sort.desc ? '降順（クリックで昇順）' : '昇順（クリックで降順）');
   const row = s => {
-    const ch = s.price / s.prevClose - 1;
+    const q = ipoQuote(s), ch = (q ? q.p : s.price) / s.prevClose - 1;   // 上場日の寄り付き前は気配（公開価格比）
     return [s.code, s.code === G.sel, {
-      n: `${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}`, sm: `${s.code}・${SEC(s.sector).short}`,
-      px: `${s.stop ? `<em class="stop ${s.stop}">${s.stop === 'up' ? 'S高' : 'S安'}</em> ` : ''}${px(s.price)}`, ch: pctS(ch), cc: cls(ch),
+      n: `${P.pos[s.code] ? '<i class="held" title="保有中"></i>' : ''}${esc(s.name)}`, sm: `${s.code}・${SEC(s.sector).short}${KIND_BADGE[kindOf(s)] ? ` <b class="kb kb-${kindOf(s)}">${KIND_BADGE[kindOf(s)]}</b>` : ''}${DL_BADGE[dlStage(s)] || ''}`,
+      px: `${q ? '<em class="stop up">気配</em> ' : s.stop ? `<em class="stop ${s.stop}">${s.stop === 'up' ? 'S高' : 'S安'}</em> ` : ''}${px(q ? q.p : s.price)}`, ch: pctS(ch), cc: cls(ch),
     }];
   };
   // 梅山カンパニーは数に入れず、いちばん下に別枠で出す
-  const items = G.stocks.filter(s => isOpen(s, r) && shown(s)).sort((a, b) => (UI.sort.desc ? -1 : 1) * (sk === 'none' ? G.stocks.indexOf(a) - G.stocks.indexOf(b) : sv(a) - sv(b))).map(row);
+  const all = allStocks();   // 標準の並びは、30銘柄のあとに追加銘柄
+  const items = all.filter(s => isOpen(s, r) && shown(s)).sort((a, b) => (UI.sort.desc ? -1 : 1) * (sk === 'none' ? all.indexOf(a) - all.indexOf(b) : sv(a) - sv(b))).map(row);
   if (umeListed() && shown(G.ume)) items.push(['sep'], row(G.ume));
   // ボタンも中の span も作り直さず、同じものを使い回して中身と並びだけ直す。押している途中で押した要素が消えると、離したときにクリックにならない
   const box = $('#stock-list'), old = {};
@@ -1383,9 +1840,9 @@ function renderList() {
     if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
   });
   for (const k in old) old[k].remove();
-  const locked = G.stocks.filter(s => !isOpen(s, r));
+  const locked = all.filter(s => !isOpen(s, r) && !s.delisted && !preIpo(s)), gone = all.filter(s => s.delisted).length;   // 上場廃止の銘柄は、未解放に数えない
   const nr = locked.length ? Math.min(...locked.map(openRank)) : 0;
-  $('#list-foot').textContent = locked.length ? `ほかに${locked.length}銘柄あります。ランク${nr}で${locked.filter(s => isOpen(s, nr)).length}銘柄が解放されます。` : '全30銘柄が解放されています。';
+  $('#list-foot').textContent = (locked.length ? `ほかに${locked.length}銘柄あります。ランク${nr}で${locked.filter(s => isOpen(s, nr)).length}銘柄が解放されます。` : `全${all.length - gone}銘柄が解放されています。`) + (gone ? `（上場廃止 ${gone}銘柄）` : '');
 }
 
 function rsi(closes, n = 14) {
@@ -1395,10 +1852,14 @@ function rsi(closes, n = 14) {
 }
 function renderChartHead() {
   const s = sel(), ch = s.price - s.prevClose, r = rank();
-  $('#c-name').innerHTML = `${esc(s.name)}<span class="code num">${s.code}</span>`;
-  $('#c-meta').textContent = `${SEC(s.sector).name}｜${s.desc}`;
-  $('#c-price').innerHTML = `${px(s.price)}<small>円</small>${s.stop ? ` <em class="stop ${s.stop}">${s.stop === 'up' ? 'ストップ高' : 'ストップ安'}</em>` : ''}`;
-  const cp = $('#c-chg'); cp.textContent = `前日比 ${pxS(ch)}円（${pctS(ch / s.prevClose)}）`; cp.className = 'num ' + cls(ch);
+  const ist = ipoStage(s), q = ipoQuote(s);
+  $('#c-name').innerHTML = `${esc(s.name)}<span class="code num">${s.code}</span>${s.delisted ? '<em class="dl-chip">上場廃止</em>' : DL_BADGE[dlStage(s)] ? `<em class="dl-chip">${dlStage(s) === 'seiri' ? '整理銘柄' : '監理銘柄'}</em>` : ist === 'first' || ist === 'new' ? `<em class="ipo-chip">新規上場（${G.dayIndex - s.ipo.day + 1}日目）</em>` : ''}`;
+  $('#c-meta').innerHTML = `${esc(SEC(s.sector).name)}｜${esc(s.desc)}${s.kind === 'penny' ? `<span class="penny-note">⚠ 1株100円以下の${term('低位株')}。板が薄く、${term('値幅制限')}が広い</span>` : ''}`;
+  $('#c-price').innerHTML = q ? `<small>${q.side}</small> ${px(q.p)}<small>円</small>` : `${px(s.price)}<small>円</small>${s.stop ? ` <em class="stop ${s.stop}">${s.stop === 'up' ? 'ストップ高' : 'ストップ安'}</em>` : ''}`;
+  const cp = $('#c-chg');
+  if (q) { cp.textContent = `公開価格 ${px(s.ipo.px)}円（気配は${pctS(q.p / s.ipo.px - 1)}）。9:00 の寄り付きで初値が決まります`; cp.className = 'num ' + cls(q.p - s.ipo.px); }
+  else if (ist === 'first') { cp.textContent = `公開価格比 ${pxS(s.price - s.ipo.px)}円（${pctS(s.price / s.ipo.px - 1)}）・初値 ${px(s.ipo.open)}円`; cp.className = 'num ' + cls(s.price - s.ipo.px); }
+  else { cp.textContent = `前日比 ${pxS(ch)}円（${pctS(ch / s.prevClose)}）`; cp.className = 'num ' + cls(ch); }
   $$('[data-cm]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cm === G.chartMode)));
   const f = (k, v, c) => `<div${c ? ` class="${c}"` : ''}><dt>${k}</dt><dd class="num">${v}</dd></div>`;
   const closes = s.daily.map(d => d.c); if (G.phase === 'open') closes.push(s.price);
@@ -1411,11 +1872,13 @@ function renderChartHead() {
   // 上下2行に列順で並べる PC・タブレットだけ、CSS の order で PER と配当利回りの位置を入れ替える（スマホの並びは変えない）
   let html = f(term('時価総額'), fmtCap(s.shares * s.price), 'o1 fx-cap')
     + f(term('PER'), s.eps > 0 ? (s.price / s.eps).toFixed(1) + '倍' : '赤字のため—', 'o4 fx-per')
-    + f(term('PBR'), (s.price / s.bps).toFixed(2) + '倍', 'o3 fx-pbr')
+    + f(term('PBR'), s.fin?.na < 0 ? '債務超過のため—' : (s.price / s.bps).toFixed(2) + '倍', 'o3 fx-pbr')
     + (divOn() ? f(term('配当利回り'), s.div ? (s.div / s.price * 100).toFixed(2) + '%' : 'なし', 'o2 fx-div') : '')
     + f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株', 'fx-vol')
     + f(term('値幅制限'), `${px(s.limDn)}〜${px(s.limUp)}`, 'fx-lim')
-    + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl');
+    + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl')
+    + (s.perk ? f(term('株主優待'), `${esc(s.perk.text)}（年${s.perk.m.length}回・${PERK_LOT}株〜）`, 'fx-perk') : '')
+    + (s.ipo ? f(term('新規上場', '上場日') + '・' + term('公開価格'), `${s.ipo.date ? mdLabel(s.ipo.date) : '今日'}・${px(s.ipo.px)}円`, 'fx-ipo') : '');
   if (r >= 4) {
     html += f('次の' + term('決算'), s.ume ? '社長の気分しだい' : mdLabel(addTD(G.date, s.nextEarn - G.dayIndex)) + ` 予想${s.consensus.toFixed(1)}円`, 'fx-earn');
     html += f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi');
@@ -1509,7 +1972,7 @@ function drawChart() {
   const Y = v => padT + (hi - v) / (hi - lo) * prH;
   ctx.font = `11px ${C.num}`; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
   // 目盛り
-  const step = niceStep((hi - lo) / 5);
+  const step = sel().tick1 ? Math.max(1, niceStep((hi - lo) / 5)) : niceStep((hi - lo) / 5);   // 低位株（呼値1円）は1円より細かい目盛りを引かない
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
     const y = Math.round(Y(v)) + 0.5;
     ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + pw, y); ctx.stroke();
@@ -1620,6 +2083,8 @@ function renderBoard() {
   if (UI.boardHold) return;   // 押している間は板を作り直さない（押したボタンが消えると、離したときにクリックにならない）。離したあとに描き直す
   $('#b-help').hidden = rank() < 3;
   if (rank() < 3) { el.innerHTML = `<div class="locked"><b>ランク3で解放</b><p>板は、売りたい人と買いたい人の注文が値段ごとに並んだ表です。</p></div>`; return; }
+  if (ipoQuote(sel())) { const q = ipoQuote(sel()); el.innerHTML = `<div class="locked"><b>初値決定前（${q.side} ${px(q.p)}円）</b><p>上場日は、寄り付き（9:00）で初値が決まるまで、気配だけが出ます。</p></div>`; return; }
+  if (sel().delisted) { el.innerHTML = '<div class="locked"><b>上場廃止</b><p>この銘柄は上場廃止になったため、板はありません。</p></div>'; return; }
   const s = sel(), { asks, bids } = book(s);
   const pre = G.phase === 'pre';
   const btn = p => `<button data-px="${p}">${px(p)}</button>`;
@@ -1648,7 +2113,7 @@ function orderEstimate() {
   const s = sel(), D = DIFF[G.diff];
   const L = lot(s), qty = Math.max(0, Math.round((+$('#o-qty').value || 0) / L) * L);
   let p;
-  if (UI.type === 'mkt') p = (G.phase === 'open' || UI.tut?.list === BTUT) && qty ? walk(s, UI.side, qty).avg : s.price;   // 板の講座では、寄り付き前でも板から目安を出して見せる
+  if (UI.type === 'mkt') p = (G.phase === 'open' || UI.tut?.list === BTUT) && qty ? walk(s, UI.side, qty).avg : ipoQuote(s)?.p ?? s.price;   // 板の講座では、寄り付き前でも板から目安を出して見せる。上場日の寄り付き前は気配
   else p = roundPx(s, +$('#o-price').value || s.price);
   const gross = p * qty, fee = Math.round(gross * D.fee);
   return { qty, p, gross, fee };
@@ -1660,9 +2125,10 @@ function renderOrderPanel() {
     const q = $('#o-qty'); if (UI.lot) q.value = L; UI.lot = L; q.min = q.step = L;
     $('label[for="o-qty"] .term').textContent = `${L}株単位`; $('#q-minus').setAttribute('aria-label', `${L}株減らす`); $('#q-plus').setAttribute('aria-label', `${L}株増やす`);
   }
+  const dw = $('#o-dl'), dwt = stockWarn(s); dw.hidden = !dwt; dw.textContent = dwt; $('#o-submit').disabled = !!s.delisted;   // 倒産・上場廃止・新規上場の注意
   const mg = UI.acct === 'margin', mp = mg && mPos(s.code), close = mp && mp.side !== UI.side;
   const lab = { buy: mg ? mSideLabel(s.code, 'buy') : '買う', sell: mg ? mSideLabel(s.code, 'sell') : '売る' };
-  $('#o-name').textContent = s.name; $('#o-cur').textContent = px(s.price) + '円';
+  $('#o-name').textContent = s.name; $('#o-cur').textContent = ipoQuote(s) ? `${ipoQuote(s).side} ${px(ipoQuote(s).p)}円` : px(s.price) + '円';
   $$('#o-acct button:not(.locked)').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.acct === UI.acct)));
   $('#m-help').hidden = !mg;
   $$('[data-side]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.side === UI.side)); b.textContent = lab[b.dataset.side]; });
@@ -1677,7 +2143,8 @@ function renderOrderPanel() {
   if (D.fee) lines.push([term('手数料'), yen(e.fee) + '円']);
   if (mg) {   // やさしいでは必要な保証金と余力を出さず、維持率のゲージだけにする
     if (close) lines.push(['返済できる株数', mp.qty.toLocaleString() + '株']);
-    else if (G.diff !== 'easy') lines.push([`必要な${term('委託保証金', '保証金')}`, yen(e.gross * MARGIN.rate) + '円'], [term('新規建て余力'), yen(marginRoom()) + '円']);
+    else if (UI.side === 'sell' && !canShort(s)) lines.push(['空売り', 'できません（信用は買いだけ）']);
+    else if (G.diff !== 'easy') lines.push([`必要な${term('委託保証金', '保証金')}${mRate(s) !== MARGIN.rate ? `（${Math.round(mRate(s) * 100)}%）` : ''}`, yen(e.gross * mRate(s)) + '円'], [term('新規建て余力'), yen(marginRoom(s)) + '円']);
     lines.push([term('建玉'), mp ? `${mp.side === 'buy' ? '買い建て' : '売り建て'} ${mp.qty.toLocaleString()}株（建値 ${px(Math.round(mp.px * 10) / 10)}円）` : 'なし']);
     if (mp) { const pl = mPL(mp, s); lines.push(['評価損益', `<span class="${cls(pl)}">${yenS(pl)}円</span>`]); }
     lines.push([term('保証金維持率', '維持率'), mGauge(marginStat().ratio)]);
@@ -1692,7 +2159,8 @@ function renderOrderPanel() {
   $('#o-avail').textContent = `現金 ${yen(P.cash)}円`;
   const q = $('#o-quick');
   if (mg && s.ume) q.innerHTML = '';
-  else if (mg) { const n = close ? mp.qty : Math.max(0, Math.floor(marginRoom() / (s.price * 1.01) / 100) * 100); q.innerHTML = `<button data-q="${n}">${close ? '全部' : '建てられる最大'} ${n.toLocaleString()}株</button>`; }
+  else if (mg && !close && UI.side === 'sell' && !canShort(s)) q.innerHTML = '';
+  else if (mg) { const n = close ? mp.qty : Math.max(0, Math.floor(marginRoom(s) / (s.price * 1.01) / 100) * 100); q.innerHTML = `<button data-q="${n}">${close ? '全部' : '建てられる最大'} ${n.toLocaleString()}株</button>`; }
   else if (UI.side === 'buy') { const maxQ = Math.max(0, Math.floor(availCash() / (s.price * (1 + D.fee) * 1.01) / L) * L); q.innerHTML = `<button data-q="${maxQ}">買える最大 ${maxQ.toLocaleString()}株</button>`; }
   else { const a = availShares(s.code); q.innerHTML = a ? `<button data-q="${a}">全部 ${a.toLocaleString()}株</button>` + (a >= 2 * L ? `<button data-q="${Math.floor(a / (2 * L)) * L}">半分</button>` : '') : ''; }
   $('#o-list').innerHTML = P.orders.map(o => { const os = byCode(o.code); return `<li><span><b>${esc(os.name)}</b> <span class="${o.side === 'buy' ? 'up' : 'down'}">${o.mg ? '信用' : ''}${o.side === 'buy' ? '買' : '売'}</span></span><span class="num">${o.qty.toLocaleString()}株</span><button data-cancel="${o.id}">取消</button><span class="od">${KIND[o.type]}${o.type !== 'mkt' ? ` ${px(o.price)}円` : '（寄り付きで約定）'}</span></li>`; }).join('') || '<li class="empty">注文はありません</li>';
@@ -1703,7 +2171,7 @@ function renderNews() {
   $('#news-hint').textContent = isReal() ? '日付は報道が届いた朝' : hint === 'dir' ? '矢印は影響の向き' : hint === 'stars' ? '★は情報の確かさ' : '';
   const key = `${G.newsId}|${unlockedStocks().length}`;   // 銘柄が増えたら、それまで隠していたニュースも出す
   if (UI.lastNews === key) return; UI.lastNews = key;
-  $('#news').innerHTML = G.news.filter(newsVisible).slice(isReal() ? -NEWS_KEEP_REAL : -50).reverse().map(n => {
+  $('#news').innerHTML = G.news.filter(newsVisible).slice(-newsShow()).reverse().map(n => {
     const sub = [];
     // 当時のニュース（real）は日付を出していて、すべて確かな報道なので、★と「◯日前」は省く
     if (hint === 'stars' && n.type !== 'div' && !n.type.startsWith('real')) sub.push(`<span class="stars" aria-label="信頼度 ${n.stars}">${'★'.repeat(n.stars)}${'☆'.repeat(3 - n.stars)}</span>`);
@@ -1751,6 +2219,7 @@ function renderHold() {
       <div><dt>今年の確定損益</dt><dd class="num ${cls(P.realizedYear)}">${yenS(P.realizedYear)}円</dd></div>
       <div><dt>${term('譲渡益課税', '税金')}（今年）</dt><dd class="num">${yen(P.taxYear)}円</dd></div>
       ${divOn() || P.divTotal ? `<div><dt>受け取った配当（税引後）</dt><dd class="num">${yen(P.divTotal)}円</dd></div>` : ''}
+      ${P.perkTotal ? `<div><dt>受け取った${term('株主優待', '優待')}（現金相当）</dt><dd class="num">${yen(P.perkTotal)}円</dd></div>` : ''}
       ${DIFF[G.diff].fee ? `<div><dt>${term('手数料')}の合計</dt><dd class="num">${yen(P.feesTotal)}円</dd></div>` : ''}
       <div><dt>${term('最大ドローダウン')}</dt><dd class="num">${(P.maxDD * 100).toFixed(1)}%</dd></div>
     </dl>
@@ -1765,7 +2234,7 @@ function renderHold() {
   </tbody></table></div></section>
   ${marginSection()}
   <section class="panel"><h2>最近の売買</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>日時</th><th>銘柄</th><th>売買</th><th>種類</th><th class="r">株数</th><th class="r">約定値段</th></tr></thead><tbody>
-    ${P.trades.slice(-15).reverse().map(t => `<tr><td class="num">${t.d === G.dayIndex ? '今日' : (G.dayIndex - t.d) + '日前'} ${minLabel(t.m)}</td><td>${esc(byCode(t.code).name)}</td><td class="${t.side === 'buy' ? 'up' : 'down'}">${t.mg ? '信用' : ''}${t.side === 'buy' ? '買い' : '売り'}</td><td>${KIND[t.kind]}</td><td class="r num">${t.qty.toLocaleString()}</td><td class="r num">${px(Math.round(t.px * 10) / 10)}</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ売買していません。</td></tr>'}
+    ${P.trades.slice(-15).reverse().map(t => `<tr><td class="num">${t.d === G.dayIndex ? '今日' : (G.dayIndex - t.d) + '日前'} ${(t.m >= MIN_PER_DAY ? '15:30' : minLabel(t.m))}</td><td>${byCode(t.code).delisted ? `<button class="golink" data-goto="${t.code}">${esc(byCode(t.code).name)}</button><span class="muted">（上場廃止）</span>` : esc(byCode(t.code).name)}</td><td class="${t.side === 'buy' ? 'up' : 'down'}">${t.mg ? '信用' : ''}${t.side === 'buy' ? '買い' : '売り'}</td><td>${KIND[t.kind]}</td><td class="r num">${t.qty.toLocaleString()}</td><td class="r num">${px(Math.round(t.px * 10) / 10)}</td></tr>`).join('') || '<tr class="empty"><td colspan="6">まだ売買していません。</td></tr>'}
   </tbody></table></div></section>`;
   drawLines($('#hist-chart'), P.hist);
 }
@@ -1825,16 +2294,21 @@ function renderCal() {
   if (rank() < 4) { el.innerHTML = `<section class="panel"><div class="locked"><b>ランク4で解放</b><p>決算発表の予定日と、配当の権利確定日がわかるカレンダーです。</p></div></section>`; return; }
   if (isReal()) { el.innerHTML = `<section class="panel"><h2>決算・配当</h2><p class="muted">リアル相場チャレンジでは、決算と配当は扱いません（実データは毎日の終値だけで、決算や配当による値動きはすでに終値に含まれています）。</p></section>`; return; }
   const P = G.player;
-  const up = G.stocks.filter(s => s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
-  const divs = G.stocks.filter(s => s.div);
-  const recDate = s => { let best = null; for (let k = 0; k < 270 && !best; k++) { const d = addTD(G.date, k); if (s.rec.includes(monthOf(d)) && lastTradingDayOfMonth(d)) best = d; } return best; };
+  const up = allStocks().filter(s => live(s) && !['fail', 'seiri'].includes(dlStage(s)) && s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
+  const divs = allStocks().filter(s => s.div && live(s));
+  const perks = allStocks().filter(s => s.perk);
+  const recDate = (s, months = s.rec) => { let best = null; for (let k = 0; k < 270 && !best; k++) { const d = addTD(G.date, k); if (months.includes(monthOf(d)) && lastTradingDayOfMonth(d)) best = d; } return best; };
   el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">決算は大引け後（15:30）に発表され、翌日の寄り付きで株価に反映されます。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>銘柄</th><th>業種</th><th class="r">${term('市場予想')}（1株利益）</th><th>保有</th></tr></thead><tbody>
     ${up.map(s => `<tr><td class="num">${mdLabel(addTD(G.date, s.nextEarn - G.dayIndex))}${s.nextEarn === G.dayIndex ? ' 今日' : ''}</td><td>${esc(s.name)}</td><td>${SEC(s.sector).short}</td><td class="r num">${s.consensus.toFixed(1)}円</td><td>${P.pos[s.code] ? '●' : ''}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
     </tbody></table></div></section>
     <section class="panel"><h2>配当と${term('権利確定日')}</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">年間配当（1株）</th><th class="r">${term('配当利回り')}</th><th>確定月</th><th>次の権利確定日</th></tr></thead><tbody>
     ${divs.map(s => `<tr><td>${esc(s.name)}</td><td class="r num">${s.div}円</td><td class="r num">${(s.div / s.price * 100).toFixed(2)}%</td><td>${s.rec.map(m => m + '月').join('・')}</td><td class="num">${(d => d ? mdLabel(d) : '—')(recDate(s))}</td></tr>`).join('')}
-    </tbody></table></div></section>`;
+    </tbody></table></div></section>
+    ${perks.length ? `<section class="panel"><h2>${term('株主優待')}</h2><p class="muted small">権利確定日の引けに、現物を${PERK_LOT}株以上持っていれば、翌朝に現金相当の額が入ります（課税なし）。信用の買い建てには付きません。</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th>優待の内容</th><th class="r">年間（現金相当）</th><th class="r">優待利回り</th><th>確定月</th><th>次の権利確定日</th><th class="r">${PERK_LOT}株の金額</th><th>保有</th></tr></thead><tbody>
+    ${perks.map(s => { const yr = s.perk.yen * s.perk.m.length; return `<tr><td>${esc(s.name)}</td><td>${esc(s.perk.text)}</td><td class="r num">${yen(yr)}円</td><td class="r num">${(yr / (s.price * PERK_LOT) * 100).toFixed(2)}%</td><td>${s.perk.m.map(m => m + '月').join('・')}</td><td class="num">${(d => d ? mdLabel(d) : '—')(recDate(s, s.perk.m))}</td><td class="r num">${yen(s.price * PERK_LOT)}円</td><td>${(P.pos[s.code]?.qty || 0) >= PERK_LOT ? '●' : ''}</td></tr>`; }).join('')}
+    </tbody></table></div></section>` : ''}`;
 }
 
 /* ---------- ミッション ---------- */
@@ -1906,6 +2380,10 @@ function buildOrder() {
   if (qty < L) return { err: L === 1 ? '株数は1株以上で入力してください。' : '株数は100株以上、100株単位で入力してください。' };
   if (G.phase === 'closed') return { err: '本日の取引は終了しました。' };
   if (mg && s.ume) return { err: `${s.name}は信用取引の対象外です。社長が株を貸してくれません。` };
+  if (s.delisted) return { err: dlWarn(s) };
+  if (mg && side === 'sell' && !canShort(s) && mPos(s.code)?.side !== 'buy') return { err: NO_SHORT(s) };
+  if (mg && dlStage(s) === 'seiri' && mPos(s.code)?.side !== (side === 'buy' ? 'sell' : 'buy')) return { err: DL_NO_MARGIN(s) };
+  if (mg && mPos(s.code)?.side !== (side === 'buy' ? 'sell' : 'buy') && ipoMgMsg(s, side)) return { err: ipoMgMsg(s, side) };
   let price = null;
   if (type !== 'mkt') {
     price = roundPx(s, +$('#o-price').value || 0);
@@ -1920,7 +2398,8 @@ function buildOrder() {
     if (type === 'mkt' && s.stop === 'down' && G.phase === 'open') return { err: 'ストップ安で買い注文がないため、成行の売りは約定しません。' };
   }
   if (side === 'buy' && type === 'mkt' && s.stop === 'up' && G.phase === 'open') return { err: 'ストップ高で売り注文がないため、成行の買いは約定しません。' };
-  const est = type === 'mkt' ? (G.phase === 'open' ? walk(s, side, qty).avg : s.price) : price;
+  const wk = type === 'mkt' && G.phase === 'open' ? walk(s, side, qty) : null;
+  const est = type === 'mkt' ? (wk ? wk.avg : ipoQuote(s)?.p ?? s.price) : price;   // 上場日の寄り付き前は気配を目安にする
   const gross = est * qty, fee = Math.round(gross * D.fee);
   if (mg) {   // 信用：反対の建玉があれば返済、なければ新規（お金は確保しない）
     const p = mPos(s.code), close = !!p && p.side !== side;
@@ -1928,7 +2407,7 @@ function buildOrder() {
       const left = p.qty - G.player.orders.filter(x => x.mg && x.code === s.code && x.side === side).reduce((a, x) => a + x.qty, 0);
       if (qty > left) return { err: left > 0 ? `返済できるのは${left.toLocaleString()}株までです（注文中の分を除く）。` : '返済できる建玉がありません（注文中の分を除く）。' };
     } else { const e = mCheck(s, side, qty, gross); if (e) return { err: e }; }
-    return { o: { code: s.code, side, type, qty, price, reserve: 0, mg: true, open: !close }, est, gross, fee, close };
+    return { o: { code: s.code, side, type, qty, price, reserve: 0, mg: true, open: !close }, est, gross, fee, close, left: wk?.left || 0 };
   }
   let reserve = 0;
   if (side === 'buy') {
@@ -1937,7 +2416,7 @@ function buildOrder() {
     if (need > availCash() + 0.5) return { err: `お金が足りません（必要 約${yen(need)}円／買付余力 ${yen(availCash())}円）。` };
     reserve = G.phase === 'open' && type === 'mkt' ? 0 : Math.min(need * buf, availCash());
   }
-  return { o: { code: s.code, side, type, qty, price, reserve }, est, gross, fee };
+  return { o: { code: s.code, side, type, qty, price, reserve }, est, gross, fee, left: wk?.left || 0 };
 }
 function confirmOrder() {
   const b = buildOrder(); const msg = $('#o-msg');
@@ -1951,6 +2430,7 @@ function confirmOrder() {
     if (after / a > 0.5) warns.push(`この注文で、資産の${Math.round(after / a * 100)}%が${s.name}1社に集中します。1社に偏ると、悪いニュース1つで大きく損をすることがあります（${term('分散投資')}）。`);
   }
   if (o.type === 'mkt' && G.phase === 'open') { const best = o.side === 'buy' ? book(s).asks[0]?.p : book(s).bids[0]?.p; if (best && Math.abs(b.est - best) / best > 0.003) warns.push(`板が薄いため、平均約${px(Math.round(b.est * 10) / 10)}円と、一番良い値段より不利に約定しそうです（${term('スリッページ')}）。`); }
+  if (b.left) warns.push(`板が薄いため、いまの板では約${(o.qty - b.left).toLocaleString()}株しか約定しない見込みです。残りの約${b.left.toLocaleString()}株は取り消されます（成行は、板の深さやストップ高・安の値段までしか約定しません）。`);
   if (G.phase === 'pre' && o.type === 'mkt') warns.push('寄り付き前なので、9:00の寄り付きの値段で約定します。');
   const sideW = o.side === 'buy' ? '買い' : '売り', lab = o.mg ? mSideLabel(o.code, o.side) : '';
   openModal(`<h2>${esc(s.name)}を${o.mg ? `信用で${lab}し` : sideW}ますか？</h2>
@@ -1958,7 +2438,7 @@ function confirmOrder() {
       <tr><th>注文</th><td>${o.mg ? `信用・${KIND[o.type]}の${lab}` : `${KIND[o.type]}の${sideW}`}</td></tr>
       <tr><th>株数</th><td>${o.qty.toLocaleString()}株</td></tr>
       ${o.type !== 'mkt' ? `<tr><th>${o.type === 'lmt' ? '指値' : '逆指値'}</th><td>${px(o.price)}円</td></tr>` : `<tr><th>値段の目安</th><td>${px(Math.round(b.est * 10) / 10)}円</td></tr>`}
-      ${o.mg ? `<tr><th>${b.close ? '返済する金額（目安）' : '建玉の金額（目安）'}</th><td>約${yen(b.gross)}円</td></tr>${!b.close && G.diff !== 'easy' ? `<tr><th>必要な${term('委託保証金', '保証金')}</th><td>約${yen(b.gross * MARGIN.rate)}円</td></tr>` : ''}`
+      ${o.mg ? `<tr><th>${b.close ? '返済する金額（目安）' : '建玉の金額（目安）'}</th><td>約${yen(b.gross)}円</td></tr>${!b.close && G.diff !== 'easy' ? `<tr><th>必要な${term('委託保証金', '保証金')}</th><td>約${yen(b.gross * mRate(s))}円</td></tr>` : ''}`
         : `<tr><th>${o.side === 'buy' ? 'この注文で使うお金' : '受け取るお金（目安）'}</th><td>約${yen(o.side === 'buy' ? b.gross + b.fee : b.gross - b.fee)}円</td></tr>`}
       ${b.fee ? `<tr><th>手数料</th><td>${yen(b.fee)}円</td></tr>` : ''}
       <tr><th>株価が1%動くと</th><td>±${yen(o.qty * s.price * 0.01)}円</td></tr>
@@ -1991,7 +2471,7 @@ function dailyReport() {
     <div class="movers"><div><h3>値上がり</h3><ul>${li(L.up)}</ul></div><div><h3>値下がり</h3><ul>${li(L.down)}</ul></div></div>
     ${L.events.length ? `<h3>今日のできごと</h3><ul class="ev">${L.events.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
     <h3>経験値</h3><p>今日 +${L.xp} XP　／　ランク${r}「${RANKS[r - 1].n}」${nx ? `（次まであと${(nx.xp - profile.xp).toLocaleString()} XP）` : ''}</p>
-    <div class="actions"><button class="primary" data-act="next">${G.ended ? 'シナリオの結果を見る' : '翌営業日へ'}</button></div>`,
+    <div class="actions"><button class="primary" data-act="next">${G.bankrupt ? '結果を見る' : G.ended ? 'シナリオの結果を見る' : '翌営業日へ'}</button></div>`,
   { next: () => { closeModal(); if (G.ended) finalReport(); else nextDay(); } });
 }
 // 最後まで遊んだゲームの記録（新しい順。RECORD_MAX 件まで）
@@ -2015,12 +2495,12 @@ function showRecords() {
   const L = (profile.records || []).slice().sort((a, b) => sg * (f(a) - f(b)) || b.at - a.at), n = L.length;
   const recName = x => { const S = SCEN[x.scen], D = DIFF[x.diff], d = new Date(x.at); return `${d.getMonth() + 1}/${d.getDate()} ${esc(S ? S.name : x.scen)}・${esc(D ? D.name : x.diff)}${x.fast ? ' ⚡' : ''}`; };
   const starsOf = x => `<span class="rec-stars" aria-label="星${x.stars}つ">${'★'.repeat(x.stars)}${'☆'.repeat(3 - x.stars)}</span>`;
-  const row = (x, i) => `<li><button class="rec-row" data-act="rec" data-i="${i}">${starsOf(x)}<span class="rec-main">${recName(x)}<small class="muted">${x.clear ? '' : '未達　'}${yen(x.asset)}円　指数 ${pctS(x.ir)}${x.pt != null ? `　+${x.pt} pt` : ''}${x.sells ? `　売${x.sells}回(勝${x.wins})` : ''}</small></span><span class="num ${cls(x.r)}">${pctS(x.r)}</span></button></li>`;
+  const row = (x, i) => `<li><button class="rec-row" data-act="rec" data-i="${i}">${starsOf(x)}<span class="rec-main">${recName(x)}<small class="muted">${x.bankrupt ? '破産　' : x.clear ? '' : '未達　'}${yen(x.asset)}円　指数 ${pctS(x.ir)}${x.pt != null ? `　+${x.pt} pt` : ''}${x.sells ? `　売${x.sells}回(勝${x.wins})` : ''}</small></span><span class="num ${cls(x.r)}">${pctS(x.r)}</span></button></li>`;
   // 1件の詳細（結果画面と同じグラフ）
   const detail = x => {
     openModal(`<h2>取引成績</h2><p class="muted small" style="text-align:center">${recName(x)}${x.real ? '' : `　相場の番号 ${x.seed}`}</p>
       <div class="stars-big" aria-label="星${x.stars}つ">${'★'.repeat(x.stars)}${'☆'.repeat(3 - x.stars)}</div>
-      <p style="text-align:center">${x.clear ? 'クリア！' : 'クリアならず'}</p>
+      <p style="text-align:center">${x.bankrupt ? '破産（総資産が0円以下）' : x.clear ? 'クリア！' : 'クリアならず'}</p>
       <dl class="rep-grid"><div><dt>最終資産</dt><dd>${yen(x.asset)}円</dd></div><div><dt>あなた</dt><dd class="${cls(x.r)}">${pctS(x.r)}</dd></div><div><dt>指数</dt><dd class="${cls(x.ir)}">${pctS(x.ir)}</dd></div></dl>
       ${x.ha ? '<canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>' : ''}
       <p class="muted small">売却${x.sells || 0}回（利益が出たのは${x.wins || 0}回）${x.pt != null ? `　獲得ポイント +${x.pt} pt` : ''}</p>
@@ -2138,11 +2618,12 @@ function showShop() {
 function finalReport() {
   const P = G.player, S = SCEN[G.scen], a = asset();
   const r = a / P.start - 1, ir = G.market.idx / P.startIdx - 1;
-  const clear = S.clear ? S.clear(r, ir) : true;
+  const bk = !!G.bankrupt, clear = !bk && (S.clear ? S.clear(r, ir) : true);
   let stars = 0; if (clear) { stars = 1; if (P.maxDD < 0.15) stars = 2; if (P.maxDD < 0.08 && r - ir >= 0.05) stars = 3; }
   profile.best[G.scen] = Math.max(profile.best[G.scen] || 0, stars);
-  const rec = { ...histOf(P), scen: G.scen, diff: G.diff, seed: G.seed, real: isReal(), fast: isFast(), at: Date.now(), start: P.start, asset: a, r, ir, stars, clear, sells: P.sells.length, wins: P.sells.filter(x => x.pnl > 0).length };
-  const pay = payPoints(rec);
+  const rec = { ...histOf(P), scen: G.scen, diff: G.diff, seed: G.seed, real: isReal(), fast: isFast(), at: Date.now(), ...(bk ? { bankrupt: true } : {}), start: P.start, asset: a, r, ir, stars, clear, sells: P.sells.length, wins: P.sells.filter(x => x.pnl > 0).length };
+  const pay = bk ? null : payPoints(rec);   // 破産はポイントなし
+  if (bk) rec.pt = 0;
   if (pay) rec.pt = pay.got;   // 取引成績にも、このゲームでもらったポイントを残す
   addRecord(rec);
   saveProfile();
@@ -2150,21 +2631,23 @@ function finalReport() {
   const best = sells.length ? sells.reduce((x, y) => (y.pnl > x.pnl ? y : x)) : null;
   const worst = sells.length ? sells.reduce((x, y) => (y.pnl < x.pnl ? y : x)) : null;
   const adv = [];
-  if (best && best.pnl > 0) adv.push(`一番うまくいった取引は${best.name}（${yenS(best.pnl)}円、${pctS(best.pct)}）。そのとき出ていたニュースをチャートのピンで見直してみよう。`);
+  if (best && best.pnl > 0) adv.push(`一番うまくいった取引は${best.name}${best.dl ? '（上場廃止）' : ''}（${yenS(best.pnl)}円、${pctS(best.pct)}）。そのとき出ていたニュースをチャートのピンで見直してみよう。`);
   if (worst && worst.pnl < 0) {
     const cut = worst.buyAvg * worst.qty * 0.05;
-    adv.push(`一番損した取引は${worst.name}（${yenS(worst.pnl)}円、${pctS(worst.pct)}）。` + (worst.pct < -0.05 ? `−5%で${term('損切り')}していれば、損は約${yen(cut)}円で済み、約${yen(-worst.pnl - cut)}円減らせました。` : '損を小さく抑えられています。'));
+    adv.push(`一番損した取引は${worst.name}${worst.dl ? '（上場廃止で決済）' : ''}（${yenS(worst.pnl)}円、${pctS(worst.pct)}）。` + (worst.pct < -0.05 ? `−5%で${term('損切り')}していれば、損は約${yen(cut)}円で済み、約${yen(-worst.pnl - cut)}円減らせました。` : '損を小さく抑えられています。'));
   }
   if (!sells.length) adv.push('一度も株を売りませんでした。利益や損失は、売って初めて確定します。');
-  adv.push(`指数（${idxName()}）を買って持っていただけなら ${pctS(ir)}。あなたは ${pctS(r)}。${r > ir ? '指数に勝ちました。これは本物の投資でも簡単ではありません。' : '指数に勝つのは、プロでも難しいことです。'}`);
-  adv.push(`${term('最大ドローダウン')}は${(P.maxDD * 100).toFixed(1)}%でした。${P.maxDD > 0.15 ? '大きく減った時期がありました。1社への集中を減らすと、落ち込みを小さくできます。' : 'リスクをうまく抑えられています。'}`);
+  if (bk) adv.unshift(...bankruptCauses(P));
+  if (!bk) adv.push(`指数（${idxName()}）を買って持っていただけなら ${pctS(ir)}。あなたは ${pctS(r)}。${r > ir ? '指数に勝ちました。これは本物の投資でも簡単ではありません。' : '指数に勝つのは、プロでも難しいことです。'}`);
+  adv.push(`${term('最大ドローダウン')}は${(Math.min(1, P.maxDD) * 100).toFixed(1)}%でした。${P.maxDD > 0.15 ? '大きく減った時期がありました。1社への集中を減らすと、落ち込みを小さくできます。' : 'リスクをうまく抑えられています。'}`);
   G.ended = true; clearSave();
-  openModal(`<h2>${S.name}　結果</h2>
+  openModal(`<h2>${S.name}　${bk ? '破産' : '結果'}</h2>
     <div class="stars-big" aria-label="星${stars}つ">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
-    <p style="text-align:center">${clear ? 'クリア！' : 'クリアならず'}　目標：${S.goal}</p>
+    <p style="text-align:center">${bk ? '総資産が0円以下になり、ゲームが終わりました' : `${clear ? 'クリア！' : 'クリアならず'}　目標：${S.goal}`}</p>
+    ${bk ? '<p class="pt-get"><b class="num">+0 pt</b>　破産のときは、ポイントはもらえません</p>' : ''}
     ${pay ? `<p class="pt-get"><b class="num">+${pay.got} pt</b>　所持 ${profile.points.toLocaleString()} pt${pay.prev ? `<small class="muted">${pay.got ? `この相場の前の最高 ${pay.prev} pt → ${pay.pts} pt。上回った分だけもらえます` : `この相場の最高 ${pay.prev} pt を超えなかったので、今回は 0 pt です（今回 ${pay.pts} pt）`}</small>` : ''}</p>` : ''}
     <dl class="rep-grid"><div><dt>最終資産</dt><dd>${yen(a)}円</dd></div><div><dt>あなた</dt><dd class="${cls(r)}">${pctS(r)}</dd></div><div><dt>指数</dt><dd class="${cls(ir)}">${pctS(ir)}</dd></div></dl>
-    <div class="sensei result-sensei">${SENSEI_SVG}<div><b class="who">カブ先生</b><div class="bubble">${esc(senseiAdvice({ r, ir, clear, stars, P }))}</div></div></div>
+    <div class="sensei result-sensei">${SENSEI_SVG}<div><b class="who">カブ先生</b><div class="bubble">${esc(senseiAdvice({ r, ir, clear, stars, P, bk }))}</div></div></div>
     <canvas id="final-chart" role="img" aria-label="資産と指数の推移"></canvas>
     <h3>振り返り</h3><ul class="ev">${adv.map(x => `<li>${x}</li>`).join('')}</ul>
     <p class="muted small">${isReal() ? `株価は${REAL_SETS[REAL_KEY].period}の実際の終値です（日中の動きはゲームが作ったもの）。過去の値動きは将来を保証しません。` : 'このゲームの株価と企業はすべて架空です。'}実際の投資では、元本を割り込む（損をする）可能性があります。</p>
@@ -2309,10 +2792,11 @@ MTUT.find(st => st.on === 'view' && st.ok('hold')).view = 'trade';
 // 練習を始める：いまの状態を丸ごと覚えておき、練習しやすいように取引中・練習用のお金100万円以上・建玉と注文なしにする
 function practiceStart(code) {
   if (UI.practice) return;
-  if ((code || G.sel) === UME.code) code = G.stocks.find(s => isOpen(s)).code;   // 梅山カンパニーは信用取引できないので、ほかの銘柄で練習する
+  // 梅山カンパニーは信用取引できず、低位株などは空売りや保証金率がちがう（講座の「約3倍」と合わない）ので、ほかの銘柄で練習する
+  if ((code || G.sel) === UME.code || byCode(code || G.sel)?.mg || byCode(code || G.sel)?.ipo) code = G.stocks.find(s => isOpen(s)).code;   // 新規上場も、信用の制限があるので別の銘柄で
   UI.practice = { lvl: 0, code: code || G.sel, g: JSON.stringify(G, (k, v) => (k === '_map' ? undefined : v)), rng: { s: RNG.s, spare: RNG.spare }, ui: { acct: UI.acct, side: UI.side, type: UI.type, qty: $('#o-qty').value } };
   const P = G.player;
-  if (G.phase !== 'open') { G.phase = 'open'; if (!sel().intraday.length) for (const s of G.stocks) s.open = s.high = s.low = s.price; }
+  if (G.phase !== 'open') { G.phase = 'open'; if (!sel().intraday.length) for (const s of allStocks()) s.open = s.high = s.low = s.price; }
   P.cash = Math.max(P.cash, 1e6); P.mpos = {}; P.orders = []; G.mcall = null;
   G.sel = UI.practice.code; UI.acct = 'margin'; UI.side = 'buy'; UI.type = 'mkt'; buildTypes(); render();
 }
@@ -2432,7 +2916,24 @@ function tutPlace() {
 }
 
 /* ---------- リザルトのカブ先生（ひとことアドバイス） ---------- */
-function senseiAdvice({ r, ir, clear, stars, P }) {
+// 破産の原因（事実だけを伝える）
+function bankruptCauses(P) {
+  const L = [], dlLoss = P.sells.filter(x => x.dl && x.pnl < 0), loss = dlLoss.reduce((t, x) => t + x.pnl, 0);
+  const failed = [...new Set(Object.keys(P.pos).concat(Object.keys(P.mpos)))].map(c => byCode(c)).filter(s => s.dl && ['fail', 'seiri'].includes(dlStage(s)));
+  if (P.cash < 0 || Object.keys(P.mpos).length) L.push(`信用取引の損が、預けた保証金を超えていました。信用取引は、預けたお金より大きな損になることがあり、その分は借金として残ります。`);
+  if (failed.length) L.push(`倒産した${failed.map(s => s.name).join('・')}を持っていました。倒産した株は、ストップ安が続いて売れないまま値打ちがほとんどなくなります。`);
+  if (dlLoss.length) L.push(`上場廃止で決済した損失が合計${yenS(loss)}円ありました（${dlLoss.map(x => x.name).join('・')}）。上場廃止になる株は、最後の売買日の終値で決済されます。ほとんど値打ちがなくなっていることが多く、持ち続けると大きな損になります。`);
+  if (!L.length) L.push('総資産が0円以下になりました。信用取引を使うと、元の資金を超える損になることがあります。');
+  return L;
+}
+function senseiAdvice({ r, ir, clear, stars, P, bk }) {
+  if (bk) {
+    const cs = P.cash < 0 || Object.keys(P.mpos).length > 0, dl = P.sells.some(x => x.dl && x.pnl < 0) || Object.keys(P.pos).concat(Object.keys(P.mpos)).some(c => ['fail', 'seiri'].includes(dlStage(byCode(c))));
+    if (cs && dl) return '信用取引の損と、上場廃止で決済した損が重なって、総資産が0円以下になったよ。信用取引の建玉は、買う前に「どこまで損してよいか」を決めておこう。';
+    if (cs) return '信用取引の損が、預けたお金を超えて借金になったよ。信用取引は元手より大きな損になることがあるから、建てる株数を控えめにして、損切りの線を先に決めておこう。';
+    if (dl) return '上場廃止で決済した損が大きくて、総資産が0円以下になったよ。赤字や「継続企業の注記」が出た会社は、1社に集中しないで、早めに様子を見直そう。';
+    return '総資産が0円以下になって、ゲームが終わったよ。次は1回の取引を小さくして、損切りの線を先に決めておこう。';
+  }
   if (!P.trades.length) return '今回は一度も売買しなかったね、次は少しの株数からでいいので買ってみよう！';
   if (stars === 3) return '文句なしの満点だ、損を小さく抑えながら指数にも勝つなんてプロ顔負けだよ！';
   if (P.maxDD > 0.2) return '途中で資産が大きく減った時期があったから、次は1社に集中せず業種を分けて持ってみよう。';
@@ -2464,10 +2965,10 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', '架空の30社。シードごとに毎回ちがう相場になる。'], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
+  const modes = [['random', 'ランダム相場', `架空の30社${profile.r7 ? `と追加の${XDEFS.length}社（ランク7で解放。ランダム相場のみ）` : '（ランク7になると、追加の銘柄が出ます。ランダム相場のみ）'}。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
-      <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : '架空の取引所「NTX」で、実在の企業をもじった30社を売買して、資産を増やそう。'}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
+      <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : `架空の取引所「NTX」で、実在の企業をもじった${profile.r7 ? DEFS.length + XDEFS.length : 30}社を売買して、資産を増やそう。`}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
       <div class="prof${isFast() ? ' fast' : ''}${r >= RANKS.length ? ' rank-legend' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP　<span id="t-pt">${profile.points.toLocaleString()} pt</span></div></div>
     <div class="setup">
       <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!anyReal() || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && anyReal() && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
@@ -2515,7 +3016,7 @@ function legendTap() {
   if (legendTaps < 10) return;
   legendTaps = 0;
   if (rank() === RANKS.length) { toast('すでに全機能が解放されています'); return; }
-  profile.xp = RANKS.at(-1).xp;
+  profile.xp = RANKS.at(-1).xp; profile.r7 = true;
   profile.points = Math.max(profile.points, SHOP.filter(x => !owns(x.id)).reduce((t, x) => t + x.price, 0));   // ショップの品物を全部買えるだけ渡す
   saveProfile();
   buildTypes(); buildFilter(); render();
@@ -2554,6 +3055,7 @@ function zoomChart(f, ax) {
 }
 function runUntil(cond) { let n = 0; while (!cond() && n++ < 400 && G.phase !== 'closed') tick(); render(); }
 function selectStock(code, scroll) {
+  if (byCode(code)?.delisted) G.chartMode = '1d';   // 上場廃止の銘柄は閲覧だけ（今日の分足はないので日足で見せる）
   G.sel = code; UI.acct = 'cash'; UI.hover = null; UI.vw.yOff = 0; $('#o-msg').textContent = ''; $('#o-price').value = ''; render();
   if (scroll && window.innerWidth < 700 && !UI.tut) $('.a-chart').scrollIntoView({ behavior: 'smooth' });
   tutEvent('select');
@@ -2615,10 +3117,12 @@ function bindUI() {
     const bp = e.target.closest('[data-px]'); if (bp) { if (UI.type === 'mkt') UI.type = 'lmt'; $('#o-price').value = bp.dataset.px; renderOrderPanel(); if (!UI.tut) { const o = $('.a-order'); o.style.scrollMarginTop = (($('.hdr')?.getBoundingClientRect().bottom || 0) + 12) + 'px'; o.scrollIntoView({ behavior: 'smooth', block: 'start' }); } tutEvent('px'); return; }
     if (e.target.closest('#o-submit')) { confirmOrder(); return; }
     const cc = e.target.closest('[data-cancel]'); if (cc) { const o = G.player.orders.find(x => x.id === +cc.dataset.cancel); if (o) { removeOrder(o); toast('注文を取り消しました'); render(); } return; }
+    const gt = e.target.closest('[data-goto]'); if (gt) { selectStock(gt.dataset.goto); switchView('trade'); return; }   // 取引履歴の、上場廃止の銘柄（閲覧だけ）
     const nw = e.target.closest('[data-news]'); if (nw) {
       const n = G.news.find(x => x.id === +nw.dataset.news); if (!n) return;
       let code = n.codes[0]; if (!code && n.sector) code = unlockedStocks().find(s => s.sector === n.sector)?.code;
-      if (code && isOpen(byCode(code))) { G.sel = code; if (UI.view !== 'trade') switchView('trade'); else render(); } else if (code) toast(`${byCode(code).name}はランク${openRank(byCode(code))}で取引できるようになります`);
+      if (code && preIpo(byCode(code))) toast(`${byCode(code).name}は、${mdLabel(addTD(G.date, byCode(code).ipo.day - G.dayIndex))}に上場します`);
+      else if (code && (isOpen(byCode(code)) || byCode(code).delisted)) { selectStock(code); if (UI.view !== 'trade') switchView('trade'); } else if (code) toast(`${byCode(code).name}はランク${openRank(byCode(code))}で取引できるようになります`);
       return;
     }
     if (e.target.closest('[data-legend]')) { legendTap(); return; }
@@ -2643,6 +3147,7 @@ function bindUI() {
   window.addEventListener('scroll', hidePop, { passive: true });   // 用語の吹き出しは画面に固定しているので、スクロールしたら閉じる
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { hidePop(); if (modalOpen && $('#modal-card [data-act="cancel"], #modal-card [data-act="close"]')) closeModal(); } });
   $('#sec-filter').addEventListener('change', e => { UI.filter = e.target.value; fitSelect(e.target); renderList(); });
+  $('#kind-filter').addEventListener('change', e => { UI.kind = e.target.value; fitSelect(e.target); renderList(); });
   $('#sort-bar').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.id === 'sort-dir') UI.sort.desc = !UI.sort.desc; else if (b.dataset.sort !== UI.sort.key) { UI.sort.key = b.dataset.sort; UI.sort.desc = b.dataset.sort !== 'none'; }   // 標準は昇順（銘柄の並び順）、値段・騰落率は降順から
@@ -2700,6 +3205,11 @@ function start(data) {
   requestAnimationFrame(loop);
 }
 window.claude?.hot?.snapshot?.(() => (G && !titleOpen && !G.ended ? { save: JSON.stringify(G, (k, v) => (k === '_map' ? undefined : v)), view: UI.view } : {}));
-window.__kabutore = { get G() { return G; }, newGame, tick, asset, rank, profile: () => profile, runDay: () => { while (G.phase !== 'closed') tick(); }, nextDay, closeModal };
+window.__kabutore = { get G() { return G; }, newGame, tick, asset, rank, profile: () => profile, runDay: () => { while (G.phase !== 'closed') tick(); }, nextDay, closeModal, saveText, resume: str => resume(JSON.parse(str)), placeOrder, addXP, legendTap, render, switchView, book, availCash, marginStat, marginRoom: c => marginRoom(c && G._map[c]), dlPlan, dlStage: c => dlStage(G._map[c]), dlWarn: c => dlWarn(G._map[c]), unlockedCodes: () => unlockedStocks().map(s => s.code), sellMissions, onGame,
+  // 動作確認用：code の銘柄（追加銘柄）で、days 営業日後の朝に前兆が始まるように日程を作り直す。戻り値は新しい日程
+  finalReport, practiceStart, practiceEnd, xnFx: v => (XN_FX = v), xnSkip: c => (XN_SKIP = c), xnForce(c, chg) { XN_FORCE = chg; xNews(G._map[c], G.phase === 'open' ? 'live' : 'gap'); render(); }, xnPlan: c => xnPlan(G._map[c]), xnOK: c => xnOK(G._map[c]), ipoStage: c => ipoStage(G._map[c]), ipoSchedule, netAsset, assetOld: () => { const P = G.player; let v = P.cash; for (const c in P.pos) v += P.pos[c].qty * G._map[c].price; if (Object.keys(P.mpos).length) { const m = marginStat(); v += m.u - m.cost; } return v; },
+  // 動作確認用：新規上場の銘柄を、days 営業日後に上場するように日程を作り直す（承認のお知らせは翌朝）。戻り値は s.ipo
+  forceList(code, days = 1) { const s = G?._map[code]; if (!s?.ipo || !preIpo(s) || days < 1) return null; Object.assign(s.ipo, { day: G.dayIndex + days, ann: G.dayIndex + 1, chg: false }); render(); return s.ipo; },
+  forceDelist(code, days = 1) { const s = G?._map[code]; if (!s?.extra || s.delisted || days < 1) return null; s.dl = dlPlan(G.seed, code, G.dayIndex + days); render(); return s.dl; } };
 if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
 })();

@@ -106,6 +106,16 @@ h2,h3,h4{text-wrap:balance;margin:0}
 .sort-bar button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .sort-bar #sort-dir{margin-left:auto}
 .p-head select{font:inherit;font-size:12px;font-weight:400;background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.p-head > span:first-child{flex:none;white-space:nowrap}
+.p-sel{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;min-width:0}
+.p-sel select[hidden]{display:none}
+/* 銘柄の種類のバッジ（業種の色と同じ色を使う。文字付きなので色だけに頼らない） */
+.kb{font-style:normal;font-size:10px;font-weight:700;line-height:1.5;padding:0 5px;margin-left:3px;border:1px solid currentColor;border-radius:4px;vertical-align:middle;white-space:nowrap;font-family:var(--f-body)}
+.kb-div{color:var(--c-bank)}.kb-cyc{color:var(--c-auto)}.kb-perk{color:var(--c-game)}.kb-penny{color:var(--c-growth)}.kb-dl{color:var(--warn)}.kb-ipo{color:var(--c-tech)}
+.ipo-chip{font-style:normal;font-size:12px;font-weight:700;color:var(--c-tech);border:1px solid currentColor;border-radius:4px;padding:0 6px;margin-left:8px;vertical-align:middle;font-family:var(--f-body)}
+.dl-chip{font-style:normal;font-size:12px;font-weight:700;color:var(--warn);border:1px solid currentColor;border-radius:4px;padding:0 6px;margin-left:8px;vertical-align:middle;font-family:var(--f-body)}
+.golink{font:inherit;color:var(--accent);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
+.penny-note{display:block;margin-top:3px;color:var(--warn);font-weight:700}
 .view{margin-top:12px;display:grid;gap:12px}
 .view .panel{padding:16px 18px}
 

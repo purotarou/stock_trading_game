@@ -47,7 +47,7 @@
 
 <main id="view-trade" class="layout">
   <section class="panel a-list" aria-label="銘柄リスト">
-    <div class="p-head"><span>銘柄</span><select id="sec-filter" aria-label="業種で絞り込み"></select></div>
+    <div class="p-head"><span>銘柄</span><span class="p-sel"><select id="kind-filter" aria-label="種類で絞り込み" hidden></select><select id="sec-filter" aria-label="業種で絞り込み"></select></span></div>
     <div class="sort-bar" id="sort-bar" role="group" aria-label="並べ替え"><button class="ghost" data-sort="none">標準</button><button class="ghost" data-sort="px">値段</button><button class="ghost" data-sort="ch">騰落率</button><button class="ghost" id="sort-dir">降順 ▼</button></div>
     <div class="list" id="stock-list"></div>
     <p class="list-foot" id="list-foot"></p>
@@ -89,6 +89,7 @@
         <label class="lab" for="o-price" id="o-price-lab">指値（円）</label>
         <input id="o-price" type="number" inputmode="decimal" step="any">
       </div>
+      <p class="warnbox" id="o-dl" role="status" hidden></p>
       <dl class="est" id="o-est"></dl>
       <button class="primary buy" id="o-submit">注文内容を確認</button>
       <p class="o-msg" id="o-msg" role="status"></p>
