@@ -397,6 +397,11 @@ html:not([data-device=phone]) .facts dt,html:not([data-device=phone]) .facts dd{
 .shop-main small{display:block}
 .shop-btn{flex:none;display:flex;align-items:center;gap:8px}
 .shop-btn button{padding:8px 12px;font-size:13px}
+.shop-play{flex:none;width:32px;height:32px;padding:0;border:0;background:none;color:var(--accent);display:grid;place-items:center;cursor:pointer;border-radius:6px}
+.shop-play:hover{background:var(--soft)}
+.shop-note{flex:none;color:var(--accent)}
+.shop-bgm .shop-act{min-width:104px;display:flex;justify-content:flex-end}
+.shop-play:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .shop-toggle{min-width:64px}
 .shop-toggle.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
 .shop-on{font-size:12px;font-weight:700;color:var(--accent)}

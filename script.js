@@ -78,7 +78,7 @@ const DEFS = [
 const DIFF = {
   easy:   { name: 'やさしい', cash: 3e6, vol: .7, fee: 0,    tax: false, hint: 'dir',   rank: 1, desc: '初期資金300万円。値動き穏やか。ニュースの影響の向きを表示。' },
   normal: { name: 'ふつう',   cash: 1e6, vol: 1,  fee: 0,    tax: true,  hint: 'stars', rank: 3, desc: '初期資金100万円。税金あり。ニュースは信頼度★だけ表示。' },
-  hard:   { name: '本格',     cash: 5e5, vol: 1,  fee: .001, tax: true,  hint: 'none',  rank: 5, desc: '初期資金50万円。手数料0.1%・税金あり・暴落あり。ニュースの影響の向きや確かさは表示しない。' },
+  hard:   { name: '本格',     cash: 5e5, vol: 1,  fee: .001, tax: true,  hint: 'none',  rank: 5, desc: '初期資金50万円。手数料0.1%・税金あり・暴落あり。ニュースの影響や信頼度の表示なし。' },
 };
 const SCEN = {
   month: { name: 'はじめての1か月', days: 20,  rank: 1, mu: .14, desc: '穏やかな上昇相場で売買に慣れよう。', goal: '資産をプラスで終える', clear: (r) => r > 0 },
@@ -333,7 +333,7 @@ function resetView() { UI.vw = { '5m': { cnt: 60, end: null }, '1d': { cnt: 60, 
 resetView();
 
 /* ---------- 音（素材は Aseet フォルダ） ---------- */
-const bgm = new Audio('Aseet/kabutore_game_bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
+const bgm = new Audio('Aseet/kabutore_bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
 // 消音モード：BGM と効果音をまとめて止める。リセットでは消えないよう、プロフィールとは別に保存する
 let muted = false; try { muted = localStorage.getItem('kabutore.mute') === '1'; } catch (e) {}
 bgm.muted = muted;
@@ -358,7 +358,7 @@ function playClick() {
   a.currentTime = 0; a.play().catch(() => {});
 }
 
-function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', opts: {}, mseen: {} }; }
+function defProfile() { return { xp: 0, missions: {}, tutorial: false, best: {}, fast: false, records: [], points: 0, pbest: {}, owned: {}, skin: '', bgm: '', opts: {}, mseen: {} }; }
 function loadProfile() { try { const p = JSON.parse(localStorage.getItem('kabutore.profile')); if (p && typeof p.xp === 'number') { const q = Object.assign(defProfile(), p); if (!p.mseen) q.mseen = { ...q.missions }; return q; } } catch (e) {} return defProfile(); }
 function saveProfile() { try { localStorage.setItem('kabutore.profile', JSON.stringify(profile)); } catch (e) {} }
 function rank(xp = profile.xp) { let r = 1; RANKS.forEach((k, i) => { if (xp >= k.xp) r = i + 1; }); return r; }
@@ -1878,7 +1878,7 @@ function openModal(html, handlers = {}) {
   $('#modal').hidden = false; modalOpen = true; hidePop();
   const f = $('#modal-card').querySelector('.primary') || $('#modal-card').querySelector('button'); if (f) f.focus();
 }
-function closeModal() { $('#modal').hidden = true; modalOpen = false; }
+function closeModal() { $('#modal').hidden = true; modalOpen = false; stopPreview(); }
 function toast(msg, kind = '') {
   const box = $('#toasts'); if (!box || UI.quiet) return;
   const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg; box.prepend(t);
@@ -2063,36 +2063,68 @@ const SHOP = [
   { id: 'skin-red', kind: 'skin', skin: 'red', name: 'レッド', price: 150, desc: 'りんごのような、あざやかな赤色です。' },
   { id: 'skin-sumi', kind: 'skin', skin: 'sumi', name: 'モノクロ', price: 150, desc: '色を抑えた、落ち着いた墨色です。' },
   { id: 'skin-black', kind: 'skin', skin: 'black', name: 'ブラック', price: 150, desc: '背景まで真っ黒の、引きしまった黒です。' },
+  { id: 'bgm2', kind: 'bgm', file: 'Aseet/kabutore_bgm2.mp3', name: 'Bright Noon Brew', price: 200, desc: '昼の光のような、明るくのびやかなBGMです。' },
+  { id: 'bgm3', kind: 'bgm', file: 'Aseet/kabutore_bgm3.mp3', name: 'Market Warmth', price: 200, desc: '市場のにぎわいのような、あたたかいBGMです。' },
   { id: 'bb', kind: 'opt', name: 'ボリンジャーバンド', price: 300, desc: 'チャートに、20本の移動平均の上下±2σの帯を引きます。値動きの広がりが見えます。' },
   { id: 'ha', kind: 'opt', name: '平均足', price: 400, desc: 'ローソク足を平均足で描きます。上げ・下げの流れが続いているかが見やすくなります（数字の表示は本来の値のまま）。' },
 ];
 const SKIN_BASE = { id: '', kind: 'skin', skin: '', name: 'ブルー', price: 0, desc: 'はじめからの、くっきりした青色です。' };
-const owns = id => !id || !!profile.owned[id];
+const BGM_BASE = { id: 'bgm-base', kind: 'bgm', file: 'Aseet/kabutore_bgm.mp3', name: 'Sunny Afternoon Brew', price: 0, desc: 'はじめからある、午後の日ざしのようなBGMです。' };
+const owns = id => !id || id === BGM_BASE.id || !!profile.owned[id];
 const optOn = id => owns(id) && !!profile.opts[id];
 function applySkin() { const k = SHOP.some(x => x.skin === profile.skin && owns(x.id)) ? profile.skin : ''; if (k) document.documentElement.dataset.skin = k; else delete document.documentElement.dataset.skin; }
+// 使うBGM。持っていないものは初期のBGMに戻す。ゲーム中に切り替わったときは、流れていれば続けて鳴らす
+function applyBgm() {
+  const x = SHOP.find(y => y.kind === 'bgm' && y.id === profile.bgm && owns(y.id)) || BGM_BASE;
+  if (bgm.getAttribute('src') === x.file) return;
+  const playing = !bgm.paused;
+  bgm.src = x.file;
+  if (playing) playBgm();
+}
+// 試聴：BGM とは別の <audio> で鳴らす。ひとつだけ鳴らし、もう一度押すか、ショップを閉じる・買う・使うで止める
+const bgmPrev = new Audio(); let prevId = '';
+// 再生ボタン（三角だけ）。鳴っているあいだは四角（停止）
+const playBtn = (id, on = false) => `<button class="shop-play" data-act="prev" data-id="${id}" aria-label="${on ? '試聴を止める' : '試聴する'}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">${on ? '<rect x="6" y="6" width="12" height="12" rx="1.5"/>' : '<path d="M8 5v14l11-7z"/>'}</svg></button>`;
+const noteIcon = '<svg class="shop-note" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M9 3v11.3A3.5 3.5 0 1 0 11 17.5V8h7V3z"/></svg>';
+const resetPlayBtns = () => document.querySelectorAll('[data-act=prev]').forEach(e => e.replaceWith(Object.assign(document.createElement('div'), { innerHTML: playBtn(e.dataset.id) }).firstChild));
+function stopPreview() { bgmPrev.pause(); prevId = ''; }
+bgmPrev.addEventListener('ended', () => { prevId = ''; resetPlayBtns(); });
 let shopAll = false;   // スタイルを全部出しているか
 function showShop() {
+  stopPreview();
   const pt = profile.points;
   const item = x => {
     const have = owns(x.id), skin = x.kind === 'skin';
     let btn;
     if (!have) btn = pt >= x.price ? `<button class="primary" data-act="buy" data-id="${x.id}">${x.price} pt で買う</button>` : `<button class="ghost" disabled>${x.price} pt（あと${x.price - pt}）</button>`;
+    else if (x.kind === 'bgm') btn = (profile.bgm || BGM_BASE.id) === x.id ? '<span class="shop-on">使用中</span>' : `<button class="ghost" data-act="use" data-id="${x.id}">使う</button>`;
     else if (x.kind === 'skin') btn = (profile.skin || '') === x.skin ? '<span class="shop-on">使用中</span>' : `<button class="ghost" data-act="use" data-id="${x.id}">使う</button>`;
     else btn = `<button class="ghost shop-toggle${optOn(x.id) ? ' on' : ''}" data-act="opt" data-id="${x.id}" role="switch" aria-checked="${optOn(x.id)}">${optOn(x.id) ? 'オン' : 'オフ'}</button>`;
-    return `<li class="shop-item"><div class="shop-main">${skin ? `<span class="shop-head"><i class="shop-sw" data-skin-sw="${x.skin || 'base'}"></i><b>${x.name}</b></span>` : `<b>${x.name}</b>`}<small class="muted">${x.desc}</small></div><div class="shop-btn">${btn}</div></li>`;
+    if (x.kind === 'bgm') btn = playBtn(x.id) + `<span class="shop-act">${btn}</span>`;
+    return `<li class="shop-item${x.kind === 'bgm' ? ' shop-bgm' : ''}">${x.kind === 'bgm' ? noteIcon : ''}<div class="shop-main">${skin ? `<span class="shop-head"><i class="shop-sw" data-skin-sw="${x.skin || 'base'}"></i><b>${x.name}</b></span>` : `<b>${x.name}</b>`}<small class="muted">${x.desc}</small></div><div class="shop-btn">${btn}</div></li>`;
   };
-  const byId = id => id ? SHOP.find(x => x.id === id) : SKIN_BASE;
+  const byId = id => id === BGM_BASE.id ? BGM_BASE : id ? SHOP.find(x => x.id === id) : SKIN_BASE;
   const skins = [SKIN_BASE, ...SHOP.filter(x => x.kind === 'skin')];
   openModal(`<h2>ショップ</h2><p class="pt-bal">所持ポイント <b class="num">${pt.toLocaleString()} pt</b></p>
     <h3>スタイル</h3><ul class="shop-list shop-grid${shopAll ? '' : ' fold'}">${skins.map(item).join('')}</ul>
     <div class="shop-more"><button class="ghost" data-act="all" aria-expanded="${shopAll}">${shopAll ? 'たたむ' : `すべて表示（${skins.length}個）`}</button></div>
     <h3>チャート</h3><ul class="shop-list">${SHOP.filter(x => x.kind === 'opt').map(item).join('')}</ul>
+    <h3>BGM</h3><ul class="shop-list">${[BGM_BASE, ...SHOP.filter(x => x.kind === 'bgm')].map(item).join('')}</ul>
     <p class="muted small">ポイントは、シナリオを最後まで遊ぶともらえます。クリアで20 pt＋★1つにつき10 pt（クリアならずは5 pt）、指数に勝つと＋15 pt、5回以上売って6割以上利益が出ると＋10 pt。難易度（ふつう×1.5・本格×2）と遊んだ日数（50日以上×1.5・200日以上×2.5）で増えます（1回${PT_CAP} ptまで）。同じ相場をもう一度遊んだときは、その相場の最高点を上回った分だけもらえます。データのリセットで、ポイントと買ったものも消えます。</p>
     <div class="actions"><button class="primary" data-act="close">閉じる</button></div>`,
-  { all: () => { shopAll = !shopAll; showShop(); },
+  { prev: b => {
+      const x = byId(b.dataset.id); if (!x || x.kind !== 'bgm') return;
+      const was = prevId; stopPreview();
+      resetPlayBtns();
+      if (was === x.id) return;
+      bgmPrev.src = x.file; bgmPrev.muted = muted; bgmPrev.volume = 0.4; bgmPrev.currentTime = 0; prevId = x.id;
+      const nb = document.querySelector(`[data-act=prev][data-id="${x.id}"]`); if (nb) nb.outerHTML = playBtn(x.id, true);
+      bgmPrev.play().catch(() => {});
+    },
+    all: () => { shopAll = !shopAll; showShop(); },
     close: () => { closeModal(); const t = $('#t-pt'); if (t) t.textContent = `${profile.points.toLocaleString()} pt`; },
-    buy: b => { const x = byId(b.dataset.id); if (!x || owns(x.id) || profile.points < x.price) return; profile.points -= x.price; profile.owned[x.id] = true; if (x.kind === 'skin') profile.skin = x.skin; else profile.opts[x.id] = true; saveProfile(); applySkin(); toast(`${x.name}を買いました`); showShop(); },
-    use: b => { const x = byId(b.dataset.id); if (!x || !owns(x.id)) return; profile.skin = x.skin; saveProfile(); applySkin(); showShop(); },
+    buy: b => { const x = byId(b.dataset.id); if (!x || owns(x.id) || profile.points < x.price) return; profile.points -= x.price; profile.owned[x.id] = true; if (x.kind === 'skin') profile.skin = x.skin; else if (x.kind === 'bgm') profile.bgm = x.id; else profile.opts[x.id] = true; saveProfile(); applySkin(); applyBgm(); toast(`${x.name}を買いました`); showShop(); },
+    use: b => { const x = byId(b.dataset.id); if (!x || !owns(x.id)) return; if (x.kind === 'bgm') { profile.bgm = x.id === BGM_BASE.id ? '' : x.id; applyBgm(); } else { profile.skin = x.skin; applySkin(); } saveProfile(); showShop(); },
     opt: b => { const x = byId(b.dataset.id); if (!x || !owns(x.id)) return; profile.opts[x.id] = !profile.opts[x.id]; saveProfile(); showShop(); } });
   // たたんでいるときは、2段目の真ん中あたりで見えなくする（見えない分のボタンは押せないようにする）
   const grid = $('#modal-card .shop-grid.fold'), its = grid ? [...grid.children] : [];
@@ -2493,7 +2525,7 @@ function legendTap() {
 function confirmReset(all) {
   openModal(`<h2>${all ? '全解放をリセットしますか？' : 'データをリセットしますか？'}</h2><p>${all ? `いまは全機能が解放されています（ランク${RANKS.length}）。リセットすると解放はすべて元に戻り、` : ''}経験値・ランク・ミッション・最高記録・取引成績・ポイントとショップで買ったもの・進行中のゲームがすべて消え、ランク1からやり直しになります。元には戻せません。</p>
     <div class="actions"><button class="ghost" data-act="cancel">やめる</button><button class="primary" data-act="ok">リセットする</button></div>`,
-  { cancel: closeModal, ok: () => { closeModal(); profile = defProfile(); saveProfile(); applySkin(); clearSave(); pick.mode = 'random'; showTitle(); toast('リセットしました。ランク1からスタートです'); } });
+  { cancel: closeModal, ok: () => { closeModal(); profile = defProfile(); saveProfile(); applySkin(); applyBgm(); clearSave(); pick.mode = 'random'; showTitle(); toast('リセットしました。ランク1からスタートです'); } });
 }
 function hideTitle() { titleOpen = false; $('#title').hidden = true; playBgm(); }
 
@@ -2661,7 +2693,7 @@ function loop(ts) {
 }
 
 function start(data) {
-  applySkin(); bindUI();
+  applySkin(); applyBgm(); bindUI();
   let resumed = false;
   if (data && data.save) { try { const g = JSON.parse(data.save); if (saveUsable(g)) { UI.view = data.view || 'trade'; resume(g); buildTypes(); buildFilter(); switchView(UI.view); resumed = true; } } catch (e) {} }
   if (!resumed) showTitle();
