@@ -3079,7 +3079,7 @@ function bindUI() {
     if (UI.boardHold) { UI.boardHold = false; if (G && UI.view === 'trade') renderBoard(); }
   };
   document.addEventListener('pointercancel', () => { touchBtn = null; listRelease(); }, true);
-  document.addEventListener('pointerup', () => setTimeout(listRelease, 0), true);   // click のあとに並べ直す
+  document.addEventListener('pointerup', e => setTimeout(listRelease, e.pointerType === 'touch' ? 400 : 0), true);   // click のあとに並べ直す。iOS のタッチは離してから click が遅れて来ることがあり、すぐ作り直すと押したボタンが消えて反応しない
   document.addEventListener('pointerup', e => { const b = touchBtn; touchBtn = null; if (b && e.target.closest('button') === b) { sePressedAt = performance.now(); if (!silentButton(b)) playClick(); } }, true);
   document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && performance.now() - sePressedAt > 1000 && !silentButton(b)) playClick(); }, true);
   document.addEventListener('click', e => {
