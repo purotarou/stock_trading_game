@@ -2748,7 +2748,7 @@ const BTUT = [
   { t: '株数を大きくしたよ。「値段の目安」が高くなったね。売りの注文を、安いほうから順に食べていくからだよ。板を見ると、注文の前に「いくらで買えるか」がわかるんだ。', at: '#o-cur', also: [['#o-est dt:first-of-type', '#o-est dd:first-of-type']], btn: 'へえ！',
     enter: () => { const s = sel(), L = lot(s); $('#o-qty').value = Math.max(L, Math.round(s.minVol * 40 / L) * L); renderOrderPanel(); } },
   { t: '板が薄いときは、「成行」より「指値」がおすすめ。成行の確認画面にも、「板が薄いよ」と注意が出るんだ。', at: '.board', btn: 'ふむふむ' },
-  { t: '板の値段を押すと、「指値」の値段に入るよ。色がついた行の値段を押してみよう。', at: '.board tr.cur button', on: 'px' },
+  { t: '板の値段をダブルタップすると、「指値」の値段に入るよ。色がついた行の値段をダブルタップしてみよう。', at: '.board tr.cur button', on: 'px' },
   { t: '注文のところに、押した値段が入ったよ。「この値段で買いたい」を、板を見ながら決められるんだ。', at: '#o-price-field', btn: 'べんり！' },
   { t: '安く買いたいときは、今の値段より下の値段を押して指値にしよう。値段が下がってくるまで待つよ。ただし、下がらなければ買えないし、注文はその日だけだよ。', at: '.board td.qb', btn: 'なるほど' },
   { t: 'すぐ買いたいときは、今の値段以上の指値にするとすぐ買えるよ。売るときは反対で、高く売りたいなら今より上、すぐ売りたいなら今の値段以下にするんだ。', at: '.board td.qa.best', btn: 'へえ！' },
@@ -3114,7 +3114,8 @@ function bindUI() {
     if (e.target.closest('#q-minus')) { const q = $('#o-qty'), L = lot(sel()); q.value = Math.max(L, (+q.value || L) - L); renderOrderPanel(); tutEvent('qty'); return; }
     if (e.target.closest('#q-plus')) { const q = $('#o-qty'), L = lot(sel()); q.value = (+q.value || 0) + L; renderOrderPanel(); tutEvent('qty'); return; }
     const qk = e.target.closest('[data-q]'); if (qk) { $('#o-qty').value = Math.max(lot(sel()), +qk.dataset.q); renderOrderPanel(); tutEvent('qty'); return; }
-    const bp = e.target.closest('[data-px]'); if (bp) { if (UI.type === 'mkt') UI.type = 'lmt'; $('#o-price').value = bp.dataset.px; renderOrderPanel(); if (!UI.tut) { const o = $('.a-order'); o.style.scrollMarginTop = (($('.hdr')?.getBoundingClientRect().bottom || 0) + 12) + 'px'; o.scrollIntoView({ behavior: 'smooth', block: 'start' }); } tutEvent('px'); return; }
+    const bp = e.target.closest('[data-px]'); if (bp) { const now = performance.now(), last = UI.pxTap; UI.pxTap = { px: bp.dataset.px, t: now }; if (!last || last.px !== bp.dataset.px || now - last.t > 500) return;   // ダブルタップ（同じ値段を0.5秒以内にもう一度）で入力。板は作り直されるので、要素でなく値段で比べる
+      UI.pxTap = null; if (UI.type === 'mkt') UI.type = 'lmt'; $('#o-price').value = bp.dataset.px; renderOrderPanel(); if (!UI.tut) { const o = $('.a-order'); o.style.scrollMarginTop = (($('.hdr')?.getBoundingClientRect().bottom || 0) + 12) + 'px'; o.scrollIntoView({ behavior: 'smooth', block: 'start' }); } tutEvent('px'); return; }
     if (e.target.closest('#o-submit')) { confirmOrder(); return; }
     const cc = e.target.closest('[data-cancel]'); if (cc) { const o = G.player.orders.find(x => x.id === +cc.dataset.cancel); if (o) { removeOrder(o); toast('注文を取り消しました'); render(); } return; }
     const gt = e.target.closest('[data-goto]'); if (gt) { selectStock(gt.dataset.goto); switchView('trade'); return; }   // 取引履歴の、上場廃止の銘柄（閲覧だけ）
