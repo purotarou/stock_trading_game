@@ -2965,7 +2965,7 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', `架空の30社${profile.r7 ? `と追加の${XDEFS.length}社（ランク7で解放。ランダム相場のみ）` : '（ランク7になると、追加の銘柄が出ます。ランダム相場のみ）'}。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
+  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : `架空の取引所「NTX」で、実在の企業をもじった${profile.r7 ? DEFS.length + XDEFS.length : 30}社を売買して、資産を増やそう。`}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
