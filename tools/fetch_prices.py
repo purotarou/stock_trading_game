@@ -6,6 +6,7 @@
     pip install yfinance pandas
     python3 tools/fetch_prices.py --scenario corona2020   # data/corona2020.js（const CORONA2020）。2020年
     python3 tools/fetch_prices.py --scenario recent       # data/recent.js（const RECENT）。2026-01-01 〜 2026-10-30
+    python3 tools/fetch_prices.py --scenario recent_extra # data/recent_extra.js（const RECENT_EXTRA）。リアル相場（2026年版）の追加18社
 
 使う価格は Close（株式分割のみ反映・配当は反映しない）に固定している。
 
@@ -66,6 +67,36 @@ SCENARIOS = {
         "names": {"4689": "LINEヤフー"},
         "update": True,
         "nintendo_check": False,
+        "also_update": "recent_extra",  # recent の --update のあと、続けて recent_extra も更新する
+    },
+    # リアル相場（コロナショック版・2020年）の追加18社。日付は corona2020.js の dates / history.dates に合わせる
+    "corona2020_extra": {
+        "var": "CORONA2020_EXTRA",
+        "out": DATA_DIR / "corona2020_extra.js",
+        "start": "2020-01-01", "end": "2021-01-01", "last": "2020-12-31",
+        "hist_start": "2019-01-01", "hist_last": "2019-12-31",
+        "expect_first": "2020-01-06", "expect_last": "2020-12-30",
+        "expect_hist_first": "2019-01-04", "expect_hist_last": "2019-12-30",
+        "names": {},
+        "update": False,
+        "nintendo_check": False,
+        "stocks": "extra20",
+        "align": "corona2020",
+    },
+    # リアル相場（2026年版）の追加18社。recent.js と同じ形式で、日付は recent.js の dates（本編）と history.dates（過去分）に合わせる
+    # （recent.js を先に更新してから、こちらを更新する。recent の --update は、続けてこちらも更新する）
+    "recent_extra": {
+        "var": "RECENT_EXTRA",
+        "out": DATA_DIR / "recent_extra.js",
+        "start": "2026-01-01", "end": "2026-10-31", "last": "2026-10-30",
+        "hist_start": "2025-01-01", "hist_last": "2025-12-31",
+        "expect_first": "2026-01-05", "expect_last": "2026-10-30",
+        "expect_hist_first": "2025-01-06", "expect_hist_last": "2025-12-30",
+        "names": {},
+        "update": True,
+        "nintendo_check": False,
+        "stocks": "extra",
+        "align": "recent",
     },
 }
 
@@ -111,6 +142,50 @@ BASE_STOCKS = [
     ("9101", "日本郵船", "海運"),
     ("9104", "商船三井", "海運"),
 ]
+# リアル相場（2026年版）の追加18社（recent_extra）。(コード, 社名, 業種, 種類, 優待の内容)。優待は確かな情報があるものだけ（なければ ""）。
+# 種類: penny 低位 / growth 新興 / div 高配当 / cyc 景気敏感 / perk 優待 / normal 普通。配当（年間・円）は、取得した配当の実績から書き出す
+# コロナショック版（corona2020_extra）の追加銘柄。(コード, 社名, 業種, 種類, 優待の内容)。優待は「優待あり」だけ。社名は今の名前（corona2020.js と同じ付け方）
+EXTRA20_STOCKS = [
+    ("6740", "ジャパンディスプレイ", "電気機器", "penny", ""),   # 赤字。2020-01-06 の終値 79円
+    ("3315", "日本コークス工業", "石油・石炭製品", "penny", ""),   # 小幅な黒字（要確認）。2020-01-06 の終値 81円
+    ("3994", "マネーフォワード", "情報・通信", "growth", ""),   # マザーズ
+    ("2914", "日本たばこ産業", "食料品", "div", ""),
+    ("8058", "三菱商事", "卸売", "div", ""),
+    ("5411", "JFEホールディングス", "鉄鋼", "cyc", ""),
+    ("5803", "フジクラ", "非鉄金属", "cyc", ""),
+    ("6305", "日立建機", "機械", "cyc", ""),
+    ("8015", "豊田通商", "卸売", "cyc", ""),
+    ("2702", "日本マクドナルドホールディングス", "小売", "perk", "優待あり"),
+    ("9861", "吉野家ホールディングス", "小売", "perk", "優待あり"),
+    ("7550", "ゼンショーホールディングス", "小売", "perk", "優待あり"),
+    ("8766", "東京海上ホールディングス", "保険", "normal", ""),
+    ("8801", "三井不動産", "不動産", "normal", ""),
+    ("4543", "テルモ", "精密機器", "normal", ""),
+    ("9735", "セコム", "サービス", "normal", ""),
+    ("4452", "花王", "化学", "normal", ""),
+    ("6501", "日立製作所", "電気機器", "normal", ""),
+]
+EXTRA_STOCKS = [
+    ("6740", "ジャパンディスプレイ", "電気機器", "penny", ""),   # 赤字。データ初日 20円
+    ("3323", "レカム", "卸売業", "penny", ""),   # 黒字（小幅）。データ初日 85円
+    ("9348", "ispace", "サービス業", "growth", ""),   # グロース市場
+    ("2914", "日本たばこ産業", "食料品", "div", ""),
+    ("1928", "積水ハウス", "建設業", "div", ""),
+    ("5713", "住友金属鉱山", "非鉄金属", "cyc", ""),
+    ("4004", "レゾナック・ホールディングス", "化学", "cyc", ""),
+    ("6301", "小松製作所", "機械", "cyc", ""),
+    ("8053", "住友商事", "卸売業", "cyc", ""),
+    ("2702", "日本マクドナルドホールディングス", "小売業", "perk", "6・12月。100株で食事券1冊（バーガー・サイド・ドリンクの引換券が各6枚）。継続保有1年以上が条件"),
+    ("9861", "吉野家ホールディングス", "小売業", "perk", "2・8月。100株でサービス券500円×4枚（年2回、各2,000円分）"),
+    ("7550", "ゼンショーホールディングス", "小売業", "perk", "3・9月。100株で食事優待券500円×2枚（年2回、各1,000円分）"),
+    ("8766", "東京海上ホールディングス", "保険業", "normal", ""),
+    ("8801", "三井不動産", "不動産業", "normal", ""),
+    ("4543", "テルモ", "精密機器", "normal", ""),
+    ("9735", "セコム", "サービス業", "normal", ""),
+    ("4452", "花王", "化学", "normal", ""),
+    ("6501", "日立製作所", "電気機器", "normal", ""),
+]
+STOCK_LISTS = {"extra": EXTRA_STOCKS, "extra20": EXTRA20_STOCKS}
 STOCKS = BASE_STOCKS
 
 
@@ -122,7 +197,7 @@ def use_scenario(name):
     START, END, LAST = SCEN["start"], SCEN["end"], SCEN["last"]
     HIST_START, HIST_LAST = SCEN["hist_start"], SCEN["hist_last"]
     HIST_MARK = VAR + ".history = "
-    STOCKS = [(c, SCEN["names"].get(c, n), s) for c, n, s in BASE_STOCKS]
+    STOCKS = [(c, SCEN["names"].get(c, n), s) for c, n, s, *_ in STOCK_LISTS.get(SCEN.get("stocks"), BASE_STOCKS)]
     # corona2020.js を別シナリオの出力先にしてしまう設定ミスの防止
     if name != "corona2020" and OUT.resolve() == CORONA_FILE.resolve():
         sys.exit("シナリオ %s の出力先が %s になっています。corona2020.js には書き込めません。" % (name, CORONA_FILE))
@@ -161,6 +236,35 @@ def fetch_one(code, start=None, end=None, ohlcv=False):
             if attempt < RETRIES:
                 time.sleep(2 * attempt)
     raise RuntimeError(str(last_err))
+
+
+def aligned():
+    """recent_extra のように、別のファイル（recent.js）の日付に合わせるシナリオか。"""
+    return bool(SCEN.get("align"))
+
+
+def align_dates(hist=False):
+    """合わせる先（recent.js）の日付。本編は dates、過去分は history.dates。"""
+    f = SCENARIOS[SCEN["align"]]["out"]
+    if not f.exists():
+        sys.exit("%s がありません。先に --scenario %s を実行してください。" % (f, SCEN["align"]))
+    text = f.read_text(encoding="utf-8")
+    if hist:
+        i = text.find(HIST_CUT)
+        if i < 0:
+            sys.exit("%s に過去分がありません。" % f)
+        return json.loads(re.search(r"^  dates: (\[.*?\]),$", text[i:], re.M).group(1))
+    return json.loads(re.search(r"^  dates: (\[.*?\]),$", text[:text.find(HIST_CUT)] if HIST_CUT in text else text, re.M).group(1))
+
+
+def fetch_div(code):
+    """表示用：開始前の1年（hist_start 〜 hist_last）の配当の合計（円/株）。取れなければ 0。"""
+    try:
+        d = yf.Ticker(code + ".T").dividends
+        d = d[(d.index.strftime("%Y-%m-%d") >= HIST_START) & (d.index.strftime("%Y-%m-%d") <= HIST_LAST)]
+        return round(float(d.sum()), 2)
+    except Exception:
+        return 0
 
 
 def fill_gaps(dates, series):
@@ -243,6 +347,7 @@ def read_js_closes():
 
 
 def write_js(dates, stocks):
+    """stocks の各要素は {code, name, sector, prices} と、あれば追加の表示項目 extra（{kind, div, perk}）。"""
     OUT.parent.mkdir(parents=True, exist_ok=True)
     dump = lambda x: json.dumps(x, ensure_ascii=False, separators=(",", ":"))
     lines = [
@@ -253,9 +358,10 @@ def write_js(dates, stocks):
         "  stocks: [",
     ]
     for s in stocks:
+        ex = "".join(", %s: %s" % (k, dump(v)) for k, v in s.get("extra", {}).items())
         lines.append(
-            "    { code: %s, name: %s, sector: %s, prices: %s },"
-            % (dump(s["code"]), dump(s["name"]), dump(s["sector"]), dump(s["prices"]))
+            "    { code: %s, name: %s, sector: %s%s, prices: %s },"
+            % (dump(s["code"]), dump(s["name"]), dump(s["sector"]), ex, dump(s["prices"]))
         )
     lines += ["  ]", "};", ""]
     OUT.write_text("\n".join(lines), encoding="utf-8")
@@ -305,7 +411,7 @@ def fetch_history(cmp_date):
     if not raw:
         sys.exit("過去分を1銘柄も取得できませんでした。ネットワークや yfinance のバージョンを確認してください。")
 
-    dates = sorted(set().union(*[{d for d in s if d <= HIST_LAST} for s in raw.values()]))
+    dates = align_dates(True) if aligned() else sorted(set().union(*[{d for d in s if d <= HIST_LAST} for s in raw.values()]))
     stocks, fill_report = {}, []
     for code, name, _ in STOCKS:
         if code not in raw:
@@ -493,6 +599,11 @@ def main():
     corona_before = sha256(CORONA_FILE)
     try:
         run(args)
+        nxt = SCEN.get("also_update")
+        if args.update and nxt and SCENARIOS[nxt]["out"].exists():   # recent の更新のあと、続けて追加18社も更新する
+            print("\n=== 続けて %s を更新 ===" % nxt)
+            use_scenario(nxt)
+            run(args)
     finally:
         report_corona_hash(args.scenario, corona_before)
 
@@ -539,6 +650,8 @@ def run_update():
 
     # 1) 直近の営業日が、すでにある値と同じか
     all_dates = sorted(set().union(*[set(s) for s in raw.values()]))
+    if aligned():   # 日付は recent.js に合わせる（recent.js を先に更新しておく）
+        all_dates = [d for d in align_dates() if d >= start and d < today]
     window = dates[-OVERLAP_DAYS:]
     got = [d for d in all_dates if window[0] <= d <= last]
     problems = []
@@ -640,16 +753,21 @@ def run(args):
 
     # 取引日 = 取得できた銘柄のどれかに値がある日（東証の営業日にほぼ一致）
     # 最終日より後の日は捨てる（end の指定ミスや日付のずれで 10月以降が混ざらないように）
-    dates = sorted(d for d in set().union(*[set(s) for s in raw.values()]) if d <= LAST)
+    dates = align_dates() if aligned() else sorted(d for d in set().union(*[set(s) for s in raw.values()]) if d <= LAST)
 
+    meta = {c: rest for c, _, _, *rest in STOCK_LISTS[SCEN["stocks"]]} if SCEN.get("stocks") in STOCK_LISTS else {}
     stocks, fill_report = [], []
     for code, name, sector in STOCKS:
         if code not in raw:
             continue
         prices, filled = fill_gaps(dates, raw[code])
         assert len(prices) == len(dates)
-        stocks.append({"code": code, "name": name, "sector": sector,
-                       "prices": [round_price(v) for v in prices]})
+        st = {"code": code, "name": name, "sector": sector, "prices": [round_price(v) for v in prices]}
+        if code in meta:   # 表示用の項目だけ（配当は実績の年間合計、優待は確かなものだけ）
+            kind, perk = meta[code]
+            st["extra"] = {"kind": kind, "div": fetch_div(code), "perk": perk}
+            time.sleep(0.3)
+        stocks.append(st)
         for d, why in filled:
             fill_report.append((code, name, d, why))
 

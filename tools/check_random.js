@@ -36,12 +36,13 @@ function dummy() {
   });
 }
 
-function load(file) {
+// storage を渡すと localStorage の代わりに使う（tools/check_extra.js がプロフィールや保存データを入れるため）
+function load(file, storage) {
   const g = {
     console, Math, JSON, Date, Object, Array, Number, String, Set, Map, Promise, Symbol, Proxy,
     setTimeout: () => 0, clearTimeout: () => {}, requestAnimationFrame: () => 0,
     performance: { now: () => 0 }, innerWidth: 1400, innerHeight: 900, devicePixelRatio: 1,
-    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    localStorage: storage || { getItem: () => null, setItem() {}, removeItem() {} },
     document: dummy(), getComputedStyle: () => dummy(), matchMedia: () => ({ matches: false }),
     Audio: function () { return dummy(); }, ResizeObserver: function () { return dummy(); },
     addEventListener() {}, scrollTo() {}, navigator: dummy(), fetch: () => new Promise(() => {}),
@@ -49,7 +50,7 @@ function load(file) {
   g.window = g;
   vm.createContext(g);
   // データファイル（あれば）も読み込む。ランダム相場の比較には使わない
-  for (const name of ['corona2020.js', 'recent.js', 'news2020.js', 'news2026.js']) {
+  for (const name of ['corona2020.js', 'recent.js', 'recent_extra.js', 'corona2020_extra.js', 'news2020.js', 'news2026.js']) {
     const data = path.join(path.dirname(file), 'data', name);
     if (fs.existsSync(data)) vm.runInContext(fs.readFileSync(data, 'utf8'), g);
   }

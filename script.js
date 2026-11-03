@@ -517,6 +517,7 @@ function newGame(scen, diff, seed, cash, mode) {
     if (isFast()) G.ume = makeUme(seed);   // G.stocks には入れない（ほかの30銘柄と指数の乱数の順番を変えない）
     if (profile.r7) G.extra = XDEFS.map((x, k) => makeExtra(x, k, seed));   // 追加銘柄も G.stocks には入れない
   }
+  if (real && profile.r7 && REAL_XDEF) G.extra = REAL_XDEF.map(makeRealExtra);   // リアル相場（2026年版・コロナショック版）の追加18社。G.stocks には入れない
   afterLoad();
   if (real) realStart(); else genHistory();
   G.player.startIdx = G.market.idx;
@@ -585,11 +586,13 @@ const REAL_SETS = {
   real: {
     file: 'data/corona2020.js', newsFile: 'data/news2020.js', name: 'コロナショック', period: '2020年',
     data: typeof CORONA2020 !== 'undefined' ? CORONA2020 : null, news: typeof NEWS2020 !== 'undefined' ? NEWS2020 : null,
+    extra: typeof CORONA2020_EXTRA !== 'undefined' ? CORONA2020_EXTRA : null,   // 追加18社（data/corona2020_extra.js。ランク7のあと新しく始めたコロナショック版だけに出る。なくても動く）
   },
   real2026: {
     file: 'data/recent.js', newsFile: 'data/news2026.js', year: 2026, span: '1〜10月',
     get name() { return '今年の相場'; }, get period() { return `${this.year}年${this.span}`; },
     data: typeof RECENT !== 'undefined' ? RECENT : null, news: typeof NEWS2026 !== 'undefined' ? NEWS2026 : null,
+    extra: typeof RECENT_EXTRA !== 'undefined' ? RECENT_EXTRA : null,   // 追加18社（data/recent_extra.js。ランク7のあと新しく始めた2026年版だけに出る。なくても動く）
     rsigUntil: '2026-09-30',   // rsig を全期間から計算すると、データを延ばすたびに既存の日の分足・高安・出来高・指数が変わるので、延長前の最終日までで固定している
   },
 };
@@ -604,6 +607,12 @@ for (const k in REAL_SETS) {
   // 実データの業種（東証の業種名）。SECTORS を回すランダム相場の乱数の順番を変えないよう、別の表にしておく
   S.sectors = {};
   for (const d of S.data.stocks) S.sectors[d.sector] ||= { name: d.sector, short: d.sector };
+  // 追加18社（リアル相場）。日付が本編・過去分と同じときだけ使う。G.stocks には入れず G.extra に持つ（指数・ニュースは30銘柄のまま）
+  const X = S.extra;
+  if (X?.stocks?.length && JSON.stringify(X.dates) === JSON.stringify(S.data.dates) && (!X.history || JSON.stringify(X.history.dates) === JSON.stringify(S.hist?.dates))) {
+    S.xdef = X.stocks; S.xpx = Object.fromEntries(X.stocks.map(d => [d.code, d.prices])); S.xhist = X.history || null;
+    for (const d of X.stocks) S.sectors[d.sector] ||= { name: d.sector, short: d.sector };
+  } else S.xdef = null;
   // 当時の実際のニュース。表示するだけで、株価を動かす genNews / apply 系には一切つながない。
   // date（出来事・発表の日）より後の最初の営業日の寄り付き前に出す（その朝に分かっていたことだけになる）
   S.newsByDay = {};
@@ -617,7 +626,7 @@ for (const k in REAL_SETS) {
   }
 }
 // いま遊んでいる（または遊ぼうとしている）シナリオのデータ。useReal で切り替える
-let REAL = null, REAL_KEY = null, REAL_PX = {}, REAL_HIST = null, REAL_SECTORS = {}, REAL_NEWS = {};
+let REAL = null, REAL_KEY = null, REAL_PX = {}, REAL_HIST = null, REAL_SECTORS = {}, REAL_NEWS = {}, REAL_XPX = {}, REAL_XHIST = null, REAL_XDEF = null;   // X = 追加18社
 const realOK = k => !!REAL_SETS[k]?.data;   // そのシナリオのデータがあるか
 const anyReal = () => Object.keys(REAL_SETS).some(realOK);
 const realDays = k => REAL_SETS[k]?.data?.dates.length || 0;
@@ -625,7 +634,7 @@ const freePool = () => Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].fr
 const realKeyOf = g => { const k = g.base || g.scen; return REAL_SETS[k] ? k : 'real'; };   // 保存データのシナリオ（古い保存データは base がない）
 function useReal(k) {
   const S = REAL_SETS[k]; if (!S?.data) return false;
-  REAL_KEY = k; REAL = S.data; REAL_PX = S.px; REAL_HIST = S.hist; REAL_SECTORS = S.sectors; REAL_NEWS = S.newsByDay;
+  REAL_KEY = k; REAL = S.data; REAL_PX = S.px; REAL_HIST = S.hist; REAL_SECTORS = S.sectors; REAL_NEWS = S.newsByDay; REAL_XPX = S.xpx || {}; REAL_XHIST = S.xhist || null; REAL_XDEF = S.xdef || null;
   return true;
 }
 const REAL_IDX_BASE = 100;
@@ -633,14 +642,15 @@ const dailyKeep = () => (isReal() ? 600 : 320);   // 日足を残す数。リア
 const SEC = k => SECTORS[k] || REAL_SECTORS[k];
 const isReal = () => G?.mode === 'real';
 const idxName = () => (isReal() ? '30銘柄平均' : 'NTX225');
-const realClose = (s, di) => REAL_PX[s.code][di];
+const realClose = (s, di) => (s.extra ? REAL_XPX : REAL_PX)[s.code][di];
 const hasRealNews = () => Object.keys(REAL_NEWS).length > 0;
 const NEWS_KEEP_REAL = 400;   // リアル相場で保存・表示するニュースの上限（1年分が収まる数）
 function pushRealNews() {
   const t = G.date.slice(5).split('-').map(Number).join('/') + ' 朝';
   for (const n of REAL_NEWS[G.dayIndex] || []) {
+    if (n.codes?.length && !n.codes.some(c => byCode(c))) continue;   // このゲームにない銘柄（追加18社が出ていないゲーム）だけのニュースは出さない
     const type = n.type === 'report' ? 'realReport' : n.type === 'rumor' ? 'realRumor' : 'real';   // 実際の報道 / 観測報道 / 当時の噂
-    pushNews({ day: G.dayIndex, time: t, type, stars: 3, codes: (n.codes || []).filter(c => REAL_PX[c]), text: n.headline, body: n.body || '', imp: n.importance || 2, hint: '', flash: false });
+    pushNews({ day: G.dayIndex, time: t, type, stars: 3, codes: (n.codes || []).filter(c => byCode(c)), text: n.headline, body: n.body || '', imp: n.importance || 2, hint: '', flash: false });
   }
 }
 
@@ -659,6 +669,23 @@ function makeRealStock(d) {
     shock: 0, gap: 0, pend: [], intraday: [], daily: [], pins: [], limUp: price, limDn: price, stop: null,
   };
 }
+// 追加18社（リアル相場）。ランダム相場の追加銘柄と同じ種類・バッジ・板・流動性・呼値・信用の設定（性格 bm・ssm・esd は使わない）。
+// 日中の動きは銘柄ごとの専用乱数（hash01(seed/rx/コード)）で、共通の RNG は引かない。配当・優待は表示だけ（入金も権利落ちもない）
+const XREAL_MG = { 6740: { short: false, rate: .5 }, 3323: { short: true, rate: .5, lend: .03 }, 3315: { short: true, rate: .5, lend: .03 } };   // 低位株の信用の設定
+const XREAL_PERK = { 2702: '食事券（年2回）', 9861: 'サービス券（年2回、1回あたり2,000円分の目安）', 7550: '食事優待券（年2回、1回あたり1,000円分の目安）' };
+const XREAL_LIQ = { 6740: .3, 3323: .4, 3315: .4 };   // 低位株の流動性
+function makeRealExtra(d) {
+  const s = makeRealStock(d), kind = d.kind || 'normal';
+  const liq = XREAL_LIQ[d.code] ?? KINDS[kind]?.p.liq ?? 1;
+  s.minVol = Math.max(300, s.minVol * liq);
+  Object.assign(s, { extra: true, kind, r: rngOn({ s: (hash01(`${G.seed}/rx/${d.code}`) * 4294967296) | 0, spare: null }) });
+  if (kind === 'penny') s.tick1 = true;   // 呼値1円
+  if (XREAL_MG[d.code]) s.mg = { ...XREAL_MG[d.code] };
+  if (d.div > 0) { s.divShow = d.div; s.divYear = +REAL.dates[0].slice(0, 4) - 1; }   // 表示用の年間配当（開始前の1年の実績）。s.div は 0 のまま＝入金なし
+  const perk = REAL_KEY === 'real2026' ? XREAL_PERK[d.code] : d.perk;   // コロナショック版は当時の内容が確認できないので「優待あり」だけ
+  if (perk) s.perkShow = perk;
+  return s;
+}
 // 初日の終値での指数（30銘柄平均）を 100 にする。過去分があれば、過去チャートも同じ基準で作る
 function realStart() {
   const mk = G.market; let cap = 0; for (const s of G.stocks) cap += s.shares * s.price;
@@ -669,8 +696,8 @@ function realStart() {
 // 開始前の過去チャート（data の history）。乱数は使わない。初日の前日終値は過去分の最終日の終値にする
 function realHistory() {
   const H = REAL_HIST, mk = G.market, n = H.dates.length;
-  for (const s of G.stocks) {
-    const x = H.stocks[s.code]; if (!x) continue;   // 過去分が取れなかった銘柄は過去チャートなし
+  for (const s of allStocks()) {
+    const x = (s.extra ? REAL_XHIST : H)?.stocks[s.code]; if (!x) continue;   // 過去分が取れなかった銘柄は過去チャートなし
     // 出来高は日ごとの増減だけ実データを使い、大きさはゲーム内の出来高（実際の1割前後）にそろえる
     let sum = 0, cnt = 0; for (const v of x.v) if (v) { sum += v; cnt++; }
     const vk = cnt ? s.minVol * MIN_PER_DAY / (sum / cnt) : 0;
@@ -694,16 +721,16 @@ function realLimits(s) {
   const c = roundTick(realClose(s, G.dayIndex));
   s.limUp = Math.max(s.limUp, c); s.limDn = Math.min(s.limDn, c);
 }
-function realOpen(s) {
+function realOpen(s, R = RNG) {
   const p0 = Math.log(s.prevClose), T = Math.log(realClose(s, G.dayIndex));
   s.dsig = Math.max(s.rsig * 0.7, Math.abs(T - p0) * 0.5);
-  setPrice(s, p0 + (T - p0) * 0.35 + s.dsig * 0.3 * RNG.normal());
+  setPrice(s, p0 + (T - p0) * 0.35 + s.dsig * 0.3 * R.normal());
 }
 /** 1分ぶんの動き。残り n 分で実際の終値 T に着くように引き寄せつつ揺らす（最後の1分でちょうど T） */
-function realStep(s, im) {
+function realStep(s, im, R = RNG) {
   const n = MIN_PER_DAY - G.minute, T = Math.log(realClose(s, G.dayIndex));
   const eps1 = s.dsig / Math.sqrt(MIN_PER_DAY) * im;
-  const r = n <= 1 ? T - s.lp : (T - s.lp) / n + eps1 * Math.sqrt((n - 1) / n) * RNG.normal();
+  const r = n <= 1 ? T - s.lp : (T - s.lp) / n + eps1 * Math.sqrt((n - 1) / n) * R.normal();
   return { r, eps1 };
 }
 
@@ -767,14 +794,15 @@ function stopLowStep(s, open) {
 }
 // リアル相場の1分：実データの終値へ向かうだけ。作りもののニュースは流さない
 function stepMinuteReal(im) {
-  for (const s of G.stocks) {
-    const prev = s.price, { r, eps1 } = realStep(s, im);
+  for (const s of G.stocks.concat(G.extra)) {   // 追加18社は専用乱数 s.r（30銘柄だけが共通の RNG を引く。concat しても順番は同じ）
+    if (s.extra && !live(s)) continue;
+    const R = s.extra ? s.r : RNG, prev = s.price, { r, eps1 } = realStep(s, im, R);
     setPrice(s, s.lp + r);
     if (G.minute === MIN_PER_DAY - 1) {   // 最後の1分は、丸めの誤差で1刻みずれないよう実データの終値をそのまま使う
       s.price = roundTick(realClose(s, G.dayIndex));
       s.stop = s.price >= s.limUp ? 'up' : s.price <= s.limDn ? 'down' : null;
     }
-    minuteBar(s, prev, r, eps1);
+    minuteBar(s, prev, r, eps1, R);
   }
   updateIndex(false);
   processOrders();
@@ -1273,7 +1301,7 @@ function startDay(first) {
 
 function openMarket() {
   const mk = G.market;
-  if (isReal()) for (const s of G.stocks) { realOpen(s); s.open = s.high = s.low = s.price; }
+  if (isReal()) for (const s of G.stocks.concat(G.extra)) { realOpen(s, s.extra ? s.r : RNG); s.open = s.high = s.low = s.price; }
   else openGaps();
   G.phase = 'open'; G.minute = 0;
   updateIndex(true);
@@ -1794,7 +1822,7 @@ function buildFilter() {
   if (kinds.length) fitSelect(kf);
 }
 const DL_BADGE = { watch: ' <b class="kb kb-dl">監理</b>', fail: ' <b class="kb kb-dl">監理</b>', seiri: ' <b class="kb kb-dl">整理</b>' };   // 倒産の途中の銘柄
-const kindOf = s => (s.kind === 'perk' && !s.perk ? 'normal' : s.kind);   // 表示の種類（優待をやめた銘柄は普通）
+const kindOf = s => (s.kind === 'perk' && !s.perk && !s.perkShow ? 'normal' : s.kind);   // 表示の種類（優待をやめた銘柄は普通）
 const KIND_BADGE = { div: '高配当', cyc: '景気敏感', perk: '優待', penny: '低位', ipo: '新規' };   // 銘柄リストに出す種類のバッジ（普通・新興は出さない）
 // 選んでいる文字が入るぎりぎりの幅にする（select は既定だと一番長い選択肢の幅になる）
 function fitSelect(el) {
@@ -1866,7 +1894,9 @@ function renderChartHead() {
   const rv = rsi(closes);
   if (isReal()) {   // 実データは終値だけなので、株式数・利益・配当にもとづく数字は出さない
     $('#facts').innerHTML = f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株', 'fx-vol') + f(term('値幅制限'), `${px(s.limDn)}〜${px(s.limUp)}`, 'fx-lim')
-      + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl') + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi') : '');
+      + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl') + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi') : '')
+      + (s.divShow ? f(term('配当利回り'), `${(s.divShow / s.price * 100).toFixed(2)}%（${s.divYear || 2025}年の実績）`, 'fx-div') : '')   // 追加18社の表示だけ（入金はない）
+      + (s.perkShow ? f(term('株主優待'), `${esc(s.perkShow)}（表示だけ。入金はありません）`, 'fx-perk') : '');
     return;
   }
   // 上下2行に列順で並べる PC・タブレットだけ、CSS の order で PER と配当利回りの位置を入れ替える（スマホの並びは変えない）
@@ -2965,7 +2995,7 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? '実在の30銘柄。過去の現実の相場になる。' : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
+  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の30銘柄（2026年版は追加の18社）。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、2026年版に追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : `架空の取引所「NTX」で、実在の企業をもじった${profile.r7 ? DEFS.length + XDEFS.length : 30}社を売買して、資産を増やそう。`}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>

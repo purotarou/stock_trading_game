@@ -919,6 +919,224 @@ const NEWS2026 = [
   { date: "2026-10-28", headline: "アドバンテストが今期の業績予想を上方修正。営業利益の予想は8,460億円から9,670億円に",
     body: "4〜9月期は、売上高が60.5%増の8,452億円、営業利益が96.5%増の4,568億円。上限2,800億円の自社株買いも決めた。", codes: ["6857"], importance: 3, type: "fact" },
 
+  /* ===================== 企業ニュース（4）：追加18社（ランク7のあとに始めた「今年の相場」だけに出る銘柄） ===================== */
+  // 決算の数字は会社の決算短信・決算資料のとおり。純利益は親会社株主（所有者）に帰属する利益
+  // （1）6740・3323・9348・2914・1928・5713
+
+  // https://eetimes.itmedia.co.jp/ee/articles/2602/05/news052.html
+  // https://www.satellitetoday.com/manufacturing/2026/02/04/kymeta-links-up-with-jdi-for-unique-metasurface-terminal/
+  { date: "2026-02-04", headline: "ジャパンディスプレイが、米カイメタと衛星通信アンテナ向けガラス基板の共同開発・量産供給の契約を結んだと発表",
+    body: "複数の周波数帯を同時に使える次世代アンテナ向け。2027年の製品化を予定している。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/67400/081220260622575925_tse-acedjpsm-67400-20260622367400-ixbrl.htm
+  // https://eetimes.itmedia.co.jp/ee/articles/2605/15/news080.html
+  { date: "2026-05-14", headline: "ジャパンディスプレイの3月期決算は、売上高が29.6%減の1,323億円、営業損失は187億円",
+    body: "純損失は198億円。今期（2027年3月期）の業績予想は公表していない。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://eetimes.itmedia.co.jp/ee/articles/2608/12/news037.html
+  // https://scouter.monex.co.jp/news/detail/6740_20260810_act_20260810_153018_5
+  { date: "2026-08-10", headline: "ジャパンディスプレイの4〜6月期は、売上高が26%減の239億円、営業損失は12億円（前年同期は92億円の損失）",
+    body: "純損失は34億円。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://s.kabutan.jp/stocks/3323/news/k202602130603/
+  // https://nikkeiyosoku.com/stock/tanshin/081220260213561740/
+  { date: "2026-02-13", headline: "レカムの10〜12月期（第1四半期）は、売上高が8.5%減の29億円、営業損益は7,000万円の赤字",
+    body: "前年同期は営業黒字だった。", codes: ["3323"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/33230/081220260807515008_tse-qcedifsm-33230-20260807333230-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/3323_20260807_act_20260807_153216_18
+  { date: "2026-08-07", headline: "レカムの10〜6月期（第3四半期累計）は、売上高124億円、営業利益4億6,300万円",
+    body: "通期（2026年9月期）の予想は、売上高148億円、営業利益5億5,000万円のまま変えていない。", codes: ["3323"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/93480/081220260528553399_tse-acedjpsm-93480-20260528393480-ixbrl.htm
+  // https://ispace-inc.com/wp-content/uploads/2026/05/JP_ispace_press-release_Q4-Financial-Announcement_FINAL.pdf
+  { date: "2026-05-15", headline: "ispaceの3月期決算は、売上高が26%減の33億円、純損失は81億円",
+    body: "会社は、売上高の減少の主な理由に、ミッション5でのエンジン開発の遅れを挙げた。", codes: ["9348"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/93480/081220260806511068_tse-qcedjpsm-93480-20260807393480-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/9348_20260807_act_20260807_154520_1
+  { date: "2026-08-07", headline: "ispaceの4〜6月期は、売上高が85.5%減の約1.7億円、純損失は63億円",
+    body: "通期の予想は変えていない。", codes: ["9348"], importance: 2, type: "fact" },
+
+  // https://www.jti.co.jp/investors/library/result/pdf/20260212_01.pdf
+  // https://s.minkabu.jp/stock/2914/settlement
+  { date: "2026-02-12", headline: "日本たばこ産業（JT）の12月期決算は、売上収益が13.4%増の3兆4,677億円、純利益は184.6%増の5,102億円",
+    body: "今期（2026年12月期）の純利益は5,700億円を見込む。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/29140/140120260508519418.pdf
+  // https://scouter.monex.co.jp/news/detail/2914_20260508_act_20260508_153108_2
+  { date: "2026-05-08", headline: "JTの1〜3月期は、売上収益9,240億円、営業利益3,046億円、純利益1,970億円",
+    body: "通期の予想は変えていない。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www.jti.co.jp/investors/library/result/pdf/20260730_01.pdf
+  // https://scouter.monex.co.jp/news/detail/2914_20260730_act_20260730_153033_5
+  { date: "2026-07-30", headline: "JTが通期の業績予想を引き上げ。純利益は5,700億円から6,440億円に、年間配当の予想は272円に",
+    body: "1〜6月期は、売上収益が17.7%増の1兆9,861億円、営業利益が29.0%増の6,449億円。通期の売上収益の予想は3兆8,850億円に引き上げた。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/19280/081220260304576061_tse-acedjpsm-19280-20260305319280-ixbrl.htm
+  // https://finance.matsui.co.jp/stock/1928/settlement/index
+  { date: "2026-03-05", headline: "積水ハウスの1月期決算は、純利益2,321億円。年間配当は144円",
+    body: "今期（2027年1月期）の純利益は6.1%減の2,180億円、年間配当は145円を見込む。", codes: ["1928"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/19280/081220260909533772_tse-scedjpsy-19280-20260910319280-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/1928_20260910_act_20260910_120019_2
+  { date: "2026-09-10", headline: "積水ハウスが中間決算を発表。通期の純利益の予想を2,240億円に引き上げ、売上高の予想は4兆2,600億円に引き下げ",
+    body: "年間配当の予想は145円のまま。", codes: ["1928"], importance: 2, type: "fact" },
+
+  // https://scouter.monex.co.jp/news/detail/5713_20260209_act_20260209_143010_2
+  // https://www.asset-alive.com/news/?mode=show&seq=56266
+  { date: "2026-02-09", headline: "住友金属鉱山が通期の業績予想を引き上げ。純利益は740億円から1,400億円に",
+    body: "会社は、非鉄金属の価格が想定以上に回復したことと、円安を理由に挙げた。", codes: ["5713"], importance: 3, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/57130/081220260511521788_tse-acedifsm-57130-20260511357130-ixbrl.htm
+  // https://finance.yahoo.co.jp/quote/5713.t/performance
+  { date: "2026-05-11", headline: "住友金属鉱山の3月期決算は、売上高が9.3%増の1兆7,416億円、純利益は1,763億円",
+    body: "今期の純利益は21.2%減の1,390億円、年間配当は228円から207円に減らす予想。", codes: ["5713"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/57130/081220260810516462_tse-qcedifsm-57130-20260810357130-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/5713_20260810_act_20260810_143012_3
+  { date: "2026-08-10", headline: "住友金属鉱山が通期の業績予想を引き上げ。純利益は1,390億円から2,160億円に",
+    body: "4〜6月期の純利益は879億円。", codes: ["5713"], importance: 3, type: "fact" },
+
+  // （2）4004・6301・8053・2702・9861・7550
+
+  // https://www2.jpx.co.jp/disc/40040/081220260213561241_tse-acedifsm-40040-20260213340040-ixbrl.htm
+  // https://eetimes.itmedia.co.jp/ee/spv/2602/16/news076_2.html
+  { date: "2026-02-13", headline: "レゾナック・ホールディングスの12月期決算は、売上収益が3.2%減の1兆3,471億円、純利益は60.5%減の290億円",
+    body: "今期（2026年12月期）の純利益は770億円を見込む。年間配当は65円。", codes: ["4004"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/40040/081220260806511574_tse-scedifsy-40040-20260806340040-ixbrl.htm
+  // https://eetimes.itmedia.co.jp/ee/articles/2608/12/news038.html
+  { date: "2026-08-06", headline: "レゾナックが中間決算を発表。通期の純利益の予想を770億円から1,125億円に引き上げ",
+    body: "1〜6月期の売上収益は5.4%増の6,769億円。通期の売上収益の予想は、石油化学事業を切り離す予定のため1兆1,650億円に引き下げた。", codes: ["4004"], importance: 2, type: "fact" },
+
+  // https://newswitch.jp/p/49076
+  // https://www2.jpx.co.jp/disc/63010/140120260501516000.pdf
+  { date: "2026-04-28", headline: "コマツの3月期決算は、売上高が0.7%増の4兆1,327億円で過去最高。純利益は14.4%減の3,764億円",
+    body: "あわせて、上限1,000億円・2,500万株の自社株買いを決めた。", codes: ["6301"], importance: 2, type: "fact" },
+
+  // https://www.komatsu.jp/en/newsroom/2026/20260729
+  // https://newswitch.jp/p/49882
+  { date: "2026-07-29", headline: "コマツの4〜6月期は、売上高が14.7%増の1兆431億円、純利益は5.4%増の962億円",
+    body: "通期の純利益の予想を3,180億円から3,490億円に引き上げた。", codes: ["6301"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80530/081220260430515781_tse-acedifsm-80530-20260501380530-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/8053_20260501_act_20260501_130005_1
+  { date: "2026-05-01", headline: "住友商事が3月期決算を発表。今期の純利益は4.9%増の6,300億円を見込む",
+    body: "7月1日付で、1株を4株に分ける株式分割を行うことも決めた。", codes: ["8053"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80530/081220260730504102_tse-qcedifsm-80530-20260731380530-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/8053_20260731_act_20260731_130022_5
+  { date: "2026-07-31", headline: "住友商事の4〜6月期は、純利益が11.2%増の1,901億円",
+    body: "通期の予想は変えていない。", codes: ["8053"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/27020/081220260205548971_tse-acedjpsm-27020-20260206327020-ixbrl.htm
+  // https://finance.matsui.co.jp/stock/2702/settlement/index
+  { date: "2026-02-06", headline: "日本マクドナルドホールディングスの12月期決算は、営業利益が10.9%増の532億円、純利益は6.1%増の339億円",
+    body: "売上高は2.7%増の4,166億円。今期の純利益は345億円、年間配当は56円から64円に増やす予想。", codes: ["2702"], importance: 2, type: "fact" },
+
+  // https://www.ryutsuu.biz/accounts/s051217.html
+  // https://scouter.monex.co.jp/news/detail/2702_20260512_act_20260512_153024_2
+  { date: "2026-05-12", headline: "日本マクドナルドHDの1〜3月期は、純利益が44.4%増の110億円",
+    body: "", codes: ["2702"], importance: 1, type: "fact" },
+
+  // https://www.ryutsuu.biz/accounts/s081313.html
+  // https://www2.jpx.co.jp/disc/27020/081220260806512748_tse-scedjpsy-27020-20260807327020-ixbrl.htm
+  { date: "2026-08-07", headline: "日本マクドナルドHDの1〜6月期は、営業利益が15.2%増の302億円。通期の純利益の予想を350億円に引き上げ",
+    body: "既存店の売上高は5.9%増。", codes: ["2702"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/98610/081220260408500410_tse-acedjpsm-98610-20260409398610-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/9861_20260409_act_20260409_160014_2
+  { date: "2026-04-09", headline: "吉野家ホールディングスの2月期決算は、売上高2,257億円、純利益47億円",
+    body: "今期（2027年2月期）は、売上高が7.2%増の2,420億円、純利益が5.0%増の49億円の予想。", codes: ["9861"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/98610/081220260707589069_tse-qcedjpsm-98610-20260708398610-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/9861_20260708_act_20260708_160016_1
+  { date: "2026-07-08", headline: "吉野家HDの3〜5月期は、経常利益が28億円",
+    body: "通期の予想は変えていない。", codes: ["9861"], importance: 1, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/75500/081220260512525178_tse-acedjpsm-75500-20260512375500-ixbrl.htm
+  // https://minkabu.jp/stock/7550/settlement
+  { date: "2026-05-12", headline: "ゼンショーホールディングスの3月期決算は、売上高が11.2%増の1兆2,641億円、純利益は16.6%増の458億円",
+    body: "今期の売上高は1兆4,240億円、純利益は500億円を見込む。", codes: ["7550"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/75500/081220260805510591_tse-qcedjpsm-75500-20260807375500-ixbrl.htm
+  // https://www.gyokaidigest.com/companies/zensho/report/2027-Q1
+  { date: "2026-08-07", headline: "ゼンショーHDの4〜6月期は、売上高が16.8%増の3,248億円、営業利益が57.5%増の248億円",
+    body: "純利益は89.2%増の152億円。通期の営業利益の予想を1,020億円に引き上げた。", codes: ["7550"], importance: 2, type: "fact" },
+
+  // （3）8766・8801・4543・9735・4452・6501
+
+  // https://www2.jpx.co.jp/disc/87660/140120260519541478.pdf
+  // https://bsrweb.jp/article/756284
+  { date: "2026-05-20", headline: "東京海上ホールディングスが、上限2,000億円の自社株買いを決定。今年度の年間配当は218円から245円に増やす予想",
+    body: "", codes: ["8766"], importance: 2, type: "fact" },
+
+  // https://dime.jp/genre/2154381/
+  // https://selectra.jp/car-insurance/news/tokiomarine-kabushiki-bunkatsu-yutai-20260825
+  { date: "2026-08-25", headline: "東京海上HDが、10月1日付で1株を15株に分ける株式分割と、株主優待の新設を発表",
+    body: "優待は、100株以上を3年以上持つ株主が対象で、初回は7,500円相当、その後は毎年2,500円相当の電子マネーなどを贈る。初回の基準日は2027年3月31日。", codes: ["8766"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/88010/081220260512525951_tse-acedjpsm-88010-20260513388010-ixbrl.htm
+  // https://www.businessinsider.jp/post-288699
+  { date: "2026-05-13", headline: "三井不動産の3月期決算は、純利益が12.0%増の2,786億円で4期連続の過去最高",
+    body: "年間配当を31円から35円に増やし、自社株買いも決めた。今期の純利益は2,850億円を見込む。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/88010/081220260804508257_tse-qcedjpsm-88010-20260807388010-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/8801_20260807_act_20260807_153042_2
+  { date: "2026-08-07", headline: "三井不動産の4〜6月期は、売上高が23.1%減の6,169億円、純利益は39.0%減の758億円",
+    body: "通期の予想は変えていない。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://scouter.monex.co.jp/news/detail/4543_20260515_act_20260515_153146_2
+  // https://www.yakuji.co.jp/?p=134014
+  { date: "2026-05-15", headline: "テルモの3月期決算は、売上収益が9.2%増の1兆1,319億円、営業利益は11.8%増の1,763億円で、いずれも過去最高",
+    body: "今期は、売上収益1兆2,390億円、営業利益2,245億円、純利益1,653億円を見込む。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/45430/081220260805510494_tse-qcedifsm-45430-20260807345430-ixbrl.htm
+  // https://www.gyokaidigest.com/companies/terumo/report/2027-Q1
+  { date: "2026-08-07", headline: "テルモの4〜6月期は、売上収益が19.9%増の3,118億円、純利益は68.3%増の704億円。通期の営業利益の予想を2,575億円に引き上げ",
+    body: "4〜6月期の営業利益には、受け取った和解金など一時的な利益が含まれる。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/97350/081220260508520212_tse-acedjpsm-97350-20260508520212-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/9735_20260512_act_20260512_153017_3
+  { date: "2026-05-12", headline: "セコムの3月期決算は、売上高が4.7%増の1兆2,569億円、純利益は4.2%増の1,127億円",
+    body: "今期の純利益は6.1%減の1,058億円、年間配当は100円から120円に増やす予想。", codes: ["9735"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/97350/081220260805510594_tse-qcedjpsm-97350-20260805510594-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/9735_20260807_act_20260807_153051_6
+  { date: "2026-08-07", headline: "セコムの4〜6月期は、売上高が3.6%増の2,984億円、純利益は3.4%減の241億円",
+    body: "通期の予想は変えていない。", codes: ["9735"], importance: 1, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/44520/081220260205548469_tse-acedifsm-44520-20260205344520-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/4452_20260205_act_20260205_153044_4
+  { date: "2026-02-05", headline: "花王の12月期決算は、売上高が3.7%増の1兆6,886億円、営業利益は11.9%増の1,641億円",
+    body: "純利益は11.4%増の1,201億円。年間配当は37期続けて増やす予想。", codes: ["4452"], importance: 2, type: "fact" },
+
+  // https://japanir.jp/en/company/company-4452/ir/4452-20260205-01_wp_financial_summary
+  // https://www.gyokaidigest.com/companies/kao/report/2025-FY
+  { date: "2026-02-05", headline: "花王が、7月1日付で1株を2株に分ける株式分割を発表",
+    body: "基準日は6月30日。", codes: ["4452"], importance: 1, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/44520/081220260805509810_tse-scedifsy-44520-20260805344520-ixbrl.htm
+  // https://www.gyokaidigest.com/companies/kao/report/2026-Q2
+  { date: "2026-08-05", headline: "花王の1〜6月期は、営業利益が38.5%増の958億円で上期として過去最高。通期の営業利益の予想を1,820億円から1,900億円に引き上げ",
+    body: "1〜6月期の売上高は7.8%増の8,719億円。通期の純利益の予想も1,300億円から1,350億円に引き上げた。", codes: ["4452"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/65010/081220260427511808_tse-acedifsm-65010-20260427365010-ixbrl.htm
+  // https://scouter.monex.co.jp/news/detail/6501_20260427_act_20260427_153021_6
+  { date: "2026-04-27", headline: "日立製作所の3月期決算は、純利益が30.3%増の8,023億円",
+    body: "今期は、売上収益が4.8%増の11兆1,000億円、Adjusted EBITA（本業のもうけの指標）は1兆4,200億円を見込む。", codes: ["6501"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/65010/081220260729501771_tse-qcedifsm-65010-20260729365010-ixbrl.htm
+  // https://news.mynavi.jp/techplus/article/20260729-4754214/
+  { date: "2026-07-29", headline: "日立の4〜6月期は、売上収益が20.0%増の2兆7,096億円、Adjusted EBITAは36.2%増の3,235億円",
+    body: "純利益は1.4%減の1,895億円。", codes: ["6501"], importance: 2, type: "fact" },
+
+  // https://monoist.itmedia.co.jp/mn/articles/2610/29/news051.html
+  // https://newswitch.jp/p/50673
+  { date: "2026-10-28", headline: "日立が7〜9月期の決算を発表。通期の見通しを、売上高12兆円、Adjusted EBITA 1兆5,600億円、純利益9,200億円に引き上げ",
+    body: "7〜9月期の売上高は15%増の2兆9,044億円。", codes: ["6501"], importance: 2, type: "fact" },
+
   /* ===================== 観測報道（正式な発表の前に実際にあった報道） ===================== */
   // 報道があった日付で入れる。報じられた内容は確定した事実ではない
 

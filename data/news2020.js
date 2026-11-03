@@ -986,6 +986,192 @@ const NEWS2020 = [
   // https://news.kddi.com/kddi/corporate/english/ir-news/2020/07/31/4565.html （会社の発表）
   { date: "2020-07-31", headline: "KDDIの4〜6月期決算は営業利益2,907億円（13.7%増）", body: "", codes: ["9433"], importance: 2, type: "fact" },
 
+  /* ===================== 企業ニュース：追加18社（ランク7のあとに始めた「コロナショック」だけに出る銘柄） ===================== */
+  // 決算の数字は会社の決算短信・開示資料のとおり。純利益は親会社株主（所有者）に帰属する利益
+
+  // https://www2.jpx.co.jp/disc/67400/140120200326485215.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/67400/140120200131455325.pdf （会社の開示資料）
+  { date: "2020-03-26", headline: "ジャパンディスプレイに、いちごトラストから優先株の払い込み（504億円）。いちごが筆頭株主に",
+    body: "INCJ（旧産業革新機構）からの借り換えも同じ日に終えた。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/67400/140120200413493325.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/67400/140120200413493294.pdf （会社の開示資料）
+  { date: "2020-04-14", headline: "ジャパンディスプレイが、遅れていた4〜12月期の四半期報告書を提出。不適切な会計処理を受けて過去の決算を訂正",
+    body: "元従業員の通知をきっかけに、外部の専門家を含む委員会が調べていた。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://monoist.itmedia.co.jp/mn/articles/2008/31/news053.html
+  // https://www.newsweekjapan.jp/articles/-/40175
+  { date: "2020-08-28", headline: "ジャパンディスプレイが、生産を止めていた白山工場（石川県）をシャープに譲渡すると発表",
+    body: "土地・建物などの譲渡額は約412億円。売却で得たお金は、大口顧客からの前受金の返済に充てる。", codes: ["6740"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/33150/140120200502404449.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/33150/140120201104415221.pdf （決算短信）
+  { date: "2020-05-22", headline: "日本コークス工業の3月期決算は、売上高が11.4%減の1,074億円、純利益は99.1%減の2,800万円",
+    body: "営業利益は75.9%減の16億円。年間配当は1円（前の期は3円）。", codes: ["3315"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/39940/140120200114446293.pdf （決算短信）
+  // https://www2.infomart.co.jp/web/jp/images/upload/645/010120200114446293_8249114.pdf
+  { date: "2020-01-14", headline: "マネーフォワードの11月期決算は、売上高が55.8%増の71億円、純損失は25億円",
+    body: "前の期の純損失は8億円。", codes: ["3994"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/39940/140120200122449198.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/39940/140120200122449194.pdf （会社の開示資料）
+  { date: "2020-01-22", headline: "マネーフォワードが、海外の投資家向けに110万株の新株を発行すると発表",
+    body: "手取りは約46億円の見込み。スマートキャンプの買収や、インドネシアの会社への出資に使う。", codes: ["3994"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/29140/140120200205458256.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/29140/140120200428401137.pdf （決算短信）
+  { date: "2020-02-06", headline: "日本たばこ産業（JT）の12月期決算は、売上収益が1.8%減の2兆1,756億円、純利益は9.7%減の3,482億円",
+    body: "年間配当は154円（前の期は150円）。今期も154円を予定する。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/29140/140120200428401137.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/29140/140120201028410029.pdf （決算短信）
+  { date: "2020-04-30", headline: "JTの1〜3月期は、営業利益が29.4%減の1,290億円、純利益は28.5%減の864億円",
+    body: "売上収益は2.8%増の5,196億円。通期の予想は変えていない。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/29140/140120201028410029.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/29140/140120210208458789.pdf （決算短信）
+  { date: "2020-10-30", headline: "JTの1〜9月期は、売上収益が2.5%減の1兆5,921億円、純利益は18.4%減の2,579億円",
+    body: "通期の予想を見直し、売上収益は2兆700億円、純利益は3,100億円とした。年間配当は154円の予定のまま。", codes: ["2914"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80580/140120200507405804.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/80580/140120200507406057.pdf （会社の開示資料）
+  { date: "2020-05-08", headline: "三菱商事の3月期決算は、純利益が9.4%減の5,354億円。年間配当は132円",
+    body: "今期の業績予想は、新型コロナの影響が見通せないとして未定。配当は134円を予定する。", codes: ["8058"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80580/140120200812480958.pdf （決算短信）
+  // https://m.uk.investing.com/news/coronavirus/mitsubishi-corp-forecasts-28-billion-hit-to-annual-profit-from-covid19-2188438?ampMode=1
+  { date: "2020-08-13", headline: "三菱商事の4〜6月期は、純利益が77.3%減の367億円",
+    body: "収益は32.3%減の2兆6,674億円。", codes: ["8058"], importance: 2, type: "fact" },
+
+  // https://www.businessinsider.jp/article/229811/
+  // https://media.rakuten-sec.net/articles/-/39759
+  { date: "2020-08-30", headline: "米投資家バフェット氏のバークシャー・ハサウェイが、三菱商事など大手商社5社の株をそれぞれ5%超持っていると発表",
+    body: "対象は伊藤忠商事・三菱商事・三井物産・住友商事・丸紅。約12か月かけて買い進めた（日本では31日の朝に伝わった）。", codes: ["8058"], importance: 3, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/54110/140120200326484895.pdf （会社の開示資料）
+  // https://www.nikkan.co.jp/articles/view/00568749
+  { date: "2020-03-27", headline: "JFEホールディングスが、京浜地区（川崎市）の高炉を2023年度をめどに休止すると発表",
+    body: "高炉を8基から7基に減らし、粗鋼の生産能力を約13%減らす。2019年度の決算で約2,200億円の減損損失を計上する。", codes: ["5411"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/54110/140120200511409318.pdf （決算短信）
+  // https://www.steelorbis.com/steel-news/latest-news/jfe-reports-net-loss-for-fiscal-year-2019-20-1145686.htm
+  { date: "2020-05-12", headline: "JFEホールディングスの3月期決算は、1,977億円の最終赤字",
+    body: "高炉休止などにともなう減損損失がかさんだ。期末配当は0円（年間は中間の20円だけ）。", codes: ["5411"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/58030/140120200401488523.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/58030/140120200629454639.pdf （決算短信）
+  { date: "2020-06-10", headline: "フジクラの3月期決算は、385億円の最終赤字",
+    body: "売上高は5.4%減の6,723億円、営業利益は87.9%減の33億円。期末配当は0円（年間は中間の5円だけ）。", codes: ["5803"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/58030/140120200910491177.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/58030/140120201030413467.pdf （会社の開示資料）
+  { date: "2020-11-02", headline: "フジクラの4〜9月期は、売上高が12.5%減の3,005億円、営業利益は54.3%増の89億円",
+    body: "未定としていた今期の配当は、中間・期末とも0円（無配）とした。", codes: ["5803"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/63050/140120200528428251.pdf （決算短信）
+  // https://irbank.net/E01585/S100HBVW/pl
+  { date: "2020-05-28", headline: "日立建機の3月期決算は、売上収益が9.9%減の9,313億円、純利益は39.9%減の412億円",
+    body: "", codes: ["6305"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/63050/140120200727466879.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/63050/140120201027409186.pdf （決算短信）
+  { date: "2020-07-27", headline: "日立建機の4〜6月期は、売上収益が27.5%減の1,702億円、純利益は98.5%減の2億円",
+    body: "調整後営業利益は87.2%減の29億円。", codes: ["6305"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80150/140120200428401853.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/80150/140120200729469365.pdf （決算短信）
+  { date: "2020-04-30", headline: "豊田通商の3月期決算は、純利益が2.2%増の1,356億円。期末配当は予想の60円から50円に",
+    body: "年間配当は110円。今期の業績予想と配当は未定。", codes: ["8015"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/80150/140120200729469365.pdf （決算短信）
+  // https://www.kabutore.biz/kessan/yotei_kobetsu.html?code=8015&p=2
+  { date: "2020-07-31", headline: "豊田通商の4〜6月期は、収益が29.3%減の1兆1,940億円、純利益は75.9%減の134億円", body: "", codes: ["8015"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/27020/140120200212462758.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/27020/140120200213463214.pdf （会社の開示資料）
+  { date: "2020-02-13", headline: "日本マクドナルドHDの12月期決算は、営業利益が11.9%増の280億円。全店売上高は5,490億円で過去最高",
+    body: "既存店の売上高は4.5%増。純利益は税率の変更などで23.0%減の169億円。年間配当は33円。", codes: ["2702"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/27020/140120200811479833.pdf （決算短信）
+  // https://finance.logmi.jp/375685
+  { date: "2020-08-12", headline: "日本マクドナルドHDの1〜6月期は、売上高が2.0%増の1,392億円、営業利益は0.7%増の148億円",
+    body: "純利益は4.9%減の92億円。", codes: ["2702"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/98610/140120200727467346.pdf （決算短信）
+  // https://www.ryutsuu.biz/accounts/m072912.html
+  { date: "2020-07-28", headline: "吉野家HDの3〜5月期は、売上高が24.8%減の397億円、純損失は41億円。国内外で最大150店を閉める計画",
+    body: "4〜5月は国内の約1,000店が休業や時短営業をした。中間配当は0円の予定。", codes: ["9861"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/98610/140120201009401627.pdf （決算短信）
+  // https://sp.m.jiji.com/english/show/7819
+  { date: "2020-10-09", headline: "吉野家HDの3〜8月期は、売上高が23.4%減の820億円、純損失は57億円",
+    body: "不採算店の閉店などで特別損失を計上した。中間配当は0円。", codes: ["9861"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/75500/140120200805475778.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/75500/140120201110420149.pdf （決算短信）
+  { date: "2020-08-07", headline: "ゼンショーHDの4〜6月期は、売上高が16.3%減の1,284億円、純損失は64億円",
+    body: "営業損失は80億円。未定としていた今期の配当は年20円の予定とした。", codes: ["7550"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/75500/140120201110420149.pdf （決算短信）
+  // https://www.tsr-net.co.jp/data/detail/1190275_1527.html
+  { date: "2020-11-13", headline: "ゼンショーHDの4〜9月期は、売上高が10.0%減の2,880億円、純損失は19億円",
+    body: "営業損失は5億円まで縮んだ。", codes: ["7550"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/87660/140120200518417926.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/87660/140120200518417931.pdf （会社の開示資料）
+  { date: "2020-05-20", headline: "東京海上HDの3月期決算は、純利益が5.4%減の2,597億円",
+    body: "今期の利益計画は、新型コロナの影響が算定できないとして未定とした。", codes: ["8766"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/88010/140120201126428777.pdf （会社の開示資料）
+  // https://www.sbbit.jp/article/refers/48032
+  // https://www.watch.impress.co.jp/docs/news/1291838.html
+  { date: "2020-11-27", headline: "三井不動産が、東京ドームを1株1,300円で買収すると発表。総額は約1,205億円",
+    body: "全株を取得したあと、20%を読売新聞グループ本社に譲る。東京ドームは賛同を表明した。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/45430/140120200518417045.pdf （決算資料）
+  // https://www2.jpx.co.jp/disc/45430/140120200424499110.pdf （会社の開示資料）
+  { date: "2020-05-18", headline: "テルモの3月期決算は、売上収益が5%増の6,289億円、当期利益は7%増の852億円",
+    body: "移動制限で決算業務が遅れ、発表を14日から延ばした。今期の業績予想は未定。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/45430/140120200806475928.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/45430/140120200806475915.pdf （決算資料）
+  { date: "2020-08-06", headline: "テルモが今期の業績予想を公表。売上収益は6,000億円、純利益は650億円",
+    body: "前の期は売上収益6,289億円、純利益852億円。心臓血管の分野で新型コロナの影響が比較的大きい。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/97350/140120200511408689.pdf （決算短信）
+  // https://kigyolog.com/company.php?id=709
+  { date: "2020-05-12", headline: "セコムの3月期決算は、売上高が4.6%増の1兆601億円、純利益は3.2%減の891億円",
+    body: "年間配当は170円（前の期は165円）。今期も170円を予定する。", codes: ["9735"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/97350/140120201106417512.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/97350/140120210204455910.pdf （決算短信）
+  { date: "2020-11-09", headline: "セコムの4〜9月期は、売上高が2.5%減の4,912億円、純利益は25.4%減の324億円", body: "", codes: ["9735"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/44520/140120200203456459.pdf （決算短信）
+  // https://www.asset-alive.com/news/?mode=show&seq=36209
+  { date: "2020-02-04", headline: "花王の12月期決算は、営業利益が1.9%増の2,117億円で7期連続の最高益",
+    body: "売上高は0.4%減の1兆5,022億円。年間配当は130円（前の期は120円）で、今期は140円を予定する。", codes: ["4452"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/44520/140120200727467177.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/44520/140120210203454348.pdf （決算短信）
+  { date: "2020-07-29", headline: "花王の1〜6月期は、売上高が7.5%減の6,672億円、純利益は11.7%減の506億円",
+    body: "通期の予想を見直し、売上高は1兆4,300億円、営業利益は1,900億円とした。年間配当は140円の予定のまま。", codes: ["4452"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/65010/140120200526424476.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/65010/140120210428402517.pdf （決算短信）
+  { date: "2020-05-29", headline: "日立製作所の3月期決算は、売上収益が7.5%減の8兆7,673億円、純利益は60.6%減の876億円", body: "", codes: ["6501"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/65010/140120200701456462.pdf （会社の開示資料）
+  // https://monoist.itmedia.co.jp/mn/articles/2007/02/news084.html
+  { date: "2020-07-01", headline: "日立製作所が、スイスABBの送配電（パワーグリッド）事業の買収を完了",
+    body: "新会社の80.1%を持つ。「日立ABBパワーグリッド」として営業を始めた。", codes: ["6501"], importance: 2, type: "fact" },
+
+  // https://www.hitachi.co.jp/New/cnews/month/2020/09/0916.pdf （会社の発表）
+  // https://www.jetro.go.jp/biznews/2020/09/54148aade4ad35f8.html
+  { date: "2020-09-16", headline: "日立製作所が、英国での原発建設計画から撤退すると発表",
+    body: "2019年1月から凍結していた。新型コロナで投資環境が厳しくなったことなどを理由に挙げた。", codes: ["6501"], importance: 2, type: "fact" },
+
   /* ===================== 観測報道（発表前に実際にあった報道） ===================== */
 
   // https://www.sbbit.jp/article/refers/45073
