@@ -1911,15 +1911,24 @@ function buildFilter() {
   $('#sec-filter').innerHTML = `<option value="all">すべての業種</option>` + keys.map(k => `<option value="${k}"${UI.filter === k ? ' selected' : ''}>${SEC(k).name}</option>`).join('');
   fitSelect($('#sec-filter'));
   // 種類の絞り込み：解放されている銘柄に、高配当・景気敏感・優待があるときだけ出す
-  const kinds = Object.keys(KIND_BADGE).filter(k => allStocks().some(s => kindOf(s) === k && isOpen(s, r)));
+  const kinds = ['normal', ...Object.keys(KIND_BADGE)].filter(k => allStocks().some(s => kindOf(s) === k && isOpen(s, r)));
   if (UI.kind !== 'all' && !kinds.includes(UI.kind)) UI.kind = 'all';
   const kf = $('#kind-filter'); kf.hidden = !kinds.length;
   kf.innerHTML = `<option value="all">すべての種類</option>` + kinds.map(k => `<option value="${k}"${UI.kind === k ? ' selected' : ''}>${KINDS[k].name}</option>`).join('');
   if (kinds.length) fitSelect(kf);
 }
 const DL_BADGE = { watch: ' <b class="kb kb-dl">監理</b>', fail: ' <b class="kb kb-dl">監理</b>', seiri: ' <b class="kb kb-dl">整理</b>' };   // 倒産の途中の銘柄
-const kindOf = s => (s.kind === 'perk' && !s.perk && !s.perkShow ? 'normal' : s.kind);   // 表示の種類（優待をやめた銘柄は普通）
-const KIND_BADGE = { div: '高配当', cyc: '景気敏感', perk: '優待', penny: '低位', ipo: '新規' };   // 銘柄リストに出す種類のバッジ（普通・新興は出さない）
+// もとの30銘柄（kind を持たない）に付ける、表示だけのラベル。値動き・乱数・ニュースには使わない（コードはランダム相場とリアル相場で重ならない）
+const LABEL_KIND = {
+  K601: 'growth', K602: 'growth', K603: 'growth', K604: 'growth', K605: 'growth',
+  K105: 'div', K301: 'div', K304: 'div', K305: 'div',
+  K103: 'cyc', K202: 'cyc', K203: 'cyc', K302: 'cyc', K405: 'cyc',
+  8306: 'div', 9433: 'div',
+  5401: 'cyc', 9101: 'cyc', 9104: 'cyc', 8035: 'cyc', 6857: 'cyc',
+  3197: 'perk', 3038: 'perk', 4661: 'perk', 9843: 'perk',
+};
+const kindOf = s => (!s.kind ? (s.ume ? undefined : LABEL_KIND[s.code] || 'normal') : s.kind === 'perk' && !s.perk && !s.perkShow ? 'normal' : s.kind);   // 表示の種類（優待をやめた銘柄は普通）
+const KIND_BADGE = { div: '高配当', cyc: '景気敏感', perk: '優待', growth: '新興', penny: '低位', ipo: '新規' };   // 銘柄リストに出す種類のバッジ（普通は出さない）
 // 選んでいる文字が入るぎりぎりの幅にする（select は既定だと一番長い選択肢の幅になる）
 function fitSelect(el) {
   const cs = getComputedStyle(el), c = fitSelect.c ||= document.createElement('canvas').getContext('2d');
@@ -2437,15 +2446,15 @@ function renderCalReal(el) {
     return { s, yr: realDivYear(s), next: isFinite(next) ? next : -1, last: ev.divs.filter(v => v.ex <= G.date).at(-1) };
   }).filter(x => x.yr || x.next >= 0);
   const perks = ss.flatMap(s => EV[s.code].perk.filter(p => p.di >= di).map(p => ({ s, p }))).sort((a, b) => a.p.di - b.p.di);
-  el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">当時の実際の発表日時です。発表の内容はニュースに出ます。株価は実際の終値のままで、発表への市場の受け止め方は、そのあとの値動きに表れます。</p>
+  el.innerHTML = `<section class="panel" id="cal-earn"><h2><span class="p-title">決算発表の予定（25営業日先まで）<button class="help-btn" id="cal-help" aria-label="決算・配当・株主優待の見かた（カブ先生）">?</button></span></h2><p class="muted small">当時の実際の発表日時です。発表の内容はニュースに出ます。株価は実際の終値のままで、発表への市場の受け止め方は、そのあとの値動きに表れます。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>時刻</th><th>銘柄</th><th>業種</th><th>保有</th></tr></thead><tbody>
     ${up.map(({ s, e }) => `<tr><td class="num">${day(e.di)}</td><td class="num">${e.slot === 'pre' ? '朝' : e.time}</td><td>${esc(s.name)}</td><td>${esc(SEC(s.sector).short)}</td><td>${own(s)}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
     </tbody></table></div></section>
-    ${divOn() ? `<section class="panel"><h2>配当と${term('権利付き最終日')}</h2><p class="muted small">権利付き最終日の大引けに現物を持っていれば、翌朝に配当が入ります（実際の株では約3か月後）。信用の買い建ては配当と同じ額を受け取り、売り建ては支払います。${term('権利落ち')}の値下がりは、実際の終値にすでに含まれています。</p>
+    ${divOn() ? `<section class="panel" id="cal-div"><h2>配当と${term('権利付き最終日')}</h2><p class="muted small">権利付き最終日の大引けに現物を持っていれば、翌朝に配当が入ります（実際の株では約3か月後）。信用の買い建ては配当と同じ額を受け取り、売り建ては支払います。${term('権利落ち')}の値下がりは、実際の終値にすでに含まれています。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">直近1年の配当（1株）</th><th class="r">${term('配当利回り')}</th><th class="r">前回の配当</th><th>次の権利付き最終日（予定）</th><th>保有</th></tr></thead><tbody>
     ${divs.map(x => `<tr><td>${esc(x.s.name)}</td><td class="r num">${+x.yr.toFixed(2)}円</td><td class="r num">${(x.yr / x.s.price * 100).toFixed(2)}%</td><td class="r num">${x.last ? +x.last.amt.toFixed(2) + '円' : '—'}</td><td class="num">${x.next >= 0 ? day(x.next) : '—'}</td><td>${own(x.s)}</td></tr>`).join('') || '<tr class="empty"><td colspan="6">配当のある銘柄はありません。</td></tr>'}
     </tbody></table></div></section>` : ''}
-    ${perks.length ? `<section class="panel"><h2>${term('株主優待')}</h2><p class="muted small">権利付き最終日の大引けに、現物を必要な株数以上持っていれば権利が付きます。金額が示されている優待（券の額面・〇円相当・ポイント）だけ、翌朝に現金相当を入れます（課税なし）。割引券・引換券などは入金しません。信用の買い建てには付きません。1年以上の保有が条件の優待は、このゲームの期間では対象外です。</p>
+    ${perks.length ? `<section class="panel" id="cal-perk"><h2>${term('株主優待')}</h2><p class="muted small">権利付き最終日の大引けに、現物を必要な株数以上持っていれば権利が付きます。金額が示されている優待（券の額面・〇円相当・ポイント）だけ、翌朝に現金相当を入れます（課税なし）。割引券・引換券などは入金しません。信用の買い建てには付きません。1年以上の保有が条件の優待は、このゲームの期間では対象外です。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>権利付き最終日</th><th>銘柄</th><th>優待の内容</th><th class="r">必要な株数</th><th class="r">現金相当（1回）</th><th>保有</th></tr></thead><tbody>
     ${perks.map(({ s, p }) => `<tr><td class="num">${day(p.di)}</td><td>${esc(s.name)}</td><td>${esc(p.text)}${p.hold ? `（${p.hold}年以上の保有が条件）` : ''}</td><td class="r num">${p.lot.toLocaleString()}株</td><td class="r num">${p.yen ? yen(p.yen) + '円' : '入金なし'}</td><td>${(P.pos[s.code]?.qty || 0) >= p.lot ? '●' : ''}</td></tr>`).join('')}
     </tbody></table></div></section>` : ''}`;
@@ -2459,14 +2468,14 @@ function renderCal() {
   const divs = allStocks().filter(s => s.div && live(s) && !xHidden(s));
   const perks = allStocks().filter(s => s.perk && !xHidden(s));
   const recDate = (s, months = s.rec) => { let best = null; for (let k = 0; k < 270 && !best; k++) { const d = addTD(G.date, k); if (months.includes(monthOf(d)) && lastTradingDayOfMonth(d)) best = d; } return best; };
-  el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">決算は大引け後（15:30）に発表され、翌日の寄り付きで株価に反映されます。</p>
+  el.innerHTML = `<section class="panel" id="cal-earn"><h2><span class="p-title">決算発表の予定（25営業日先まで）<button class="help-btn" id="cal-help" aria-label="決算・配当・株主優待の見かた（カブ先生）">?</button></span></h2><p class="muted small">決算は大引け後（15:30）に発表され、翌日の寄り付きで株価に反映されます。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>銘柄</th><th>業種</th><th class="r">${term('市場予想')}（1株利益）</th><th>保有</th></tr></thead><tbody>
     ${up.map(s => `<tr><td class="num">${mdLabel(addTD(G.date, s.nextEarn - G.dayIndex))}${s.nextEarn === G.dayIndex ? ' 今日' : ''}</td><td>${esc(s.name)}</td><td>${SEC(s.sector).short}</td><td class="r num">${s.consensus.toFixed(1)}円</td><td>${P.pos[s.code] ? '●' : ''}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
     </tbody></table></div></section>
-    <section class="panel"><h2>配当と${term('権利確定日')}</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">年間配当（1株）</th><th class="r">${term('配当利回り')}</th><th>確定月</th><th>次の権利確定日</th></tr></thead><tbody>
+    <section class="panel" id="cal-div"><h2>配当と${term('権利確定日')}</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">年間配当（1株）</th><th class="r">${term('配当利回り')}</th><th>確定月</th><th>次の権利確定日</th></tr></thead><tbody>
     ${divs.map(s => `<tr><td>${esc(s.name)}</td><td class="r num">${s.div}円</td><td class="r num">${(s.div / s.price * 100).toFixed(2)}%</td><td>${s.rec.map(m => m + '月').join('・')}</td><td class="num">${(d => d ? mdLabel(d) : '—')(recDate(s))}</td></tr>`).join('')}
     </tbody></table></div></section>
-    ${perks.length ? `<section class="panel"><h2>${term('株主優待')}</h2><p class="muted small">権利確定日の引けに、現物を${PERK_LOT}株以上持っていれば、翌朝に現金相当の額が入ります（課税なし）。信用の買い建てには付きません。</p>
+    ${perks.length ? `<section class="panel" id="cal-perk"><h2>${term('株主優待')}</h2><p class="muted small">権利確定日の引けに、現物を${PERK_LOT}株以上持っていれば、翌朝に現金相当の額が入ります（課税なし）。信用の買い建てには付きません。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th>優待の内容</th><th class="r">年間（現金相当）</th><th class="r">優待利回り</th><th>確定月</th><th>次の権利確定日</th><th class="r">${PERK_LOT}株の金額</th><th>保有</th></tr></thead><tbody>
     ${perks.map(s => { const yr = s.perk.yen * s.perk.m.length; return `<tr><td>${esc(s.name)}</td><td>${esc(s.perk.text)}</td><td class="r num">${yen(yr)}円</td><td class="r num">${(yr / (s.price * PERK_LOT) * 100).toFixed(2)}%</td><td>${s.perk.m.map(m => m + '月').join('・')}</td><td class="num">${(d => d ? mdLabel(d) : '—')(recDate(s, s.perk.m))}</td><td class="r num">${yen(s.price * PERK_LOT)}円</td><td>${(P.pos[s.code]?.qty || 0) >= PERK_LOT ? '●' : ''}</td></tr>`; }).join('')}
     </tbody></table></div></section>` : ''}`;
@@ -2928,9 +2937,44 @@ const BTUT = [
   { t: 'メリット③。薄い板や、特別気配（ストップ高・安）のような、いつもと違う状態に先に気づけるよ。', at: '.board', btn: 'なるほど' },
   { t: 'おしまい！わからなくなったら、また「？」を押してね。', btn: 'ありがとう！' },
 ];
-// 銘柄の数字（チャートの下の枠）のミニ講座（銘柄名の横の「？」から）。売買はしない。skip = 今は出ない数字の説明は飛ばす
+// チャートの見かたのミニ講座（銘柄名の横の「？」で、下の枠の数字の講座より先に流れる）。売買はしない。
+// 今の表示に合わせて出し分ける: 5分足／日足（getter の t）、ランク3の移動平均線、ショップで買ったボリンジャーバンド・平均足、出している注文の線
+const chartMode5 = () => G.chartMode === '5m';
+const hasOrdLine = () => G.player.orders.some(o => o.code === sel().code && o.price && (o.type === 'lmt' || o.type === 'stp'));
+const CTUT = [
+  { t: 'まずは、上のチャートの見かたを、いっしょに見てみよう！そのあとで、下の枠の数字も説明するよ。', at: '.chart-wrap', btn: 'おねがい！', view: 'trade' },
+  { t: 'チャートの1本1本は「ローソク足」だよ。始値（最初の値段）・高値・安値・終値（最後の値段）を、1本にまとめて表しているんだ。', at: '.chart-wrap', btn: 'ふむふむ' },
+  { t: '赤い足は、始値より終値が高かった（値上がり）。緑の足は、始値より終値が低かった（値下がり）。日本では上がると赤、下がると緑だよ。', at: '.chart-wrap', btn: 'なるほど' },
+  { t: '太い部分を「実体」、上下に伸びる細い線を「ひげ」というよ。実体は始値と終値の間、ひげの先は高値と安値を表すんだ。', at: '.chart-wrap', btn: 'わかった' },
+  { t: '「5分足」は5分ごとに1本、「日足」は1日を1本で表すよ。ここで切り替えられるんだ。', at: '.chart-tools .seg', btn: 'うん' },
+  { get t() { return chartMode5() ? '今は5分足。今日の9:00から引けまでの動きだよ。縦の点線は昼休み（11:30〜12:30）で、その前が前場、あとが後場だね。' : '今は日足。1日が1本で、いちばん右が今日だよ。' + (isReal() ? '年が変わるところには、年と点線が入るよ。' : '') + 'まだ今日が終わっていないあいだは、右端の足が動き続けるんだ。'; }, at: '.chart-wrap', btn: 'へえ！' },
+  { t: '破線は、前の日の終値だよ。いまの値段が、昨日より上か下かがひと目でわかるんだ。', at: '.chart-wrap', btn: 'なるほど', skip: () => !chartMode5() },
+  { t: 'ローソク足の下の棒は「出来高」。その時間に売り買いされた株の数だよ。棒が高いほど、たくさんの人が取引したということなんだ。色は足と同じだよ。', at: '.chart-wrap', btn: 'ふむふむ' },
+  { t: '右端のタグは、いまの値段だよ。赤なら前日終値より上、緑なら下だね。', at: '.chart-wrap', btn: 'うん' },
+  { get t() { return chartMode5() ? '色のついた線は「移動平均線」。直近12本（1時間ぶん）の終値の平均をつないだ線で、細かい上下をならして、流れを見やすくしているよ。' : '色のついた2本の線は「移動平均線」。短いほうは直近5日、長いほうは直近25日の終値の平均をつないだ線で、細かい上下をならして、大きな流れを見やすくしているよ。名前と色は、チャートの上の凡例にあるよ。'; }, at: '.chart-wrap', also: [['.legend']], btn: 'ふむふむ', skip: () => rank() < 3 },
+  { t: '株価が線より上にあれば上がる流れ、下にあれば下がる流れの目安だよ。', at: '.chart-wrap', btn: 'なるほど', skip: () => rank() < 3 },
+  { t: '日足では、短い線が長い線を下から上に抜けると「ゴールデンクロス」（上がりはじめのサイン）、上から下に抜けると「デッドクロス」（下がりはじめのサイン）と呼ばれるよ。ただし、あくまで目安だよ。', at: '.chart-wrap', btn: 'へえ！', skip: () => rank() < 3 || chartMode5() },
+  { t: '移動平均線は、ランク3になると表示されるよ。ランクを上げて、また「？」を押してみてね。', at: '.legend', btn: 'がんばる！', skip: () => rank() >= 3 },
+  { t: 'ショップで買った「ボリンジャーバンド」だよ。薄く色のついた帯が、直近20本の平均を中心に、上下に値動きの散らばり（±2σ）の幅を取った範囲なんだ。値段の大半は、この帯の中に収まるといわれているよ。', at: '.chart-wrap', also: [['.legend']], btn: 'ふむふむ', skip: () => !optOn('bb') },
+  { t: '値段が帯の上の端に近づくと「上がりすぎ」、下の端に近づくと「下がりすぎ」の目安だよ。帯が広がっているときは値動きが荒く、せまいときは落ち着いているんだ。強い上昇のときは、上の端に沿って上がり続けることもあるから注意してね。', at: '.chart-wrap', btn: 'なるほど', skip: () => !optOn('bb') },
+  { t: 'ショップで買った「平均足」だよ。ローソク足を、前の足と平均してなめらかにした足で、上げ・下げの流れが続いているかが見やすくなるんだ。赤が続くあいだは上げの流れ、緑が続くあいだは下げの流れだよ。', at: '.chart-wrap', also: [['.legend']], btn: 'ふむふむ', skip: () => !optOn('ha') },
+  { t: '平均足は、見やすくするために形を変えた足だよ。上の「始・高・安・終」の数字は、本来の値段のままだから、安心してね。', at: '#ohlc', btn: 'わかった', skip: () => !optOn('ha') },
+  { t: 'チャートの上の端に並ぶ小さな丸が「ニュース」のピンだよ。そのとき出たニュースの向きを表していて、赤はいい知らせ、緑は悪い知らせなんだ。', at: '.chart-wrap', btn: 'ふむふむ' },
+  { t: '足のそばの▲▼は、キミが売り買いしたところだよ。▲は買い、▼は売り。あとで見返して、うまくいった理由・いかなかった理由を考えよう。', at: '.chart-wrap', btn: 'うん' },
+  { t: '色のついた横の線は、キミが出している指値・逆指値の注文だよ。値段と株数がタグに出ていて、その値段まで来たら約定するんだ。', at: '.chart-wrap', btn: 'なるほど', skip: () => !hasOrdLine() },
+  { t: 'ここには、足の上にカーソルを置いた（タップした）ときの、始値・高値・安値・終値と出来高が出るよ。', at: '#ohlc', btn: 'ふむふむ' },
+  { t: 'チャートは、ドラッグで左右上下に動かせるよ。「＋」「−」やホイール・ピンチで拡大・縮小して、「最新」を押すといちばん新しい足に戻るんだ。', at: '.seg.zoom', btn: 'べんり！' },
+  { t: 'ここからは、チャートを見るコツだよ。まず、実体が長い足は、その向きに勢いがあったサイン。小さい足は、どちらにも決めかねているサインだよ。', at: '.chart-wrap', btn: 'ふむふむ' },
+  { t: '上ひげが長い足は、いったん上がったのに売られて戻された足。下ひげが長い足は、いったん下がったのに買われて戻された足だよ。「ここで止められた」という手がかりになるんだ。', at: '.chart-wrap', btn: 'なるほど' },
+  { t: '大きく動いた足は、出来高も大きいか見てみよう。たくさん取引された動きは信頼しやすいし、出来高が少ない動きは一時的なことが多いよ。', at: '.chart-wrap', btn: 'へえ！' },
+  { t: '日足で大きな流れ（上がっているか、下がっているか）を見て、5分足で買う・売るタイミングを考えるのがコツだよ。', at: '.chart-tools .seg', btn: 'わかった' },
+  { t: 'ニュースのピンの近くで、値段がどう動いたかも見てみよう。いい知らせでも、すでに上がったあとなら、そのあと下がることもあるよ。', at: '.chart-wrap', btn: 'きをつける' },
+  { t: 'チャートだけで決めずに、ニュース・板・数字もあわせて考えよう。過去の動きは、これからを約束しないからね。', at: '.chart-wrap', btn: 'はーい' },
+];
+// 銘柄の数字（チャートの下の枠）のミニ講座（銘柄名の横の「？」から。チャートの講座のあとに続く）。売買はしない。skip = 今は出ない数字の説明は飛ばす
 const FTUT = [
-  { t: 'チャートの下の枠にある数字を、いっしょに見てみよう！どれも「この株を買っていいか」を考えるヒントになるよ。', at: '.facts', btn: 'おねがい！', view: 'trade' },
+  ...CTUT,
+  { t: 'ここからは、チャートの下の枠にある数字を、いっしょに見てみよう！どれも「この株を買っていいか」を考えるヒントになるよ。', at: '.facts', btn: 'つづけて！', view: 'trade' },
   { t: '「時価総額」は、会社の大きさだよ。株の値段 × 発行している株の数で決まるんだ。大きい会社は、値動きが比べてゆるやかなことが多いよ。', at: '.facts .fx-cap', btn: 'ふむふむ', skip: () => isReal() },
   { t: '「配当利回り」は、1年にもらえる配当が、いまの株の値段の何%かを表すよ。たとえば3%なら、10万円ぶん持っていると年に約3,000円もらえる計算だよ。高いほどおトクに見えるけど、株価が下がって高くなっているだけのこともあるから注意してね。', at: '.facts .fx-div', btn: 'なるほど', skip: () => isReal() || !divOn() },
   { t: '「PBR」は、株の値段が、会社の持っている財産（純資産）の何倍かを表すよ。1倍なら、財産とちょうど同じ値段。1倍より小さいと「割安」と言われるけど、あまり儲かっていない会社だから安いこともあるんだ。', at: '.facts .fx-pbr', btn: 'わかった', skip: () => isReal() },
@@ -2943,12 +2987,34 @@ const FTUT = [
   { t: '「次の決算」は、会社が成績を発表する日と、予想されている1株あたりの利益だよ。発表で予想より良いか悪いかで、株が大きく動くから、持ちこしには注意しようね。', at: '.facts .fx-earn', btn: 'きをつける', skip: () => isReal() || rank() < 4 },
   { t: '「RSI」は、最近の14日間で、買われすぎか売られすぎかを0〜100で表すよ。70以上だと買われすぎ（下がるかも）、30以下だと売られすぎ（上がるかも）の目安。ただし、強い上昇のときは70以上のまま上がり続けることもあるよ。', at: '.facts .fx-rsi', btn: 'ふむふむ', skip: () => rank() < 4 },
   { t: 'どの数字も、1つだけで決めないのがコツだよ。たとえば「PERが低い」「出来高が多い」「ニュースも良い」と重なったら、前向きに考えやすいよ。数字は、過去と今の目安で、未来を約束するものではないんだ。', at: '.facts', btn: 'わかった' },
-  { t: 'おしまい！わからなくなったら、銘柄名の横の「？」を押してね。', btn: 'ありがとう！' },
+  { t: 'おしまい！チャートも数字も、わからなくなったら、銘柄名の横の「？」を押してね。', btn: 'ありがとう！' },
+];
+// 決算・配当の画面のミニ講座（見出しの「？」から。ランク4から）。売買はしない。ランダム相場とリアル相場でしくみの細部がちがうので、getter の t で出し分ける
+const calTax = () => (DIFF[G.diff].tax ? '本格モードでは、配当から税金（20.315%）が引かれて入るよ。' : 'このモードでは、配当に税金はかからないよ。');
+const CALTUT = [
+  { t: 'この画面では、株価が大きく動く「決算」と、株を持っているともらえる「配当金」「株主優待」の予定がわかるよ。いっしょに見ていこう！', btn: 'おねがい！', view: 'cal' },
+  { t: '会社は3か月ごとに、売上や利益などの成績を発表するよ。これが「決算」。この表は、これから25営業日のうちに決算を発表する銘柄だよ。', at: '#cal-earn', btn: 'ふむふむ' },
+  { get t() { return isReal() ? '「発表日」と「時刻」は、当時の実際の発表の日時だよ。「朝」は取引が始まる前の発表。「保有」に●が付いているのは、キミが持っている銘柄だよ。' : '「発表日」は決算の日、「市場予想」は、専門家たちが予想した1株あたりの利益の平均だよ。「保有」に●が付いているのは、キミが持っている銘柄だよ。'; }, at: '#cal-earn thead', btn: 'うん' },
+  { get t() { return isReal() ? '取引が始まる前の発表はその日の朝、取引中の発表はその時刻、15:00より後の発表は引けのあとに、ニュースに出るよ。引けのあとの発表は、次の日の値動きに表れるんだ。' : '決算は引けのあと（15:30）に発表されて、次の日の寄り付きで株価に反映されるよ。結果が「市場予想」より良ければ上がりやすく、悪ければ下がりやすいんだ。'; }, at: '#cal-earn', btn: 'なるほど' },
+  { t: '大事なのは、「良いか悪いか」より「予想とくらべてどうか」だよ。増益でも、みんなの期待ほどでなければ下がることがあるんだ。これを「材料出尽くし」というよ。', at: '#cal-earn', btn: 'へえ！' },
+  { t: '決算の次の日は、株価が大きく上にも下にも飛ぶことがあるよ。持ったまま発表を迎えるか、前に少し売っておくか、発表日を見て決めておこう。', at: '#cal-earn', btn: 'きをつける' },
+  { t: '次は「配当金」。会社が、もうけの一部を株主に配るお金だよ。持っている株数に応じてもらえるんだ。', at: '#cal-div', btn: 'ふむふむ', skip: () => !$('#cal-div') },
+  { get t() { return isReal() ? '「直近1年の配当」は、1株あたり1年でもらえた配当の合計。「前回の配当」は、いちばん最近の1回分だよ。「配当利回り」は、1年の配当が今の株価の何%かを表すよ。' : '「年間配当」は、1株あたり1年でもらえる配当。「確定月」の回数に分けてもらえるよ。たとえば年間60円で3月・9月なら、1回30円だね。「配当利回り」は、年間配当が今の株価の何%かを表すよ。'; }, at: '#cal-div thead', btn: 'うん', skip: () => !$('#cal-div') },
+  { get t() { return (isReal() ? '配当をもらうには、「権利付き最終日」の大引け（15:30）に、現物の株を持っていればいいよ。実際の株は受け渡しに日数がかかるので、権利確定日より前のこの日が最終日なんだ。' : '配当をもらうには、「権利確定日」（確定月の最後の営業日）の引けに、現物の株を持っていればいいよ。1日だけ持っていても、もらえるんだ。') + 'たとえば1回30円で100株なら、3,000円。次の日の朝に入金されるよ。' + calTax(); }, at: '#cal-div', btn: 'なるほど', skip: () => !$('#cal-div') },
+  { get t() { return '「1日だけ持ってもらえるなら、その日に買えばおトク？」と思うよね。でも、権利の次の日は、配当のぶんだけ株価が下がりやすいんだ。これを「権利落ち」というよ。' + (isReal() ? 'リアル相場では、その値下がりが実際の終値にすでに入っているよ。' : ''); }, at: '#cal-div', btn: 'えっ？', skip: () => !$('#cal-div') },
+  { t: 'だから、配当だけをねらって直前に買っても、値下がりで差し引きゼロになりがちだよ。配当は、長く持つあいだのおまけと考えよう。', at: '#cal-div', btn: 'わかった', skip: () => !$('#cal-div') },
+  { t: '信用取引の建玉は、配当そのものはもらえないよ。かわりに、買い建ては配当と同じ額を受け取って、売り建て（空売り）は同じ額を支払うんだ。空売りで権利をまたぐときは気をつけてね。', at: '#cal-div', btn: 'きをつける', skip: () => !$('#cal-div') || !canMargin() },
+  { t: '最後は「株主優待」。会社が株主に、商品券・食事券・割引券などを贈る、日本ならではの仕組みだよ。', at: '#cal-perk', btn: 'ふむふむ', skip: () => !$('#cal-perk') },
+  { get t() { return isReal() ? '優待も、権利付き最終日の大引けに、現物を「必要な株数」以上持っていればもらえるよ。必要な株数は会社ごとにちがうんだ。「1年以上の保有」が条件の優待は、このゲームの期間ではもらえないよ。' : `優待は、権利確定日の引けに、現物を${PERK_LOT}株以上持っていればもらえるよ。${PERK_LOT}株より多く持っても、もらえる量は同じなんだ。`; }, at: '#cal-perk', btn: 'うん', skip: () => !$('#cal-perk') },
+  { get t() { return isReal() ? '「現金相当」に金額があるもの（券の額面・〇円相当・ポイント）は、次の日の朝にその額を入れるよ。割引券や引換券のように金額が決まっていないものは「入金なし」だよ。優待に税金はかからないんだ。' : `このゲームでは、優待は現金に置きかえて、次の日の朝に入るよ。税金はかからないんだ。「優待利回り」は、1年の優待の金額が${PERK_LOT}株の値段の何%かを表すよ。配当利回りと足すと、もらえるものの合計の目安になるね。`; }, at: '#cal-perk', btn: 'なるほど', skip: () => !$('#cal-perk') },
+  { get t() { return '信用の買い建てでは、優待はもらえないよ。現物で持っているときだけなんだ。' + (isReal() ? '' : '権利落ちの日は、配当のぶんに加えて、優待のぶんも少し株価が下がりやすいよ。'); }, at: '#cal-perk', btn: 'わかった', skip: () => !$('#cal-perk') },
+  { t: '配当や優待の利回りが高い銘柄は魅力的だけど、株価が下がったせいで利回りが高く見えていることもあるよ。会社の成績（決算）とあわせて選ぼうね。', btn: 'はーい' },
+  { t: 'おしまい！決算の日と権利の日を、この画面で先に確かめておこう。わからなくなったら、また「？」を押してね。', btn: 'ありがとう！' },
 ];
 MTUT.forEach(st => { if (st.backTo) st.back = MTUT.findIndex(x => x.id === st.backTo); });
 // 戻るで前のステップに行っても、対象のある画面が開くように、光らせる場所から画面を決める
-const tutViewOf = at => (/^#m-sec/.test(at) ? 'hold' : /^(#stock-list|\.facts|\[data-cm|\.chart-wrap|\.a-order|\.a-news|\.a-board|#c-price|#o-|\.stepper|#modal-card)/.test(at) ? 'trade' : null);
-for (const L of [TUT, MTUT, BTUT, FTUT]) L.forEach(st => { if (st.at && !st.view && st.on !== 'view') st.view = tutViewOf(st.at) || undefined; });
+const tutViewOf = at => (/^#m-sec/.test(at) ? 'hold' : /^#cal-/.test(at) ? 'cal' : /^(#stock-list|\.facts|\[data-cm|\.chart-wrap|\.chart-tools|\.legend|\.seg\.zoom|#ohlc|\.a-order|\.a-news|\.a-board|#c-price|#o-|\.stepper|#modal-card)/.test(at) ? 'trade' : null);
+for (const L of [TUT, MTUT, BTUT, FTUT, CALTUT]) L.forEach(st => { if (st.at && !st.view && st.on !== 'view') st.view = tutViewOf(st.at) || undefined; });
 MTUT.find(st => st.on === 'view' && st.ok('hold')).view = 'trade';
 // 練習を始める：いまの状態を丸ごと覚えておき、練習しやすいように取引中・練習用のお金100万円以上・建玉と注文なしにする
 function practiceStart(code) {
@@ -2992,6 +3058,7 @@ function startBoardLesson() {
   UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, BTUT);
 }
 function startFactsLesson() { if (UI.tut) return; UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, FTUT); }
+function startCalLesson() { if (UI.tut) return; UI.tutSpeed = G.speed; G.speed = 0; renderHeader(); tutGo(0, CALTUT); }
 function startTutorial() { if (modalOpen) closeModal(); G.speed = 0; renderHeader(); tutGo(0, TUT); }
 function tutGo(i, list = UI.tut?.list || TUT) {
   if (i >= list.length) { endTutorial(); return; }
@@ -3264,6 +3331,7 @@ function bindUI() {
     if (e.target.closest('#m-help')) { startMarginLesson(); return; }
     if (e.target.closest('#b-help')) { startBoardLesson(); return; }
     if (e.target.closest('#f-help')) { startFactsLesson(); return; }
+    if (e.target.closest('#cal-help')) { startCalLesson(); return; }
     const ac = e.target.closest('[data-acct]');
     if (ac && ac.classList.contains('locked')) { const R = RANKS[MARGIN.rank - 1]; toast(`🔒 信用取引はランク${MARGIN.rank}「${R.n}」（${R.xp.toLocaleString()} XP）で解放されます。あと${(R.xp - profile.xp).toLocaleString()} XP`); return; }
     if (ac) { UI.acct = ac.dataset.acct; $('#o-msg').textContent = ''; renderOrderPanel(); return; }
