@@ -273,7 +273,8 @@ const GLOSS = {
   'PBR': '株価純資産倍率。株価が1株あたりの純資産の何倍か。1倍を下回ると割安とされることが多い。',
   '配当': '会社が利益の一部を株主に配るお金。',
   '配当利回り': '株価に対して1年間にもらえる配当の割合。株価2,000円で配当60円なら3%。',
-  '権利確定日': 'この日に株を持っていると配当を受け取れる日。このゲームでは月末の最終取引日。',
+  '権利確定日': 'この日に株を持っていると配当を受け取れる日。このゲームでは月末の最終取引日（リアル相場は実際のとおり、2営業日前の権利付き最終日に持っていればよい）。',
+  '権利付き最終日': '配当や株主優待の権利を得るために、株を持っていなければならない最後の日（大引けの時点）。株の受け渡しに2営業日かかるので、権利確定日の2営業日前になる。次の日が権利落ち日。',
   '権利落ち': '権利確定日の翌営業日に、配当の分だけ株価が下がりやすくなること。',
   '新規上場': '会社の株が、はじめて取引所で売買できるようになること（IPO）。上場の前に「上場承認」が発表され、上場日の寄り付きで最初の値段（初値）が決まる。',
   '公開価格': '新規上場の前に、会社が株を売り出した値段。初値はこの値段より高くなることが多いが、下回ること（公募割れ）もある。',
@@ -356,7 +357,7 @@ const TERM_GROUPS = [
   ['板（気配）', ['板', '気配値', '板が薄い', '特別気配']],
   ['取引時間と値段のルール', ['寄り付き', '大引け', '前場・後場', '値幅制限', 'ストップ高', 'ストップ安', '呼値']],
   ['チャートと指標', ['ローソク足', '出来高', '移動平均線', 'RSI', 'ボラティリティ', 'PER', 'PBR']],
-  ['配当・決算・税金', ['配当', '配当利回り', '権利確定日', '権利落ち', '株主優待', '決算', '市場予想', '材料出尽くし', '譲渡益課税']],
+  ['配当・決算・税金', ['配当', '配当利回り', '権利確定日', '権利付き最終日', '権利落ち', '株主優待', '決算', '市場予想', '材料出尽くし', '譲渡益課税']],
   ['損益とリスク', ['損切り', '含み損益', '最大ドローダウン', '信頼度']],
   ['信用取引', ['信用取引', '空売り', '建玉', '返済', '委託保証金', '新規建て余力', '保証金維持率', '追証', '信用金利・貸株料', '返済期限']],
 ];
@@ -517,7 +518,7 @@ function newGame(scen, diff, seed, cash, mode) {
     if (isFast()) G.ume = makeUme(seed);   // G.stocks には入れない（ほかの30銘柄と指数の乱数の順番を変えない）
     if (profile.r7) G.extra = XDEFS.map((x, k) => makeExtra(x, k, seed));   // 追加銘柄も G.stocks には入れない
   }
-  if (real && profile.r7 && REAL_XDEF) G.extra = REAL_XDEF.map(makeRealExtra);   // リアル相場（2026年版・コロナショック版）の追加18社。G.stocks には入れない
+  if (real && profile.r7) G.extra = [...(REAL_XDEF || []), ...REAL_IDEF].map(makeRealExtra);   // リアル相場（2026年版・コロナショック版）の追加18社と新規上場2社。G.stocks には入れない
   afterLoad();
   if (real) realStart(); else genHistory();
   G.player.startIdx = G.market.idx;
@@ -587,12 +588,16 @@ const REAL_SETS = {
     file: 'data/corona2020.js', newsFile: 'data/news2020.js', name: 'コロナショック', period: '2020年',
     data: typeof CORONA2020 !== 'undefined' ? CORONA2020 : null, news: typeof NEWS2020 !== 'undefined' ? NEWS2020 : null,
     extra: typeof CORONA2020_EXTRA !== 'undefined' ? CORONA2020_EXTRA : null,   // 追加18社（data/corona2020_extra.js。ランク7のあと新しく始めたコロナショック版だけに出る。なくても動く）
+    ipo: typeof CORONA2020_IPO !== 'undefined' ? CORONA2020_IPO : null,   // 新規上場2社（data/corona2020_ipo.js。追加18社と同じ条件で出る。なくても動く）
+    events: typeof EVENTS2020 !== 'undefined' ? EVENTS2020 : null, eventsFile: 'data/events2020.js',   // 当時の決算・配当・株主優待（なくても動く）
   },
   real2026: {
     file: 'data/recent.js', newsFile: 'data/news2026.js', year: 2026, span: '1〜10月',
     get name() { return '今年の相場'; }, get period() { return `${this.year}年${this.span}`; },
     data: typeof RECENT !== 'undefined' ? RECENT : null, news: typeof NEWS2026 !== 'undefined' ? NEWS2026 : null,
     extra: typeof RECENT_EXTRA !== 'undefined' ? RECENT_EXTRA : null,   // 追加18社（data/recent_extra.js。ランク7のあと新しく始めた2026年版だけに出る。なくても動く）
+    ipo: typeof RECENT_IPO !== 'undefined' ? RECENT_IPO : null,   // 新規上場2社（data/recent_ipo.js。追加18社と同じ条件で出る。なくても動く）
+    events: typeof EVENTS2026 !== 'undefined' ? EVENTS2026 : null, eventsFile: 'data/events2026.js',   // 当時の決算・配当・株主優待（なくても動く）
     rsigUntil: '2026-09-30',   // rsig を全期間から計算すると、データを延ばすたびに既存の日の分足・高安・出来高・指数が変わるので、延長前の最終日までで固定している
   },
 };
@@ -613,6 +618,14 @@ for (const k in REAL_SETS) {
     S.xdef = X.stocks; S.xpx = Object.fromEntries(X.stocks.map(d => [d.code, d.prices])); S.xhist = X.history || null;
     for (const d of X.stocks) S.sectors[d.sector] ||= { name: d.sector, short: d.sector };
   } else S.xdef = null;
+  // 新規上場（リアル相場）。日付が本編と同じで、上場日が本編の中にあるものだけ。上場日より前の prices は null
+  const I = S.ipo;
+  S.idef = I?.stocks?.length && JSON.stringify(I.dates) === JSON.stringify(S.data.dates) ? I.stocks.filter(d => S.data.dates.includes(d.ipo?.date)) : [];
+  for (const d of S.idef) { (S.xpx ||= {})[d.code] = d.prices; S.sectors[d.sector] ||= { name: d.sector, short: d.sector }; }
+  // 当時の決算・配当・株主優待（tools/fetch_events.py）。初日が本編と同じときだけ使う。株価は動かさない（終値は実データのまま）
+  S.ev = S.events?.first === S.data.dates[0] ? realEvents(S.events, S.data.dates) : null;
+  S.earnByDay = {};
+  for (const c in S.ev || {}) for (const e of S.ev[c].earn) (S.earnByDay[e.di] ||= []).push({ ...e, code: c });
   // 当時の実際のニュース。表示するだけで、株価を動かす genNews / apply 系には一切つながない。
   // date（出来事・発表の日）より後の最初の営業日の寄り付き前に出す（その朝に分かっていたことだけになる）
   S.newsByDay = {};
@@ -626,7 +639,8 @@ for (const k in REAL_SETS) {
   }
 }
 // いま遊んでいる（または遊ぼうとしている）シナリオのデータ。useReal で切り替える
-let REAL = null, REAL_KEY = null, REAL_PX = {}, REAL_HIST = null, REAL_SECTORS = {}, REAL_NEWS = {}, REAL_XPX = {}, REAL_XHIST = null, REAL_XDEF = null;   // X = 追加18社
+let REAL = null, REAL_KEY = null, REAL_PX = {}, REAL_HIST = null, REAL_SECTORS = {}, REAL_NEWS = {}, REAL_XPX = {}, REAL_XHIST = null, REAL_XDEF = null, REAL_IDEF = [];   // X = 追加18社（REAL_XPX は新規上場の分も持つ）、I = 新規上場
+let REAL_EV = null, REAL_EARN = {}, REAL_EV_ON = true;   // 当時の決算・配当・優待（銘柄ごと）、決算の日ごとの一覧、使うか（確認用に切れる）
 const realOK = k => !!REAL_SETS[k]?.data;   // そのシナリオのデータがあるか
 const anyReal = () => Object.keys(REAL_SETS).some(realOK);
 const realDays = k => REAL_SETS[k]?.data?.dates.length || 0;
@@ -634,9 +648,77 @@ const freePool = () => Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].fr
 const realKeyOf = g => { const k = g.base || g.scen; return REAL_SETS[k] ? k : 'real'; };   // 保存データのシナリオ（古い保存データは base がない）
 function useReal(k) {
   const S = REAL_SETS[k]; if (!S?.data) return false;
-  REAL_KEY = k; REAL = S.data; REAL_PX = S.px; REAL_HIST = S.hist; REAL_SECTORS = S.sectors; REAL_NEWS = S.newsByDay; REAL_XPX = S.xpx || {}; REAL_XHIST = S.xhist || null; REAL_XDEF = S.xdef || null;
+  REAL_KEY = k; REAL = S.data; REAL_PX = S.px; REAL_HIST = S.hist; REAL_SECTORS = S.sectors; REAL_NEWS = S.newsByDay; REAL_XPX = S.xpx || {}; REAL_XHIST = S.xhist || null; REAL_XDEF = S.xdef || null; REAL_IDEF = S.idef;
+  REAL_EV = S.ev; REAL_EARN = S.earnByDay;
   return true;
 }
+// 決算・配当・優待のデータを、本編の営業日の番号（di）で引ける形にする。
+//   divs: 配当の実績（di = 権利付き最終日 = 権利落ち日の前の営業日。開始前の分は di = -1 で、直近1年の配当の計算にだけ使う）
+//   skip: 前年の同じ時期にあった配当がない回（無配など。note は注記）
+//   earn: 決算短信・修正の発表。slot = pre（その日の寄り付き前）/ min（場中の m 分）/ close（引けのあと）。休みの日の発表は次の営業日の朝
+//   perk: 株主優待（di = 権利付き最終日。lot = 必要な株数、yen = 現金相当（0 は入金なし）、hold = 継続保有の条件（年））
+function realEvents(E, D) {
+  const at = d => D.indexOf(d), md = d => d.slice(5).split('-').map(Number).join('/');
+  const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const out = {};
+  for (const [code, x] of Object.entries(E.stocks)) {
+    const earn = [];
+    for (const [d, t, k, text, body] of x.earn) {
+      const di = D.findIndex(v => v >= d); if (di < 0) continue;
+      const c = toMin(t);
+      const slot = D[di] !== d || c < 540 ? 'pre' : c >= 900 ? 'close' : 'min';   // 9:00〜11:30 は前場、12:30〜15:00 は後場の分、昼休みは後場の初め
+      const m = slot !== 'min' ? 0 : c < 690 ? c - 540 : c < 750 ? 150 : 150 + c - 750;
+      const dir = /赤字転落|赤字拡大|下方修正|減/.test(text) ? -1 : /増|黒字|上方修正|縮小/.test(text) ? 1 : 0;   // チャートのピンの向き
+      earn.push({ di, slot, m, time: D[di] !== d ? `${md(d)} ${t}` : t, k, text, body: body || '', dir });
+    }
+    out[code] = {
+      divs: x.div.map(([ex, amt]) => ({ ex, amt, di: at(ex) >= 1 ? at(ex) - 1 : -1 })),
+      skip: (x.skip || []).map(([d, note]) => ({ di: at(d), note })).filter(v => v.di >= 0),
+      earn,
+      perk: (x.perk || []).map(p => ({ ...p, di: at(p.d) })).filter(p => p.di >= 0),
+    };
+  }
+  return out;
+}
+const realEv = () => REAL_EV_ON && isReal() && REAL_EV;
+// 決算の発表をニュースに出す（株価は動かさない）。保有していれば「今日のできごと」にも出す
+function realEarn(slot, m) {
+  const P = G.player;
+  for (const e of REAL_EARN[G.dayIndex] || []) {
+    if (e.slot !== slot || (slot === 'min' && e.m !== m)) continue;
+    const s = byCode(e.code); if (!s || !live(s)) continue;
+    pushNews({ day: G.dayIndex, time: e.time, type: 'earn', stars: 3, codes: [s.code], text: e.text, body: e.body, hint: '', flash: false });
+    s.pins.push({ d: G.dayIndex, m: slot === 'pre' ? 0 : slot === 'close' ? MIN_PER_DAY - 1 : m, dir: e.dir }); if (s.pins.length > 160) s.pins.shift();
+    if (e.k === 'k' && P.pos[s.code]) { G.dayEvents.push(`保有中の${s.name}が決算を発表：${e.text}`); complete('earn'); }
+  }
+}
+// 権利付き最終日の引け：配当（ランク4から）と株主優待の権利。入金は翌朝（startDay の pendingDiv・pendingPerk）。権利落ちの値下がりは実際の終値に含まれているので、株価は動かさない
+function realRights() {
+  const P = G.player, di = G.dayIndex, per1 = v => `${+v.toFixed(2)}円`;
+  for (const s of allStocks()) {
+    const ev = REAL_EV[s.code]; if (!ev || !live(s)) continue;
+    const q = P.pos[s.code]?.qty || 0, mp = P.mpos[s.code];
+    if (divOn()) {
+      for (const v of ev.divs) {
+        if (v.di !== di) continue;
+        if (q > 0) { P.pendingDiv += q * v.amt; G.dayEvents.push(`${s.name}の権利付き最終日。${q}株×${per1(v.amt)}＝${yen(q * v.amt)}円の配当の権利を得ました（明日入金）`); }
+        if (mp?.side === 'buy') { P.pendingDiv += mp.qty * v.amt; G.dayEvents.push(`信用で買い建て中の${s.name}の権利付き最終日。配当と同じ額（${yen(mp.qty * v.amt)}円）を受け取ります（明日入金）`); }
+        else if (mp) { P.cash -= mp.qty * v.amt; G.dayEvents.push(`信用で売り建て中の${s.name}の権利付き最終日。配当と同じ額（${yen(mp.qty * v.amt)}円）を支払いました`); }
+      }
+      for (const k of ev.skip) if (k.di === di && (q > 0 || mp)) G.dayEvents.push(`保有中の${s.name}の権利付き最終日。${k.note || '今回は配当がありません（無配）'}`);
+    }
+    for (const p of ev.perk) {
+      if (p.di !== di) continue;
+      const held = P.pos[s.code] ? di - P.pos[s.code].d : 0, what = `${s.name}の権利付き最終日。株主優待（${p.text}）`;   // 今日のできごとは表示のときにエスケープされる
+      if (q >= p.lot && p.hold && held < p.hold * DAYS) G.dayEvents.push(`${what}は、${p.hold}年以上持ち続けることが条件のため対象外です`);
+      else if (q >= p.lot && p.yen > 0) { P.pendingPerk += p.yen; G.dayEvents.push(`${what}の権利を得ました。現金相当の${yen(p.yen)}円を明日受け取ります`); }
+      else if (q >= p.lot) G.dayEvents.push(`${what}の権利を得ました（割引券や引換券などのため、ゲームでは入金しません）`);
+      else if (q > 0) G.dayEvents.push(`${what}は${p.lot}株以上が条件のため対象外です（${q}株）`);
+      else if (mp?.side === 'buy') G.dayEvents.push(`信用で買い建て中の${s.name}は、株主優待の対象外です。優待がもらえるのは、現物を持っているときだけです`);
+    }
+  }
+}
+const realDivYear = s => { const y1 = (+G.date.slice(0, 4) - 1) + G.date.slice(4); return (REAL_EV?.[s.code]?.divs || []).filter(v => v.ex > y1 && v.ex <= G.date).reduce((a, v) => a + v.amt, 0); };   // 直近1年の配当の実績（1株）
 const REAL_IDX_BASE = 100;
 const dailyKeep = () => (isReal() ? 600 : 320);   // 日足を残す数。リアル相場は過去分（約240日）と1年分が収まるように多めにする
 const SEC = k => SECTORS[k] || REAL_SECTORS[k];
@@ -644,7 +726,7 @@ const isReal = () => G?.mode === 'real';
 const idxName = () => (isReal() ? '30銘柄平均' : 'NTX225');
 const realClose = (s, di) => (s.extra ? REAL_XPX : REAL_PX)[s.code][di];
 const hasRealNews = () => Object.keys(REAL_NEWS).length > 0;
-const NEWS_KEEP_REAL = 400;   // リアル相場で保存・表示するニュースの上限（1年分が収まる数）
+const NEWS_KEEP_REAL = 800;   // リアル相場で保存・表示するニュースの上限（当時のニュースと50社の決算の1年分が収まる数）
 function pushRealNews() {
   const t = G.date.slice(5).split('-').map(Number).join('/') + ' 朝';
   for (const n of REAL_NEWS[G.dayIndex] || []) {
@@ -655,12 +737,13 @@ function pushRealNews() {
 }
 
 function makeRealStock(d) {
-  const p0 = d.prices[0], price = roundTick(p0);
+  const L = d.ipo ? REAL.dates.indexOf(d.ipo.date) : 0;   // 新規上場は上場日から（それより前の prices は null）。開始時の値段は公開価格
+  const p0 = d.ipo ? d.ipo.offer : d.prices[0], price = roundTick(p0);
   const until = REAL_SETS[REAL_KEY].rsigUntil, n = until ? REAL.dates.filter(x => x <= until).length : d.prices.length;   // rsig を計算する日数
-  let sq = 0; for (let i = 1; i < n; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
-  const rsig = Math.sqrt(sq / (n - 1));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
+  let sq = 0; for (let i = L + 1; i < n; i++) sq += Math.log(d.prices[i] / d.prices[i - 1]) ** 2;
+  const rsig = Math.sqrt(sq / (n - 1 - L));   // その銘柄の1日の値動きの大きさ（日中の揺れの目安）
   return {
-    code: d.code, name: d.name, sector: d.sector, desc: `${REAL_SETS[REAL_KEY].period}の実際の終値で動きます`, unlock: 1, rec: [],
+    code: d.code, name: d.name, sector: d.sector, desc: d.ipo ? `${REAL_SETS[REAL_KEY].period}に新規上場（${d.ipo.market}）。上場日の実際の初値と、その後の実際の終値で動きます` : `${REAL_SETS[REAL_KEY].period}の実際の終値で動きます`, unlock: 1, rec: [],
     shares: 1e9 / p0, div: 0,   // 株式数は実データにないので、指数が「30銘柄を同じ金額ずつ持った平均」になるようにする
     sig: rsig * Math.sqrt(DAYS), beta: 1, idio: rsig * Math.sqrt(DAYS), mu: 0, kappa: 0, jump: 0, jsize: 0, rsig, dsig: rsig,
     price, lp: Math.log(price), prevClose: price, open: price, high: price, low: price, dayVol: 0,
@@ -684,6 +767,8 @@ function makeRealExtra(d) {
   if (d.div > 0) { s.divShow = d.div; s.divYear = +REAL.dates[0].slice(0, 4) - 1; }   // 表示用の年間配当（開始前の1年の実績）。s.div は 0 のまま＝入金なし
   const perk = REAL_KEY === 'real2026' ? XREAL_PERK[d.code] : d.perk;   // コロナショック版は当時の内容が確認できないので「優待あり」だけ
   if (perk) s.perkShow = perk;
+  // 新規上場：上場日・公開価格・初値は実データどおり（ipoPlan の抽選は使わない。前身はない）。上場前は隠し、専用乱数も上場日の寄り付きのあとから引く
+  if (d.ipo) { const L = REAL.dates.indexOf(d.ipo.date); s.ipo = { day: L, base: L, ann: L - IPO_ANN, px: d.ipo.offer, open: roundTick(d.ipo.open), early: false, from: null, mkt: d.ipo.market }; }
   return s;
 }
 // 初日の終値での指数（30銘柄平均）を 100 にする。過去分があれば、過去チャートも同じ基準で作る
@@ -806,6 +891,7 @@ function stepMinuteReal(im) {
   }
   updateIndex(false);
   processOrders();
+  if (realEv()) realEarn('min', G.minute);   // 場中に発表された当時の決算（株価は動かさない）
 }
 const WICK1 = 3;   // 低位株（呼値1円）の分足のひげの倍率
 /** 1分足（高値・安値・出来高）を記録する。R = 使う乱数（梅山カンパニーだけ専用のもの） */
@@ -975,7 +1061,7 @@ function ipoDay() {
     const news = (text, o = {}) => pushNews({ day: d, time: '8:00', type: 'big', stars: 3, codes: [s.code], text, hint: '', flash: false, ...o });
     const when = mdLabel(addTD(G.date, x.day - d));
     if (d === x.ann && d < x.day) news(x.chg ? `【上場日の変更】東証、${s.name}の新規上場日を${when}に変更（前倒し）` : `【上場承認】東証、${s.name}の新規上場を承認。上場日は${when}`);
-    if (d === x.day) news(`【新規上場】${s.name}（${s.code}）が本日、東証グロースに新規上場。公開価格${px(x.px)}円${x.early ? `（上場廃止になった${byCode(x.from)?.name || x.from}の後継として、上場を前倒し）` : ''}`, { flash: true });
+    if (d === x.day) news(`【新規上場】${s.name}（${s.code}）が本日、${x.mkt || '東証グロース'}に新規上場。公開価格${px(x.px)}円${x.early ? `（上場廃止になった${byCode(x.from)?.name || x.from}の後継として、上場を前倒し）` : ''}`, { flash: true });
   }
 }
 // 上場日の寄り付き：初値で始まり、その日は初値を基準に通常の値幅制限。値動きの乱数はここから引く
@@ -1288,6 +1374,7 @@ function startDay(first) {
     if (G.extra.length) xNewsDay();
   }
   if (isReal()) pushRealNews();
+  if (realEv()) realEarn('pre');   // 当時の決算（休みの日や朝の発表）
   if (G.ume) umeDay(first);
   if (G.extra.length) { dlDay(); ipoDay(); }
   if (G.dayIndex === G.crashDay) {
@@ -1301,7 +1388,11 @@ function startDay(first) {
 
 function openMarket() {
   const mk = G.market;
-  if (isReal()) for (const s of G.stocks.concat(G.extra)) { realOpen(s, s.extra ? s.r : RNG); s.open = s.high = s.low = s.price; }
+  if (isReal()) for (const s of G.stocks.concat(G.extra)) {
+    if (s.extra && !live(s)) continue;   // 上場前の新規上場
+    if (ipoStage(s) === 'first') { ipoOpen(s); realLimits(s); s.dsig = Math.max(s.rsig * 0.7, Math.abs(Math.log(realClose(s, G.dayIndex) / s.price)) * 0.5); continue; }   // 上場日は実際の初値で始まる（乱数なし）
+    realOpen(s, s.extra ? s.r : RNG); s.open = s.high = s.low = s.price;
+  }
   else openGaps();
   G.phase = 'open'; G.minute = 0;
   updateIndex(true);
@@ -1370,6 +1461,8 @@ function closeMarket() {
   // 決算発表（引け後）。追加銘柄は30銘柄のあとに、専用の乱数で
   for (const s of G.stocks) if (s.nextEarn === G.dayIndex) earnings(s, RNG);
   for (const s of G.extra) if (s.nextEarn === G.dayIndex) { if (!live(s) || ipoStage(s) === 'first' || ['fail', 'seiri'].includes(dlStage(s))) s.nextEarn += 60; else earnings(s, s.r); }   // 上場前・上場日と、倒産したあとは決算を出さない
+  // リアル相場：引けのあとの当時の決算、権利付き最終日の配当・優待
+  if (realEv()) { realEarn('close'); realRights(); }
   // 配当の権利確定
   if (lastTradingDayOfMonth(G.date)) {
     const mo = monthOf(G.date);
@@ -1892,11 +1985,13 @@ function renderChartHead() {
   const f = (k, v, c) => `<div${c ? ` class="${c}"` : ''}><dt>${k}</dt><dd class="num">${v}</dd></div>`;
   const closes = s.daily.map(d => d.c); if (G.phase === 'open') closes.push(s.price);
   const rv = rsi(closes);
-  if (isReal()) {   // 実データは終値だけなので、株式数・利益・配当にもとづく数字は出さない
+  const ev = realEv()?.[s.code];
+  if (isReal()) {   // 実データは終値だけなので、株式数・利益にもとづく数字は出さない（配当・優待・決算の日は当時のデータから）
     $('#facts').innerHTML = f(term('出来高'), s.dayVol.toLocaleString('ja-JP') + '株', 'fx-vol') + f(term('値幅制限'), `${px(s.limDn)}〜${px(s.limUp)}`, 'fx-lim')
       + f('始値／高値／安値', G.phase === 'pre' ? '—' : `${px(s.open)}／${px(s.high)}／${px(s.low)}`, 'fx-ohl') + (r >= 4 ? f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi') : '')
-      + (s.divShow ? f(term('配当利回り'), `${(s.divShow / s.price * 100).toFixed(2)}%（${s.divYear || 2025}年の実績）`, 'fx-div') : '')   // 追加18社の表示だけ（入金はない）
-      + (s.perkShow ? f(term('株主優待'), `${esc(s.perkShow)}（表示だけ。入金はありません）`, 'fx-perk') : '');
+      + (ev ? realFacts(s, ev, f, r)
+        : (s.divShow ? f(term('配当利回り'), `${(s.divShow / s.price * 100).toFixed(2)}%（${s.divYear || 2025}年の実績）`, 'fx-div') : '')   // 決算・配当のデータがないときは、追加18社の表示だけ（入金はない）
+        + (s.perkShow ? f(term('株主優待'), `${esc(s.perkShow)}（表示だけ。入金はありません）`, 'fx-perk') : ''));
     return;
   }
   // 上下2行に列順で並べる PC・タブレットだけ、CSS の order で PER と配当利回りの位置を入れ替える（スマホの並びは変えない）
@@ -1914,6 +2009,14 @@ function renderChartHead() {
     html += f(term('RSI') + '（14日）', rv == null ? '—' : rv.toFixed(0), 'fx-rsi');
   }
   $('#facts').innerHTML = html;
+}
+
+// リアル相場の詳細：配当利回り（直近1年の実績。ランク4から）、株主優待（次の回）、次の決算（ランク4から）
+function realFacts(s, ev, f, r) {
+  const dv = realDivYear(s), pk = ev.perk.find(p => p.di >= G.dayIndex), ke = ev.earn.find(e => e.k === 'k' && e.di >= G.dayIndex);
+  return (divOn() ? f(term('配当利回り'), dv ? `${(dv / s.price * 100).toFixed(2)}%（直近1年の実績 ${+dv.toFixed(2)}円）` : 'なし（直近1年は配当なし）', 'fx-div') : '')
+    + (pk ? f(term('株主優待'), `${esc(pk.text)}（${pk.lot}株〜${pk.hold ? `・${pk.hold}年以上の保有` : ''}・${mdLabel(REAL.dates[pk.di])}まで）`, 'fx-perk') : '')
+    + (r >= 4 ? f('次の' + term('決算'), ke ? `${mdLabel(REAL.dates[ke.di])}${ke.slot === 'pre' ? ' 朝' : ` ${ke.time}`}` : '—', 'fx-earn') : '');
 }
 
 function sma(a, n) { const out = []; let sum = 0; for (let i = 0; i < a.length; i++) { sum += a[i]; if (i >= n) sum -= a[i - n]; out.push(i >= n - 1 ? sum / n : null); } return out; }
@@ -2319,10 +2422,35 @@ function drawLines(cv, hist, rec) {   // rec = 取引成績の記録（G がな�
 }
 
 /* ---------- 決算・配当 ---------- */
+// リアル相場：当時の決算の発表日、配当と株主優待の権利付き最終日。配当の金額は、まだ決まっていない先の分は出さず、前回の実績を出す
+function renderCalReal(el) {
+  const EV = realEv();
+  if (!EV) { el.innerHTML = `<section class="panel"><h2>決算・配当</h2><p class="muted">決算・配当・株主優待のデータ（${REAL_SETS[REAL_KEY].eventsFile}）がないため、このシナリオでは扱いません（tools/fetch_events.py で作成）。</p></section>`; return; }
+  const P = G.player, di = G.dayIndex, D = REAL.dates, day = i => `${mdLabel(D[i])}${i === di ? ' 今日' : ''}`;
+  const ss = allStocks().filter(s => live(s) && EV[s.code]), own = s => (P.pos[s.code] ? '●' : '');
+  const up = ss.flatMap(s => EV[s.code].earn.filter(e => e.k === 'k' && e.di >= di && e.di - di <= 25).map(e => ({ s, e }))).sort((a, b) => a.e.di - b.e.di);
+  const divs = ss.map(s => {
+    const ev = EV[s.code], next = Math.min(...ev.divs.filter(v => v.di >= di).map(v => v.di), ...ev.skip.filter(v => v.di >= di).map(v => v.di));
+    return { s, yr: realDivYear(s), next: isFinite(next) ? next : -1, last: ev.divs.filter(v => v.ex <= G.date).at(-1) };
+  }).filter(x => x.yr || x.next >= 0);
+  const perks = ss.flatMap(s => EV[s.code].perk.filter(p => p.di >= di).map(p => ({ s, p }))).sort((a, b) => a.p.di - b.p.di);
+  el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">当時の実際の発表日時です。発表の内容はニュースに出ます。株価は実際の終値のままで、発表への市場の受け止め方は、そのあとの値動きに表れます。</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>時刻</th><th>銘柄</th><th>業種</th><th>保有</th></tr></thead><tbody>
+    ${up.map(({ s, e }) => `<tr><td class="num">${day(e.di)}</td><td class="num">${e.slot === 'pre' ? '朝' : e.time}</td><td>${esc(s.name)}</td><td>${esc(SEC(s.sector).short)}</td><td>${own(s)}</td></tr>`).join('') || '<tr class="empty"><td colspan="5">近い予定はありません。</td></tr>'}
+    </tbody></table></div></section>
+    ${divOn() ? `<section class="panel"><h2>配当と${term('権利付き最終日')}</h2><p class="muted small">権利付き最終日の大引けに現物を持っていれば、翌朝に配当が入ります（実際の株では約3か月後）。信用の買い建ては配当と同じ額を受け取り、売り建ては支払います。${term('権利落ち')}の値下がりは、実際の終値にすでに含まれています。</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>銘柄</th><th class="r">直近1年の配当（1株）</th><th class="r">${term('配当利回り')}</th><th class="r">前回の配当</th><th>次の権利付き最終日（予定）</th><th>保有</th></tr></thead><tbody>
+    ${divs.map(x => `<tr><td>${esc(x.s.name)}</td><td class="r num">${+x.yr.toFixed(2)}円</td><td class="r num">${(x.yr / x.s.price * 100).toFixed(2)}%</td><td class="r num">${x.last ? +x.last.amt.toFixed(2) + '円' : '—'}</td><td class="num">${x.next >= 0 ? day(x.next) : '—'}</td><td>${own(x.s)}</td></tr>`).join('') || '<tr class="empty"><td colspan="6">配当のある銘柄はありません。</td></tr>'}
+    </tbody></table></div></section>` : ''}
+    ${perks.length ? `<section class="panel"><h2>${term('株主優待')}</h2><p class="muted small">権利付き最終日の大引けに、現物を必要な株数以上持っていれば権利が付きます。金額が示されている優待（券の額面・〇円相当・ポイント）だけ、翌朝に現金相当を入れます（課税なし）。割引券・引換券などは入金しません。信用の買い建てには付きません。1年以上の保有が条件の優待は、このゲームの期間では対象外です。</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>権利付き最終日</th><th>銘柄</th><th>優待の内容</th><th class="r">必要な株数</th><th class="r">現金相当（1回）</th><th>保有</th></tr></thead><tbody>
+    ${perks.map(({ s, p }) => `<tr><td class="num">${day(p.di)}</td><td>${esc(s.name)}</td><td>${esc(p.text)}${p.hold ? `（${p.hold}年以上の保有が条件）` : ''}</td><td class="r num">${p.lot.toLocaleString()}株</td><td class="r num">${p.yen ? yen(p.yen) + '円' : '入金なし'}</td><td>${(P.pos[s.code]?.qty || 0) >= p.lot ? '●' : ''}</td></tr>`).join('')}
+    </tbody></table></div></section>` : ''}`;
+}
 function renderCal() {
   const el = $('#view-cal');
   if (rank() < 4) { el.innerHTML = `<section class="panel"><div class="locked"><b>ランク4で解放</b><p>決算発表の予定日と、配当の権利確定日がわかるカレンダーです。</p></div></section>`; return; }
-  if (isReal()) { el.innerHTML = `<section class="panel"><h2>決算・配当</h2><p class="muted">リアル相場チャレンジでは、決算と配当は扱いません（実データは毎日の終値だけで、決算や配当による値動きはすでに終値に含まれています）。</p></section>`; return; }
+  if (isReal()) { renderCalReal(el); return; }
   const P = G.player;
   const up = allStocks().filter(s => live(s) && !['fail', 'seiri'].includes(dlStage(s)) && s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
   const divs = allStocks().filter(s => s.div && live(s));
@@ -2985,7 +3113,8 @@ const scenMissingFile = k => REAL_SETS[SCEN[k].free ? freePool()[0] : k].file;
 function realDisclaimer(k) {
   const rs = REAL_SETS[SCEN[k].free ? freePool()[0] : k];
   const news = rs && Object.keys(rs.newsByDay || {}).length > 0;
-  return `リアル相場チャレンジの終値は、${rs?.period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。決算・配当は出ません。${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
+  const ev = rs?.ev ? '決算は当時の発表日時に、実際の数字を要約したニュースとして出ます。配当と株主優待は当時の実績どおり、権利付き最終日に持っていれば翌朝に入ります（優待は金額が示されているものだけ）。どちらも株価は動かしません。' : '決算・配当は出ません。';
+  return `リアル相場チャレンジの終値は、${rs?.period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。${ev}${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
 }
 function showTitle() {
   practiceEnd(true); if (UI.view === 'mission') markMissionsSeen();
@@ -2995,7 +3124,7 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の30銘柄（2026年版は追加の18社）。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、2026年版に追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
+  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の30銘柄と、追加の18社・新規上場2社。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : `架空の取引所「NTX」で、実在の企業をもじった${profile.r7 ? DEFS.length + XDEFS.length : 30}社を売買して、資産を増やそう。`}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
@@ -3239,6 +3368,8 @@ window.__kabutore = { get G() { return G; }, newGame, tick, asset, rank, profile
   // 動作確認用：code の銘柄（追加銘柄）で、days 営業日後の朝に前兆が始まるように日程を作り直す。戻り値は新しい日程
   finalReport, practiceStart, practiceEnd, xnFx: v => (XN_FX = v), xnSkip: c => (XN_SKIP = c), xnForce(c, chg) { XN_FORCE = chg; xNews(G._map[c], G.phase === 'open' ? 'live' : 'gap'); render(); }, xnPlan: c => xnPlan(G._map[c]), xnOK: c => xnOK(G._map[c]), ipoStage: c => ipoStage(G._map[c]), ipoSchedule, netAsset, assetOld: () => { const P = G.player; let v = P.cash; for (const c in P.pos) v += P.pos[c].qty * G._map[c].price; if (Object.keys(P.mpos).length) { const m = marginStat(); v += m.u - m.cost; } return v; },
   // 動作確認用：新規上場の銘柄を、days 営業日後に上場するように日程を作り直す（承認のお知らせは翌朝）。戻り値は s.ipo
+  // 確認用：リアル相場の当時の決算・配当・優待を切る（false で、値動き・ニュースが入れる前と同じになる）。realEvents: 今のシナリオの決算・配当・優待のデータ
+  realEv: v => (REAL_EV_ON = v), realEvents: () => REAL_EV,
   forceList(code, days = 1) { const s = G?._map[code]; if (!s?.ipo || !preIpo(s) || days < 1) return null; Object.assign(s.ipo, { day: G.dayIndex + days, ann: G.dayIndex + 1, chg: false }); render(); return s.ipo; },
   forceDelist(code, days = 1) { const s = G?._map[code]; if (!s?.extra || s.delisted || days < 1) return null; s.dl = dlPlan(G.seed, code, G.dayIndex + days); render(); return s.dl; } };
 if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});

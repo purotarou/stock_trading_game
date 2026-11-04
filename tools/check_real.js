@@ -18,6 +18,7 @@ const hash = x => crypto.createHash('sha256').update(JSON.stringify(x)).digest('
 
 function run(file) {
   const K = load(file), out = {};
+  K.realEv?.(false);   // 当時の決算・配当・優待（ニュースと入金だけで、値動きは変えない）は比べない。値動きと当時のニュースだけを比べる
   for (const seed of SEEDS) {
     K.newGame('real', 'normal', seed, 0, 'real');
     if (K.G.mode !== 'real') throw new Error(file + ': リアル相場を始められません（data/corona2020.js がない？）');

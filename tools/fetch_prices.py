@@ -7,6 +7,8 @@
     python3 tools/fetch_prices.py --scenario corona2020   # data/corona2020.js（const CORONA2020）。2020年
     python3 tools/fetch_prices.py --scenario recent       # data/recent.js（const RECENT）。2026-01-01 〜 2026-10-30
     python3 tools/fetch_prices.py --scenario recent_extra # data/recent_extra.js（const RECENT_EXTRA）。リアル相場（2026年版）の追加18社
+    python3 tools/fetch_prices.py --scenario recent_ipo   # data/recent_ipo.js（const RECENT_IPO）。2026年版の新規上場2社（上場日より前は null）
+    python3 tools/fetch_prices.py --scenario corona2020_ipo # data/corona2020_ipo.js（const CORONA2020_IPO）。コロナショック版の新規上場2社
 
 使う価格は Close（株式分割のみ反映・配当は反映しない）に固定している。
 
@@ -97,6 +99,34 @@ SCENARIOS = {
         "nintendo_check": False,
         "stocks": "extra",
         "align": "recent",
+        "also_update": "recent_ipo",   # recent_extra の --update のあと、続けて recent_ipo も更新する
+    },
+    # リアル相場の新規上場（2026年版・コロナショック版それぞれ2社）。日付は本編に合わせ、上場日より前の prices は null。過去分はない
+    "recent_ipo": {
+        "var": "RECENT_IPO",
+        "out": DATA_DIR / "recent_ipo.js",
+        "start": "2026-01-01", "end": "2026-10-31", "last": "2026-10-30",
+        "hist_start": "2025-01-01", "hist_last": "2025-12-31",
+        "expect_first": "2026-01-05", "expect_last": "2026-10-30",
+        "names": {},
+        "update": True,
+        "nintendo_check": False,
+        "stocks": "ipo26",
+        "align": "recent",
+        "ipo": True,
+    },
+    "corona2020_ipo": {
+        "var": "CORONA2020_IPO",
+        "out": DATA_DIR / "corona2020_ipo.js",
+        "start": "2020-01-01", "end": "2021-01-01", "last": "2020-12-31",
+        "hist_start": "2019-01-01", "hist_last": "2019-12-31",
+        "expect_first": "2020-01-06", "expect_last": "2020-12-30",
+        "names": {},
+        "update": False,
+        "nintendo_check": False,
+        "stocks": "ipo20",
+        "align": "corona2020",
+        "ipo": True,
     },
 }
 
@@ -185,7 +215,17 @@ EXTRA_STOCKS = [
     ("4452", "花王", "化学", "normal", ""),
     ("6501", "日立製作所", "電気機器", "normal", ""),
 ]
-STOCK_LISTS = {"extra": EXTRA_STOCKS, "extra20": EXTRA20_STOCKS}
+# 新規上場（recent_ipo / corona2020_ipo）。(コード, 社名, 業種, 上場日, 公開価格, 初値, 市場)。公開価格・初値は証券会社の IPO 実績の値
+# （分割なし）。初値は取得した上場日の始値と照合する（初値が上場日に付いた銘柄だけを選んでいる）
+IPO26_STOCKS = [
+    ("581A", "GO", "情報・通信", "2026-06-16", 2400, 2910, "東証グロース"),          # タクシーアプリ。初値 +21%
+    ("593A", "ティアフォー", "情報・通信", "2026-07-22", 1085, 1009, "東証グロース"),   # 自動運転ソフト。公募割れ −7%
+]
+IPO20_STOCKS = [
+    ("4053", "Sun Asterisk", "情報・通信", "2020-07-31", 700, 1209, "東証マザーズ"),   # 初値 +73%
+    ("1375", "雪国まいたけ", "水産・農林", "2020-09-17", 2200, 2100, "東証1部"),       # 公募割れ −5%
+]
+STOCK_LISTS = {"extra": EXTRA_STOCKS, "extra20": EXTRA20_STOCKS, "ipo26": IPO26_STOCKS, "ipo20": IPO20_STOCKS}
 STOCKS = BASE_STOCKS
 
 
@@ -600,10 +640,11 @@ def main():
     try:
         run(args)
         nxt = SCEN.get("also_update")
-        if args.update and nxt and SCENARIOS[nxt]["out"].exists():   # recent の更新のあと、続けて追加18社も更新する
+        while args.update and nxt and SCENARIOS[nxt]["out"].exists():   # recent の更新のあと、続けて追加18社・新規上場も更新する
             print("\n=== 続けて %s を更新 ===" % nxt)
             use_scenario(nxt)
             run(args)
+            nxt = SCEN.get("also_update")
     finally:
         report_corona_hash(args.scenario, corona_before)
 
@@ -723,9 +764,48 @@ def run_update():
               "SCENARIOS の end / last / expect_last と script.js の REAL_SETS の span も合わせてください。" % LAST)
 
 
+def run_ipo():
+    """新規上場の銘柄を書き出す。上場日より前の prices は null、上場日からは終値（欠損は前日の値で補完）。
+    初値（上場日の始値）が取れること、上場日が dates にあること、初値が表の値と一致することを確かめる。過去分は作らない。"""
+    dates = align_dates()
+    stocks, problems = [], []
+    for i, (code, name, sector, day, offer, first, market) in enumerate(STOCK_LISTS[SCEN["stocks"]], 1):
+        print("[%d/%d] %s %s ... " % (i, len(STOCKS), code, name), end="", flush=True)
+        raw = fetch_one(code, ohlcv=True)
+        print("%d日分" % len(raw))
+        got = min(raw)
+        if got != day:
+            problems.append("%s %s: 取得できた最初の日 %s が上場日 %s と違う（初値の持ち越しなど）" % (code, name, got, day))
+        if day not in dates:
+            problems.append("%s %s: 上場日 %s が本編の dates にない" % (code, name, day))
+            continue
+        op = round_price(raw[day][0]) if day in raw else None
+        if op != first:
+            problems.append("%s %s: 上場日の始値 %s が初値 %s と違う" % (code, name, op, first))
+        k = dates.index(day)
+        ps, filled = fill_gaps(dates[k:], {d: v[3] for d, v in raw.items()})
+        prices = [None] * k + [round_price(v) for v in ps]
+        stocks.append({"code": code, "name": name, "sector": sector, "prices": prices,
+                       "extra": {"kind": "ipo", "ipo": {"date": day, "offer": offer, "open": op, "market": market}}})
+        print("     上場日 %s（%d営業日目）公開価格 %s → 初値 %s（%+.1f%%）、補完 %d日" % (day, k, offer, op, (op / offer - 1) * 100 if op else 0, len(filled)))
+        time.sleep(0.5)
+    if problems:
+        sys.exit("\n".join(["  [警告] " + p for p in problems]) + "\n何も書かずに止まりました。")
+    jumps = [(s["code"], dates[i], s["prices"][i - 1], s["prices"][i]) for s in stocks for i in range(1, len(dates))
+             if s["prices"][i - 1] is not None and abs(s["prices"][i] / s["prices"][i - 1] - 1) > 0.3]
+    write_js(dates, stocks)
+    print("\n書き出し: %s（%d銘柄 × %d日, %s 〜 %s）" % (OUT, len(stocks), len(dates), dates[0], dates[-1]))
+    print("  [%s] 前日比 ±30%% 超の日: %s" % ("OK  " if not jumps else "警告", "なし" if not jumps else jumps))
+
+
 def run(args):
     if args.update:
         run_update()
+        return
+    if SCEN.get("ipo"):
+        if args.history:
+            sys.exit("新規上場（%s）には過去分がありません。" % SCEN["name"])
+        run_ipo()
         return
     if args.history:
         if not OUT.exists():

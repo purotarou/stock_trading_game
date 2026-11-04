@@ -50,7 +50,7 @@ function load(file, storage) {
   g.window = g;
   vm.createContext(g);
   // データファイル（あれば）も読み込む。ランダム相場の比較には使わない
-  for (const name of ['corona2020.js', 'recent.js', 'recent_extra.js', 'corona2020_extra.js', 'news2020.js', 'news2026.js']) {
+  for (const name of ['corona2020.js', 'recent.js', 'recent_extra.js', 'corona2020_extra.js', 'recent_ipo.js', 'corona2020_ipo.js', 'events2020.js', 'events2026.js', 'news2020.js', 'news2026.js']) {
     const data = path.join(path.dirname(file), 'data', name);
     if (fs.existsSync(data)) vm.runInContext(fs.readFileSync(data, 'utf8'), g);
   }
