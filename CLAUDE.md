@@ -128,7 +128,7 @@
 順番は F1 → F2 → リアル相場ニュース。各ステップとも、これまでと同じ進め方（バックアップ→計画だけ出して止まる→実装→前のステップと比べる→報告して止まる）。
 1. **F1: 選定とデータ取得（データ取得は済み。銘柄の最終確認待ち）。** `tools/fetch_prices.py` の `SCENARIOS` に `recent_extra` を足し、`EXTRA_STOCKS`（コード・社名・業種・種類・優待の内容）の18社を `data/recent_extra.js`（`const RECENT_EXTRA`。recent.js と同じ形式で、日付は recent.js の `dates` / `history.dates` に合わせる。各銘柄に表示用の `kind`・`div`（開始前の1年の配当の実績・円）・`perk`（確かな優待の内容だけ）を持つ）に出力。`recent` の `--update` は続けて `recent_extra` も更新する（`--scenario recent_extra --update` だけでも可。recent.js を先に更新しておく）。`data/corona2020.js` と `data/recent.js` は変えていない。作業前のバックアップは `kabutore_backup_beforeF1`
 2. **F2: 組み込み（完了）。** `REAL_SETS.real2026.extra`（`RECENT_EXTRA`。日付が本編・過去分と同じときだけ使う）→ `S.xdef` / `xpx` / `xhist`、`useReal` が `REAL_XDEF` / `REAL_XPX` / `REAL_XHIST` に切り替える。R7 到達後に新しく始めた `real2026` だけ、`newGame` が `makeRealExtra` で `G.extra` に入れる（コロナ版・古いセーブは追加なし。指数・ニュースの銘柄選びは30銘柄のまま、追加銘柄のニュースは出さない）。日中の動きは専用乱数 `s.r`（`hash01(seed/rx/コード)`。`stepMinuteReal`・`openMarket` が `G.stocks.concat(G.extra)` を回し、30銘柄だけが共通の RNG を引く）。`realClose` は `s.extra` なら `REAL_XPX`。性格（bm・ssm・esd）は使わず、流動性（`XREAL_LIQ`・`KINDS`）・呼値1円・信用（`XREAL_MG`）だけ種類で決める。配当・優待は表示だけ（`divShow`・`perkShow`。`s.div`・`s.perk` は持たない＝入金なし。`kindOf` は `perkShow` も見る）。倒産・上場廃止・新規上場なし。確認: `check_random` / `check_real` が F1 完了時点と同じ、30銘柄がR7前後・保存をまたいで全日同じ、追加18社の終値が `RECENT_EXTRA` と一致（`check_random.js` の `load` は `recent_extra.js` も読む）。日中の動きは銘柄ごとの専用乱数
-3. **リアル相場ニュース:** 追加18社の当時のニュース（`data/news2026.js` の形式。出典 URL・type・importance は先頭コメントの方針に従う）
+3. **リアル相場ニュース（完了）:** 追加18社と新規上場2社の当時のニュースは `data/news2026.js`・`data/news2020.js` の「追加18社」区画と、そのうしろの「補強」区画にある（決算そのものは `events*.js` に任せ、ここには入れない）。形式の検査は `node tools/check_news.js 2020|2026`（断片ファイルを渡すと追加分だけ検査）。作業前のバックアップは `kabutore_backup_beforeNews`
 
 ### リアル相場の決算・配当・株主優待（H2、両シナリオ・50社。完了）
 - **データ:** `data/events2020.js`（`EVENTS2020`）・`data/events2026.js`（`EVENTS2026`）。`python3 tools/fetch_events.py --scenario real|real2026` で作る（株価のデータを先に作る。IR BANK の HTML は `.cache/irbank/` に保存して使い回す。`--refresh` で取り直す。`.cache/` は git に入れない）。銘柄ごとに `div`（yfinance の配当の実績 [権利落ち日, 1株配当]。開始前の1年の分も。分割の日と同じ権利落ち日の配当は、利回りが前回より分割比の平方根を超えて大きいときだけ分割比で割る＝日本製鉄 2025-09・東京海上 2026-09）、`skip`（前年の同じ時期にあった配当が今年ない回 [権利付き最終日, 注記]。注記は `DIV_NOTE`。任天堂 2026-09 は金額未定で無配ではない）、`earn`（IR BANK の適時開示一覧の決算短信・業績予想や配当予想の修正 [日付, 時刻, k|r, 見出し, 本文]。見出し・本文は【速報】の要約。同じ期の短信は1件にまとめる（期中レビュー後の再提出・IFRS/米国基準の併載）。要約のない短信は `EARN_MANUAL`（決算短信の1ページ目から手で書いた見出し）。タイトルに「訂正」を含むものは除く）、`perk`（`PERKS` の表。当時の内容を調べて手で書いたもの。各行の上に出典。権利確定日から、株価データの営業日で権利付き最終日 `d` を計算する）
@@ -144,7 +144,7 @@
 - **確認:** `check_random` / `check_real` が H1 の前と同じ。R7 のリアル相場（両シナリオ・シード42/7）で既存48社・指数・ニュースが全日同じ、新規上場は上場前に足・乱数なし、始値 = 初値、終値が全日データと一致、保存をまたいで同じ（確認スクリプトはリポジトリに入れていない）。作業前のバックアップは `kabutore_backup_beforeH1`
 
 ### リアル相場の追加18社（コロナショック版・2020年）：G2 まで完了
-- **状態:** G1（銘柄の選定とデータ取得）・G2（ゲームへの組み込み。R7 後のコロナショック版にも出る）完了。**G3（2020年の追加ニュース）は未着手**。作業前のバックアップは `kabutore_backup_beforeG1`
+- **状態:** G1（銘柄の選定とデータ取得）・G2（ゲームへの組み込み。R7 後のコロナショック版にも出る）完了。G3（2020年の追加ニュース）も完了。作業前のバックアップは `kabutore_backup_beforeG1`
 - **データ:** `data/corona2020_extra.js`（`const CORONA2020_EXTRA`。corona2020.js と同じ形式で、日付は corona2020.js の `dates`（242日）・`history.dates`（241日）と完全に同じ）。`tools/fetch_prices.py` の `SCENARIOS` の `corona2020_extra`（銘柄は `EXTRA20_STOCKS`。`align: "corona2020"`）で作る。各銘柄に表示用の `kind`・`div`（2019年の配当の実績・円）・`perk` を持つ。`data/corona2020.js`・`recent.js`・`recent_extra.js` は変えていない（ハッシュ同じ）
 - **表示だけ:** 優待は「優待あり」とだけ表示（内容は書かない）。配当は2019年の実績を表示するだけ。入金は作らない
 - **18社（社名は corona2020.js と同じく今の名前）:**

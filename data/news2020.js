@@ -1172,6 +1172,219 @@ const NEWS2020 = [
   { date: "2020-09-16", headline: "日立製作所が、英国での原発建設計画から撤退すると発表",
     body: "2019年1月から凍結していた。新型コロナで投資環境が厳しくなったことなどを理由に挙げた。", codes: ["6501"], importance: 2, type: "fact" },
 
+  /* ----- 追加18社の補強と新規上場2社（Sun Asterisk・雪国まいたけ） ----- */
+
+  /* ===== 新規上場：Sun Asterisk（4053） ===== */
+
+  // https://thebridge.jp/2020/06/sun-asterisk-files-for-ipo
+  // https://diamond.jp/articles/-/241652
+  { date: "2020-06-26", headline: "Sun Asteriskが東証マザーズへの上場を承認される。上場予定は7月31日",
+    body: "デジタル・クリエイティブスタジオ事業を営む。公募205万株、売出215万株で、主幹事は大和証券。", codes: ["4053"], importance: 2, type: "fact" },
+
+  // https://www.traders.co.jp/ipo/4053
+  // https://www.ipokiso.com/company/2020/sun-asterisk.html
+  { date: "2020-07-13", headline: "Sun Asteriskの公開価格の仮条件は630〜700円",
+    body: "ブックビルディングは7月14日から20日まで。", codes: ["4053"], importance: 1, type: "fact" },
+
+  // https://www.traders.co.jp/ipo/4053
+  // https://www.ipokiso.com/company/2020/sun-asterisk.html
+  { date: "2020-07-21", headline: "Sun Asteriskの公開価格が700円に決まる。仮条件の上限",
+    body: "上場日は7月31日。", codes: ["4053"], importance: 1, type: "fact" },
+
+  // https://www.traders.co.jp/ipo/4053
+  // https://www.ipokiso.com/company/2020/sun-asterisk.html
+  { date: "2020-07-31", headline: "Sun Asteriskが東証マザーズに上場。初値は公開価格700円の約7割高い1,209円",
+    body: "初値は公開価格を509円（72.7%）上回った。", codes: ["4053"], importance: 3, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/40530/140120200812480879.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/40530/140120201110420341.pdf （決算短信）
+  { date: "2020-08-14", headline: "Sun Asteriskの1〜6月期は、売上高が27億円、営業利益は5億5,000万円",
+    body: "上場後はじめての決算。通期の予想（売上高51億円、営業利益7億円）は据え置いた。", codes: ["4053"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/40530/140120201110420341.pdf （決算短信）
+  // https://www2.jpx.co.jp/disc/40530/140120200812480879.pdf （決算短信）
+  { date: "2020-11-11", headline: "Sun Asteriskの1〜9月期は、売上高が40億円、営業利益は6億9,400万円",
+    body: "純利益は6億4,900万円。", codes: ["4053"], importance: 1, type: "fact" },
+
+  /* ===== 新規上場：雪国まいたけ（1375） ===== */
+
+  // https://diamond.jp/zai/articles/-/246020
+  // https://gendai.media/articles/-/75697
+  { date: "2020-08-14", headline: "雪国まいたけが東証1部への上場を承認される。上場予定は9月17日",
+    body: "2015年にベインキャピタルのTOBで上場廃止となっており、約5年ぶりの再上場。ベインキャピタルが保有株を売り出す。", codes: ["1375"], importance: 2, type: "fact" },
+
+  // https://www.traders.co.jp/ipo/1375
+  // https://diamond.jp/zai/articles/-/246020
+  { date: "2020-09-01", headline: "雪国まいたけの公開価格の仮条件は2,000〜2,400円",
+    body: "想定価格は2,330円だった。", codes: ["1375"], importance: 1, type: "fact" },
+
+  // https://www.traders.co.jp/ipo/1375
+  // https://www.ipokiso.com/company/2020/maitake.html
+  { date: "2020-09-09", headline: "雪国まいたけの公開価格が2,200円に決まる。仮条件の上限には届かず",
+    body: "上場日は9月17日。", codes: ["1375"], importance: 1, type: "fact" },
+
+  // https://diamond.jp/zai/articles/-/246020
+  // https://www.ipokiso.com/company/2020/maitake.html
+  { date: "2020-09-17", headline: "雪国まいたけが東証1部に上場。初値は公開価格2,200円を下回る2,100円",
+    body: "公開価格を4.5%下回る公募割れの初値だった。", codes: ["1375"], importance: 3, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/13750/140120200915492876.pdf （会社の開示資料）
+  // https://gendai.media/articles/-/75697
+  { date: "2020-09-17", headline: "雪国まいたけが今期の予想を公表。売上収益356億円、営業利益83億円",
+    body: "上場にあわせて開示した。営業利益は前の期より24.4%増える見込み。", codes: ["1375"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/13750/140120201104415753.pdf （決算説明資料）
+  // https://www2.jpx.co.jp/disc/13750/140120200915492876.pdf （会社の開示資料）
+  { date: "2020-11-05", headline: "雪国まいたけの4〜9月期は、売上収益が4.3%増の150億円、営業利益は19.2%増の33億円",
+    body: "上場後はじめての決算。家庭での調理が増え、きのこの需要が伸びた。", codes: ["1375"], importance: 2, type: "fact" },
+
+  /* ===== 既存の補強 ===== */
+
+  // https://www2.jpx.co.jp/disc/33150/140120200319481578.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/33150/140120200502404449.pdf （決算短信）
+  { date: "2020-03-24", headline: "日本コークス工業が、3月期の期末配当予想を1円とすると発表",
+    body: "前の期は3円。業績の見通しを踏まえた。", codes: ["3315"], importance: 1, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/33150/140120201016404937.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/33150/140120201104415221.pdf （会社の開示資料）
+  { date: "2020-10-19", headline: "日本コークス工業が、4〜9月期の営業利益予想を11億円から14億円に上方修正",
+    body: "コークスの市況が堅調だった。売上高の予想は440億円から410億円に下げた。", codes: ["3315"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/33150/140120201221437004.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/33150/140120201104415221.pdf （会社の開示資料）
+  { date: "2020-12-25", headline: "日本コークス工業が、今期の営業利益予想を43億円から57億円に上方修正。期末配当は3円に",
+    body: "コスト削減に加え、コークスの市況が上がった。純利益の予想は19億円から29億円。", codes: ["3315"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/39940/140120200730470544.pdf （会社の開示資料）
+  // https://edinetdb.jp/company/E33390/history
+  { date: "2020-07-31", headline: "マネーフォワードが、入金消込システムのアール・アンド・エー・シーを子会社にすると発表",
+    body: "「V-ONE クラウド」などを提供する会社。中堅規模以上の企業向けの商品を強める。", codes: ["3994"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/54110/140120200811480076.pdf （会社の開示資料）
+  // https://www.newsweekjapan.jp/articles/-/164595
+  { date: "2020-08-12", headline: "JFEホールディングスが今期の予想を公表。事業損益は1,000億円の赤字、中間配当は見送り",
+    body: "新型コロナの影響が読めないとして未定にしていた。通期の売上収益は3兆1,700億円の見通し。", codes: ["5411"], importance: 3, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/58030/140120200204456923.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/58030/140120200408490998.pdf （会社の開示資料）
+  { date: "2020-02-05", headline: "フジクラが3月期の予想を下方修正。営業利益は155億円から80億円、純損益は75億円の赤字に",
+    body: "光関連製品の競争の激化などによる。期末配当は5円から2.5円に引き下げる。", codes: ["5803"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/58030/140120200408490998.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/58030/140120200525423444.pdf （会社の開示資料）
+  { date: "2020-05-25", headline: "フジクラが3月期の純損益予想を330億円の赤字に引き下げ。減損損失114億円を計上へ",
+    body: "光ファイバの製造設備などの減損と、繰延税金資産の取り崩しによる。決算発表は再び延期した。", codes: ["5803"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/58030/140120200729468935.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/58030/140120201030413467.pdf （会社の開示資料）
+  { date: "2020-08-03", headline: "フジクラが4〜9月期の予想を公表。営業利益10億円、純損益は65億円の赤字",
+    body: "新型コロナの影響で未定にしていた。売上高の予想は2,900億円。", codes: ["5803"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/87660/140120200107443768.pdf （会社の開示資料）
+  // https://www.insurancejournal.com/news/international/2020/01/07/553737.htm
+  { date: "2020-01-07", headline: "東京海上HDが、ブラジルで保険の合弁会社を設立すると発表。出資額は約395億円",
+    body: "国営のカイシャ銀行系の保険会社と組み、住宅ローンに付ける保険などを扱う。東京海上側の議決権は50.01%。", codes: ["8766"], importance: 2, type: "fact" },
+
+  // https://www2.jpx.co.jp/disc/87660/140120201117425745.pdf （会社の開示資料）
+  // https://www2.jpx.co.jp/disc/87660/140120201117425744.pdf （会社の開示資料）
+  { date: "2020-11-19", headline: "東京海上HDが、500億円の株主還元を決定。一時的な配当と自己株式の取得",
+    body: "一時的な配当は1株35円（総額244億円）、自己株式の取得は256億円が上限。中間配当は普通配当と合わせて135円。", codes: ["8766"], importance: 2, type: "fact" },
+
+  // https://www.watch.impress.co.jp/docs/news/1248135.html
+  // https://www.bcnretail.com/market/detail/20200420_168590.html
+  { date: "2020-04-20", headline: "日本マクドナルドが、13都道府県の約1,910店で店内客席の利用を終日中止",
+    body: "政府の「特定警戒都道府県」が対象で、5月6日までの予定。持ち帰り・ドライブスルー・デリバリーは続ける。", codes: ["2702"], importance: 2, type: "fact" },
+
+  // https://digitalpr.jp/r/38695
+  // https://mdpr.jp/news/detail/2050584
+  { date: "2020-04-28", headline: "日本マクドナルドが、全国約2,900店で店内客席の利用を終日中止すると発表",
+    body: "4月29日から5月6日までの予定。持ち帰り・ドライブスルー・デリバリーは続ける。", codes: ["2702"], importance: 3, type: "fact" },
+
+  // https://www.yakuji.co.jp/?p=78697
+  // https://www.yakuji.co.jp/?p=78543
+  { date: "2020-04-13", headline: "テルモの血液成分分離装置が、新型コロナ患者向けに米FDAの緊急使用許諾を取得",
+    body: "吸着カートリッジと組み合わせ、集中治療室で呼吸不全の18歳以上の患者に使う。治療機器としては初めて。", codes: ["4543"], importance: 3, type: "fact" },
+
+  // https://toyokeizai.net/articles/-/352470
+  // https://newswitch.jp/image/21781
+  { date: "2020-05-26", headline: "テルモが、人工肺（ECMO）の生産能力を平時の約3倍に引き上げたと明らかに",
+    body: "国内シェアは7割。1月に部材の調達から増産に着手し、装置本体の体制は3月に整った。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://newswitch.jp/p/21816
+  // https://newswitch.jp/p/21926
+  { date: "2020-04-09", headline: "花王が、4月下旬から消毒液を増産すると発表。生産量は前年の20倍以上に",
+    body: "和歌山工場など国内4工場で生産する。まず医療機関や介護施設に供給する。", codes: ["4452"], importance: 2, type: "fact" },
+
+  // https://www.kao.com/jp/newsroom/news/release/2020/20201001-001/
+  // https://www.nikkei.com/article/DGXLRSP541055_R01C20A0000000/
+  { date: "2020-10-01", headline: "花王の衛生科学研究センターが、専門家向けに新型コロナの感染防止情報の発信を開始",
+    body: "感染の仕組みや環境表面の除染方法などを、論文などの知見に基づいて紹介する。", codes: ["4452"], importance: 1, type: "fact" },
+
+  // https://jidounten-lab.com/u_35710
+  // https://www.hitachicm.com/global/news-list_en/20-08-19e （会社の発表。ページは開けず、検索結果の要旨で確認）
+  { date: "2020-08-19", headline: "日立建機が、自律運転の建設機械向けシステムの基盤「ZCORE」を開発",
+    body: "油圧ショベルやダンプトラックなどに載せ、認識・判断・実行を機械側で行えるようにする。", codes: ["6305"], importance: 1, type: "fact" },
+
+  // https://www.toyota-tsusho.com/press/detail/200401_004594.html
+  // https://eetimes.itmedia.co.jp/ee/articles/2004/14/news056.html
+  { date: "2020-04-01", headline: "豊田通商グループのネクスティ エレクトロニクスが、キャッツのODM事業を譲り受けることで基本合意。新会社を設立",
+    body: "新会社はネクスティエンジニアリングサービス（資本金1億円）。設計や生産の受託を手がける。", codes: ["8015"], importance: 1, type: "fact" },
+
+  // https://www.toyota-tsusho.com/press/detail/201027_004701.html
+  // https://www.nttdata.com/global/ja/news/release/2020/102700
+  { date: "2020-10-27", headline: "豊田通商など7社が、貿易のデジタル化を進める「TradeWaltz」の運営会社に共同出資",
+    body: "NTTデータ、三菱商事、東京海上日動、三菱UFJ銀行、兼松、損保ジャパンとの7社。ブロックチェーンを使う。", codes: ["8015"], importance: 1, type: "fact" },
+
+  // https://www.toyota-tsusho.com/press/detail/201223_004731.html
+  // https://www.toyota-tsusho.com/press/2020/
+  { date: "2020-12-23", headline: "豊田通商が、医療用アプリを手がけるアルムと業務提携",
+    body: "アプリ「Join」で、インドの病院とガーナ・ナイジェリアのクリニックを結び、遠隔診療などに使う。", codes: ["8015"], importance: 1, type: "fact" },
+
+  // https://www.bcnretail.com/market/detail/20200309_161701.html
+  // https://macaro-ni.jp/87652?page=2
+  { date: "2020-03-09", headline: "吉野家が、3月10日から31日まで、テイクアウトの牛丼並盛を税込300円に値下げ",
+    body: "新型コロナによる臨時休校を受けた措置。通常は税込380円。", codes: ["9861"], importance: 1, type: "fact" },
+
+  // https://www.watch.impress.co.jp/docs/news/1248494.html
+  // https://weekly.ascii.jp/elem/000/004/010/4010270/
+  { date: "2020-04-21", headline: "吉野家が、4月23日からテイクアウト限定の「ファミリーセット」を販売",
+    body: "牛丼並盛3人前が1,350円、4人前が1,800円（税抜）。持ち帰りの販売が全体の6割を超えたことを受けた。", codes: ["9861"], importance: 1, type: "fact" },
+
+  // https://www.bcnretail.com/market/detail/20201019_195694.html
+  // https://www.bcnretail.com/market/detail/20201026_196635.html
+  { date: "2020-10-19", headline: "ゼンショーHDが、すき家・はま寿司など全業態で「Go To Eat」の食事券に参加",
+    body: "購入額に25%が上乗せされる食事券。ココスは10月26日から使える。", codes: ["7550"], importance: 1, type: "fact" },
+
+  // https://www.kabutore.biz/genzaikabuka/enkaku.html?code=7550
+  // https://ja.wikipedia.org/wiki/ココスジャパン
+  { date: "2020-02-18", headline: "ココスジャパンがジャスダックを上場廃止。ゼンショーグループの完全子会社に",
+    body: "株式交換によるもので、効力の発生は2月20日。", codes: ["7550"], importance: 1, type: "fact" },
+
+  // https://www.ryutsuu.biz/strategy/m052727.html
+  // https://digitalpr.jp/r/37064
+  { date: "2020-05-27", headline: "三井不動産が、延期していた施設の開業日を発表。ららぽーと豊洲は5月29日にリニューアル",
+    body: "ららぽーと豊洲3は6月1日、三井アウトレットパーク 横浜ベイサイドは6月4日に開業する。", codes: ["8801"], importance: 1, type: "fact" },
+
+  // https://media.monex.co.jp/articles/-/15266
+  // https://www2.jpx.co.jp/disc/89510/140120201009401770.pdf （投資法人側の開示。ページは開けず、検索結果の要旨で確認）
+  { date: "2020-10-09", headline: "三井不動産が、新宿三井ビルディングを日本ビルファンド投資法人に1,700億円で譲渡",
+    body: "引き渡しは2021年1月の予定。東京駅近くのグラントウキョウサウスタワーの一部（470億円）も同時に譲渡する。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://www.sbbit.jp/article/refers/49415
+  // https://www.sbbit.jp/article/refers/48811
+  { date: "2020-12-16", headline: "三井不動産が、東京ドームのTOBで、大株主オアシスと保有株の全株を応募する契約を結んだと発表",
+    body: "買い付け価格は1株1,300円。オアシスは東京ドームの約1割を持つ香港の投資ファンド。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://www.nihon-ma.co.jp/news/20200514_9735-8/
+  // https://www2.jpx.co.jp/disc/70580/140120200514414390.pdf （共栄セキュリティーサービスの開示。ページは開けず、検索結果の要旨で確認）
+  { date: "2020-05-14", headline: "セコムが、警備会社の共栄セキュリティーサービスと業務・資本提携。株式の2.99%を取得",
+    body: "施設警備に強い共栄の人的警備と、セコムのシステムや技術を組み合わせる。", codes: ["9735"], importance: 1, type: "fact" },
+
+  // https://www.nihon-ma.co.jp/news/20201026_8928-4/
+  // https://maonline.jp/news/summary20201031
+  { date: "2020-10-26", headline: "セコムが、マンション分譲のセコムホームライフの全株式を穴吹興産に譲渡する契約を結ぶ",
+    body: "譲渡日は12月22日の予定。取得価額は非公表。", codes: ["9735"], importance: 1, type: "fact" },
+
   /* ===================== 観測報道（発表前に実際にあった報道） ===================== */
 
   // https://www.sbbit.jp/article/refers/45073

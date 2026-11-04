@@ -1137,6 +1137,150 @@ const NEWS2026 = [
   { date: "2026-10-28", headline: "日立が7〜9月期の決算を発表。通期の見通しを、売上高12兆円、Adjusted EBITA 1兆5,600億円、純利益9,200億円に引き上げ",
     body: "7〜9月期の売上高は15%増の2兆9,044億円。", codes: ["6501"], importance: 2, type: "fact" },
 
+  /* ----- 追加18社の補強と新規上場2社（GO・ティアフォー） ----- */
+
+  // ---- A) 新規上場2社：GO（581A）・ティアフォー（593A） ----
+
+  // https://www.nihon-ma.co.jp/tokyopromarket/news/dmnnj93_r
+  // https://www.oanda.jp/lab-education/market_news/kn_2026051401002056/
+  // https://gamebiz.jp/news/425901
+  { date: "2026-05-14", headline: "タクシー配車アプリのGOが、東証グロース市場への上場承認を受けたと発表。上場日は6月16日",
+    body: "調達した資金は、配車事業の拡大と自動運転サービスの事業化に充てる。DeNAは保有するGO株の一部を売り出す。", codes: ["581A"], importance: 2, type: "fact" },
+
+  // https://kabu.bridge-salon.jp/?p=47465
+  // https://media.paypay-sec.co.jp/cat5/jisha260615
+  { date: "2026-06-02", headline: "GOの新規上場の仮条件は1株2,350〜2,400円。2日から5日まで需要を受け付ける",
+    body: "公募はなく、すべて売出し。売出しの規模は約886億円。", codes: ["581A"], importance: 1, type: "fact" },
+
+  // https://www.oanda.jp/lab-education/market_news/kn_2026061601001854/
+  // https://media.paypay-sec.co.jp/cat5/jisha260615
+  // https://kabu.bridge-salon.jp/?p=47465
+  { date: "2026-06-16", headline: "GOが東証グロースに上場。初値は2,910円で、公開価格（2,400円）を約21%上回る",
+    body: "終値は2,640円で、時価総額は約2,050億円。今年最大の新規上場となった。", codes: ["581A"], importance: 3, type: "fact" },
+
+  // https://www.tousaiblog.org/go-kessan
+  // https://scouter.monex.co.jp/news/detail/581A_20260714_act_20260714_153038_12
+  { date: "2026-07-14", headline: "GOの5月期決算は、売上高が31.8%増の414億円、営業利益が158.1%増の70億円。今期の営業利益は130億円を見込む",
+    body: "純利益は88億円。繰延税金資産の計上による約34億円の押し上げを含む。上場後はじめての通期決算。", codes: ["581A"], importance: 2, type: "fact" },
+
+  // https://car.watch.impress.co.jp/docs/news/2140924.html
+  // https://dxmagazine.jp/news/2651uk1/
+  { date: "2026-09-15", headline: "GO、米Waymo、日本交通が東京での自動運転タクシーの商用化で合意。2027年中の完全無人運行をめざす",
+    body: "2027年中に段階的に100台規模の運行を目標とする。配車はGOとWaymoの両方のアプリで受け付ける予定。", codes: ["581A"], importance: 2, type: "fact" },
+
+  // https://www.logi-today.com/971292
+  // https://nihon-ma.co.jp/tokyopromarket/news/f0w8ohdj8ilx
+  { date: "2026-06-29", headline: "自動運転ソフト開発のティアフォーが、東証グロース市場への上場承認を受けたと発表。上場日は7月22日",
+    body: "自動運転用のオープンソースソフト「Autoware」の開発を主導する会社。2025年9月期の売上高は64億1,000万円。", codes: ["593A"], importance: 2, type: "fact" },
+
+  // https://kabu.bridge-salon.jp/ipo-202607-593a/
+  // https://www.ipokiso.com/company/2026/tier4.html
+  { date: "2026-07-06", headline: "ティアフォーの新規上場の仮条件は1株1,015〜1,085円。6日から10日まで需要を受け付ける",
+    body: "2025年9月期の純損失は48億円。", codes: ["593A"], importance: 1, type: "fact" },
+
+  // https://www.sakigake.jp/news/article/20260722CO0034/
+  // https://kumanichi.com/articles/2016256
+  { date: "2026-07-13", headline: "ティアフォーの公開価格（売り出し価格）が1株1,085円に決まった",
+    body: "仮条件（1,015〜1,085円）の上限で決まった。", codes: ["593A"], importance: 1, type: "fact" },
+
+  // https://www.sakigake.jp/news/article/20260722CO0034/
+  // https://kumanichi.com/articles/2016256
+  { date: "2026-07-22", headline: "ティアフォーが東証グロースに上場。初値は1,009円で、公開価格（1,085円）を約7.0%下回る公募割れ",
+    body: "自動運転技術の開発を専門とする会社としては初の上場。初値ベースの時価総額は約640億円。", codes: ["593A"], importance: 3, type: "fact" },
+
+  // https://jioinc.jp/investleaders/?p=17399
+  // https://scouter.monex.co.jp/news/detail/593A_20260814_act_20260814_160048_2
+  { date: "2026-08-14", headline: "ティアフォーの10〜6月期（第3四半期累計）は、売上高が30.0%増の51億7,800万円、営業損失は68億2,600万円",
+    body: "補助金収入36億6,100万円を営業外で計上し、純損失は41億7,400万円。通期の予想は変えていない。", codes: ["593A"], importance: 2, type: "fact" },
+
+  // ---- B) 既存ニュースの補強 ----
+
+  // https://www.nihon-ma.co.jp/news/20260817_3323-42/
+  // https://maonline.jp/news/20260817b
+  { date: "2026-08-17", headline: "レカムが秋田県の文具・事務用品販売のとみやを子会社化すると発表。9月に株式交換で完全子会社にする",
+    body: "9月4日に株式の過半数を取得し、9月7日に残りを株式交換で取得する予定。取得価額は公表していない。", codes: ["3323"], importance: 2, type: "fact" },
+
+  // https://www.nihon-ma.co.jp/news/20261019_3323-46/
+  // https://www.nihon-ma.co.jp/news/company/3323/
+  { date: "2026-10-19", headline: "レカムが光通信との合弁会社レカムIEパートナーを、株式交換で完全子会社にすると発表",
+    body: "いまはレカムが51%、光通信が49%を持つ。効力の発生は11月9日の予定。", codes: ["3323"], importance: 2, type: "fact" },
+
+  // https://space-connect.jp/ispace-mission6/
+  // https://space-connect.jp/ispace-202603q3/
+  { date: "2026-01-16", headline: "ispaceが、JAXAの宇宙戦略基金「月極域における高精度着陸技術」の実施機関に採択されたと発表。支援は最大200億円",
+    body: "最長5年程度の支援。2029年に月の南極近傍への高精度着陸をめざすミッション6の着陸船を開発する。", codes: ["9348"], importance: 2, type: "fact" },
+
+  // https://www.newsweekjapan.jp/articles/-/327822
+  // https://space-connect.jp/ispace-starship/
+  { date: "2026-07-08", headline: "ispaceが、米スペースXの宇宙船「Starship」の月面輸送枠500kgを確保し、小型荷物向けの輸送サービスを始めると発表",
+    body: "Starshipの月面着陸は最速で2030年をめざす。500kg分の購入契約額は5,000万ドル（約81億円）と報じられた。", codes: ["9348"], importance: 2, type: "fact" },
+
+  // https://www.ispace-inc.com/2026/07/24/esa-awards-ispace-europe-contract-for-execution-of-magpie-esas-first-lunar-rover/
+  // https://space-connect.jp/ispace-2027q1/
+  { date: "2026-07-24", headline: "ispaceの欧州法人が、欧州宇宙機関（ESA）から月面探査ローバー計画「MAGPIE」のフェーズ2を受注。契約額は6,500万ユーロ",
+    body: "ローバーの開発から月面での運用までを請け負う。2029年にispaceのミッション4で月へ運ぶ予定。", codes: ["9348"], importance: 2, type: "fact" },
+
+  // https://newswitch.jp/p/48575
+  // https://media.rakuten-sec.net/articles/-/52513
+  { date: "2026-03-05", headline: "積水ハウスが第7次中期経営計画（2026〜2028年度）を発表。2029年1月期に売上高5兆260億円、営業利益4,500億円をめざす",
+    body: "3年間で4,400億円の成長投資を計画。2026年1月期の売上高より19.7%多い。", codes: ["1928"], importance: 2, type: "fact" },
+
+  // https://nihon-ma.co.jp/tokyopromarket/news/ea7zv0bstge
+  // https://the-shashi.com/tse/4004/decisions/crasus-chemical-spinoff-2026/
+  { date: "2026-09-07", headline: "レゾナックの石油化学子会社クラサスケミカルが、東証スタンダード市場への上場承認を受けた。上場日は9月29日",
+    body: "公募・売出しをしない直接上場。レゾナックHDは20%未満の株式を持ち続け、残りは株主への現物配当で切り離す。", codes: ["4004"], importance: 2, type: "fact" },
+
+  // https://toyokeizai.net/articles/-/959195
+  // https://the-shashi.com/tse/4004/decisions/crasus-chemical-spinoff-2026/
+  { date: "2026-09-29", headline: "レゾナックの石油化学子会社クラサスケミカルが東証スタンダードに上場。10月1日付でレゾナック株1株につき1株を現物配当",
+    body: "株式の一部を残して独立させる「パーシャル・スピンオフ」による上場。国内では2例目。", codes: ["4004"], importance: 2, type: "fact" },
+
+  // https://www.sumitomocorp.com/en/asia-oceania/news/release/2026/group/20970
+  // https://www.cityam.com/sumitomo-corporation-smbc-aviation-capital-apollo-and-brookfield-complete-the-acquisition-of-air-lease-corporation/
+  { date: "2026-04-09", headline: "住友商事などが米航空機リース大手エア・リースの買収を完了。社名はSumisho Air Leaseに変わった",
+    body: "住友商事、SMBCアビエーション・キャピタル、米アポロ、カナダのブルックフィールドの4者による買収。買収額は約74億ドル、債務を含めると約282億ドル。", codes: ["8053"], importance: 3, type: "fact" },
+
+  // https://www.sumitomocorp.com/ja/jp/news/release/2026/group/21640
+  // https://www.kaohooninternational.com/markets/590899
+  { date: "2026-09-17", headline: "住友商事が、タイのガス火力発電会社ABPLの株式15%を四国電力に譲渡したと発表",
+    body: "譲渡後も住友商事は15%を持つ。損益は今年度の業績予想にすでに入れてある。", codes: ["8053"], importance: 1, type: "fact" },
+
+  // https://www.nikkei.com/article/DGXZQOUB235AZ0T20C26A3000000/
+  // https://ryukyushimpo.jp/kyodo/entry-5142239.html
+  // https://japan.co.jp/reports/berkshire-hathaway-tokio-marine-investment-partnership-2026.html
+  { date: "2026-03-23", headline: "東京海上HDが、米バークシャー・ハサウェイと資本業務提携。2,874億円の出資を受け入れる",
+    body: "バークシャー子会社が約2.5%の株式を取得する。再保険の取引と、共同でのM&Aの検討が柱。", codes: ["8766"], importance: 3, type: "fact" },
+
+  // https://www.mitsuifudosan.co.jp/corporate/news/2026/0206/
+  // https://www.lnews.jp/2026/02/s0206508.html
+  { date: "2026-02-06", headline: "三井不動産が三井倉庫ホールディングスと資本業務提携。約7%の株式を取得する",
+    body: "新株300万株と自己株式225万株の計525万株を第三者割当で引き受ける。高機能な物流施設の開発などで連携する。", codes: ["8801"], importance: 2, type: "fact" },
+
+  // https://www.nikkei.com/article/DGXZQOUC307T30Q6A930C2000000/
+  // https://www.yakuji.co.jp/entry140004.html
+  { date: "2026-09-30", headline: "テルモが、米アーセナル・メディカルの買収に合意",
+    body: "子会社のテルモ・ニューロを通じて買収する。慢性硬膜下血腫の治療用に開発中の液体塞栓材「NeoCast」を取得する。", codes: ["4543"], importance: 2, type: "fact" },
+
+  // https://www.nikkei.com/article/DGKKZO96190250S6A510C2DTC000/
+  // https://www2.jpx.co.jp/disc/97350/140120260701586107.pdf
+  { date: "2026-05-12", headline: "セコムが、上限1,000億円の自社株買いを決定。同社として過去最大の規模",
+    body: "取得は最大2,300万株、期間は2027年2月25日まで。", codes: ["9735"], importance: 2, type: "fact" },
+
+  // https://maonline.jp/news/20260710a
+  // https://www.nihon-ma.co.jp/news/20260710_9861-50/
+  { date: "2026-07-10", headline: "吉野家ホールディングスが、米国のラーメン店チェーン「Kizuki」の運営会社の持分70%を取得すると発表",
+    body: "米国子会社を通じて取得する。Kizukiはシアトルを中心に17店舗を展開している。", codes: ["9861"], importance: 2, type: "fact" },
+
+  // https://scan.netsecurity.ne.jp/article/2026/10/20/56507.html
+  // https://www.yoshinoya.com/news/2026/press-release/
+  { date: "2026-09-30", headline: "吉野家ホールディングスが、アルバイト採用の委託先への不正アクセスで、応募者の個人情報が漏れたと発表",
+    body: "委託先のApplyNowのシステムが攻撃され、吉野家の応募者4,998件の情報が漏れた。二次被害は確認されていない。", codes: ["9861"], importance: 1, type: "fact" },
+
+  // https://www.toonippo.co.jp/articles/-/2387908
+  // https://news.jp/i/1485808127132795187
+  { date: "2026-10-22", headline: "ゼンショーHDが、「すき家」「はま寿司」などのアプリの利用を21日夜から停止していると発表",
+    body: "PHPの脆弱性に備えた予防的な措置という。", codes: ["7550"], importance: 1, type: "fact" },
+
   /* ===================== 観測報道（正式な発表の前に実際にあった報道） ===================== */
   // 報道があった日付で入れる。報じられた内容は確定した事実ではない
 
