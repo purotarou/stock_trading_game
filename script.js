@@ -133,9 +133,9 @@ const SCEN = {
   // リアル相場チャレンジ専用（相場で「リアル相場チャレンジ」を選んだときだけ一覧に出す）。日数は実データの営業日数
   // 名前・期間の表示は REAL_SETS（リアル相場のデータ表）にまとめてある。キーは REAL_SETS のキーと同じ
   real:  { get name() { return REAL_SETS.real.name; }, get days() { return realDays('real'); }, rank: 5, mu: 0, get desc() { return `${REAL_SETS.real.period}の実際の株価で1年間取引する。`; }, goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true },
-  real2026: { get name() { return REAL_SETS.real2026.name; }, get days() { return realDays('real2026'); }, rank: 5, mu: 0, get desc() { return `${REAL_SETS.real2026.period}の実際の株価で取引する。`; }, goal: '30銘柄平均に勝つ', clear: (r, ir) => r > ir, real: true, noFree: true },   // noFree: フリープレイの相場の候補に入れない
-  // 相場は上のリアル相場のシナリオ（noFree でないもの）からランダムで選ぶ（G.base）。実データが終わったら終了
-  realfree: { name: 'フリープレイ', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: 'どの相場になるかは始まってからのお楽しみ。初期資金も自由に決められる。', goal: 'なし', clear: null, real: true, free: true },
+  real2026: { get name() { return REAL_SETS.real2026.name; }, get days() { return realDays('real2026'); }, rank: 5, mu: 0, get desc() { return `${REAL_SETS.real2026.period}の実際の株価で取引する。`; }, goal: '資産+20%', clear: (r) => r >= .20, real: true, noFree: true },   // noFree: newGame に相場を渡さないときの、フリープレイの相場の候補に入れない（タイトルでは選べる）
+  // 相場はタイトルで選んだリアル相場のシナリオ（G.base。フリープレイを押したまま、上の相場のボタンで選ぶ）。実データが終わったら終了
+  realfree: { name: 'フリープレイ', get days() { return REAL ? REAL.dates.length : 0; }, rank: 5, mu: 0, desc: '上の相場から1つ選んで自由に遊べる。初期資金も自由に決められる。', goal: 'なし', clear: null, real: true, free: true },
 };
 // フリープレイで選べる初期資金（円）
 const CASH_MIN = 1e4, CASH_MAX = 1e9;
@@ -494,11 +494,11 @@ function rngOn(r) { return Object.assign(r, { next: RNG.next, normal: RNG.normal
 // 30銘柄と追加銘柄（梅山カンパニーは別）。共通の乱数（RNG）を引く処理では使わず、G.stocks だけを回す
 const allStocks = () => (G.extra?.length ? G.stocks.concat(G.extra) : G.stocks);
 
-function newGame(scen, diff, seed, cash, mode) {
+function newGame(scen, diff, seed, cash, mode, freeKeys) {   // freeKeys: リアル相場のフリープレイで選んだ相場（なければ freePool からシードの剰余で選ぶ）
   RNG.s = seed | 0; RNG.spare = null;
   if (mode === 'real' && !SCEN[scen].real) scen = 'real';
   // リアル相場のフリープレイは、ほかのリアル相場のシナリオから相場を選ぶ（乱数の順番を変えないようにシードで決める）
-  const pool = freePool(), base = mode === 'real' ? (SCEN[scen].free ? pool[Math.abs(seed | 0) % pool.length] : scen) : null;
+  const pool = freeKeys?.length ? freeKeys : freePool(), base = mode === 'real' ? (SCEN[scen].free ? pool[Math.abs(seed | 0) % pool.length] : scen) : null;
   const real = mode === 'real' && realOK(base);   // リアル相場は、そのシナリオのデータ（data/corona2020.js など）があるときだけ
   if (!real && SCEN[scen].real) scen = 'free';
   if (real) useReal(base);
@@ -3174,17 +3174,18 @@ function senseiAdvice({ r, ir, clear, stars, P, bk }) {
 }
 
 /* ---------- タイトル ---------- */
-const pick = { mode: 'random', scen: 'month', diff: 'easy' };
+const pick = { mode: 'random', scen: 'month', diff: 'easy', market: 'real' };   // market: リアル相場のフリープレイで遊ぶ相場（フリープレイを押したまま、ほかのシナリオのボタンで選ぶ）
 // シナリオが遊べるか（データがあるか）。フリープレイは、相場の候補のどれかのデータがあれば遊べる
-const scenAvail = k => !SCEN[k].real || (SCEN[k].free ? freePool().some(realOK) : realOK(k));
+const freeCands = () => Object.keys(SCEN).filter(k => SCEN[k].real && !SCEN[k].free && realOK(k));   // フリープレイで選べる相場（データがあるもの）
+const scenAvail = k => !SCEN[k].real || (SCEN[k].free ? freeCands().length > 0 : realOK(k));
 const scenOff = (k, r) => scenLock(SCEN[k], r) || !scenAvail(k);
-const scenMissingFile = k => REAL_SETS[SCEN[k].free ? freePool()[0] : k].file;
+const scenMissingFile = k => REAL_SETS[SCEN[k].free ? Object.keys(REAL_SETS)[0] : k].file;
 // リアル相場の注意書き。選んだシナリオの期間に合わせ、ニュースがあるかどうかで文を切り替える
 function realDisclaimer(k) {
-  const rs = REAL_SETS[SCEN[k].free ? freePool()[0] : k];
-  const news = rs && Object.keys(rs.newsByDay || {}).length > 0;
-  const ev = rs?.ev ? '決算は当時の発表日時に、実際の数字を要約したニュースとして出ます。配当と株主優待は当時の実績どおり、権利付き最終日に持っていれば翌朝に入ります（優待は金額が示されているものだけ）。どちらも株価は動かしません。' : '決算・配当は出ません。';
-  return `リアル相場チャレンジの終値は、${rs?.period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。${ev}${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
+  const rss = (SCEN[k].free ? [pick.market] : [k]).map(x => REAL_SETS[x]).filter(Boolean), rs = rss[0], period = rss.map(x => x.period).join('と');
+  const news = rss.some(x => Object.keys(x.newsByDay || {}).length > 0);
+  const ev = rss.some(x => x.ev) ? '決算は当時の発表日時に、実際の数字を要約したニュースとして出ます。配当と株主優待は当時の実績どおり、権利付き最終日に持っていれば翌朝に入ります（優待は金額が示されているものだけ）。どちらも株価は動かしません。' : '決算・配当は出ません。';
+  return `リアル相場チャレンジの終値は、${period}の実際の株価（株式分割を反映した値。配当は反映していません）です。始値・高値・安値・日中の動き・板・出来高は、終値をもとにゲームが作ったもので、実際とは異なります。${ev}${news ? 'ニュースは実際の報道を要約したもので、出来事の翌営業日の朝に表示されます（表示するだけで、株価は動かしません）。' : 'ニュースは出ません。'}実データは Yahoo Finance から個人利用の範囲で取得したもので、このモードは配布しないでください。過去の値動きは将来の値動きを保証しません。`;
 }
 function showTitle() {
   practiceEnd(true); if (UI.view === 'mission') markMissionsSeen();
@@ -3194,6 +3195,8 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
+  if (real && SCEN[pick.scen].real && !SCEN[pick.scen].free) pick.market = pick.scen;
+  if (real && (SCEN[pick.market]?.free || scenOff(pick.market, r))) pick.market = Object.keys(SCEN).find(k => SCEN[k].real && !SCEN[k].free && !scenOff(k, r)) || 'real';
   const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の50社。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
@@ -3201,7 +3204,7 @@ function showTitle() {
       <div class="prof${isFast() ? ' fast' : ''}${r >= RANKS.length ? ' rank-legend' : ''}"><b>ランク${r}「${RANKS[r - 1].n}」</b>${profile.xp.toLocaleString()} XP　<span id="t-pt">${profile.points.toLocaleString()} pt</span></div></div>
     <div class="setup">
       <div><h2>相場</h2><div class="choices modes">${modes.map(([k, n, d]) => `<button class="choice" data-mode="${k}" aria-pressed="${pick.mode === k}" ${k === 'real' && (!anyReal() || realLock) ? 'disabled' : ''}><b>${n}</b><span>${d}</span>${k === 'real' && anyReal() && realLock ? `<em>ランク${SCEN.real.rank}で解放</em>` : ''}</button>`).join('')}</div>
-      <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = scenLock(S, r), miss = !scenAvail(k), b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k}" ${lock || miss ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}　目標：${S.goal}</span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : miss ? `${scenMissingFile(k)} がありません` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
+      <h2>シナリオ</h2><div class="choices">${Object.entries(SCEN).filter(([, S]) => !!S.real === real).map(([k, S]) => { const lock = scenLock(S, r), miss = !scenAvail(k), b = profile.best[k]; return `<button class="choice" data-scen="${k}" aria-pressed="${pick.scen === k || (pick.scen === 'realfree' && !S.free && pick.market === k)}" ${lock || miss ? 'disabled' : ''}><b>${S.name}</b><span>${S.desc}${S.days && !S.free ? `（${S.days}営業日）` : ''}<span class="goal-br">目標：${S.goal}</span></span><em class="${b ? 'best' : ''}">${lock ? `ランク${S.rank}で解放` : miss ? `${scenMissingFile(k)} がありません` : b != null ? '★'.repeat(b) + '☆'.repeat(3 - b) : ''}</em></button>`; }).join('')}</div></div>
       <div><h2>難易度</h2><div class="choices">${Object.entries(DIFF).map(([k, D]) => { const lock = D.rank > r; return `<button class="choice" data-diff="${k}" aria-pressed="${pick.diff === k}" ${lock ? 'disabled' : ''}><b>${D.name}</b><span>${D.desc}</span><em>${lock ? `ランク${D.rank}で解放` : ''}</em></button>`; }).join('')}</div>
         <div class="seed-row" id="cash-row" ${SCEN[pick.scen].free ? '' : 'hidden'}><label for="cash">初期資金</label><input id="cash" class="num" type="number" min="${CASH_MIN}" max="${CASH_MAX}" step="10000" placeholder="${DIFF[pick.diff].cash}"><span>円（1万〜10億円。フリープレイのみ）</span></div>
         <div class="seed-row"><label for="seed">相場の番号（シード）</label><input id="seed" class="num" type="number" placeholder="おまかせ"><span>${real ? '終値は実データどおり。番号で変わるのは日中の動きだけです' : '同じ番号なら、友達と同じ相場で勝負できます'}</span></div></div>
@@ -3213,12 +3216,20 @@ function showTitle() {
     if (e.target.closest('#t-logo')) { fastTap(); return; }
     const sc = e.target.closest('[data-scen]'), df = e.target.closest('[data-diff]'), md = e.target.closest('[data-mode]');
     if (md && !md.disabled && md.dataset.mode !== pick.mode) { const sv = $('#seed').value; pick.mode = md.dataset.mode; showTitle(); $('#seed').value = sv; return; }
-    if (sc && !sc.disabled) { pick.scen = sc.dataset.scen; $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b === sc))); $('#cash-row').hidden = !SCEN[pick.scen].free; if (SCEN[pick.scen].real) $('.disclaimer').textContent = realDisclaimer(pick.scen); }
+    if (sc && !sc.disabled) {
+      const k = sc.dataset.scen;
+      // リアル相場: フリープレイは押したまま、ほかのシナリオのボタンで遊ぶ相場を選ぶ（相場は1つだけ）。フリープレイをもう一度押すと解除
+      if (real && SCEN[k].free) pick.scen = pick.scen === k ? pick.market : k;
+      else if (real && pick.scen === 'realfree') pick.market = k;
+      else { pick.scen = k; if (real) pick.market = k; }
+      $$('[data-scen]', el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scen === pick.scen || (pick.scen === 'realfree' && !SCEN[b.dataset.scen].free && b.dataset.scen === pick.market))));
+      $('#cash-row').hidden = !SCEN[pick.scen].free; if (SCEN[pick.scen].real) $('.disclaimer').textContent = realDisclaimer(pick.scen);
+    }
     if (df && !df.disabled) { pick.diff = df.dataset.diff; $$('[data-diff]', el).forEach(b => b.setAttribute('aria-pressed', String(b === df))); $('#cash').placeholder = DIFF[pick.diff].cash; }
     if (e.target.closest('#go-new')) {
       const sv = $('#seed').value; const seed = sv ? (+sv | 0) : Math.floor(Math.random() * 1e9);
       const cv = +$('#cash').value, cash = SCEN[pick.scen].free && cv ? clamp(Math.round(cv / 1000) * 1000, CASH_MIN, CASH_MAX) : 0;
-      newGame(pick.scen, pick.diff, seed, cash, pick.mode); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
+      newGame(pick.scen, pick.diff, seed, cash, pick.mode, SCEN[pick.scen].free && real ? [pick.market] : null); hideTitle(); UI.lastNews = -1; buildTypes(); buildFilter(); switchView('trade'); render();
       if (G.scen === 'month' && !profile.tutorial) startTutorial(); else toast(!isReal() ? `相場の番号は ${seed} です` : G.base !== G.scen ? `今回の相場は「${SCEN[G.base].name}」。${dateLabel(G.date)}から、実際の株価で取引します` : `${dateLabel(G.date)}から、実際の株価で取引します`);
     }
     if (e.target.closest('#go-rec')) { showRecords(); return; }
