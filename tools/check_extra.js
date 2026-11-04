@@ -64,10 +64,11 @@ const same = (a, b, k) => a.length === b.length && a.every((x, i) => x[k] === b[
 const firstDiff = (a, b, k) => a.findIndex((x, i) => x[k] !== b[i]?.[k]);
 
 // ---------- 1. ON/OFF ----------
-console.log('1. 追加銘柄あり・なしで、30銘柄・指数・ニュースが同じか（どちらもランク7）');
+console.log('1. 追加銘柄あり・なしで、30銘柄・指数・ニュースが同じか（どちらもランク7。なしは xOn(false)）');
 const CASES = [['year', 'normal', 2024, 245], ['storm', 'hard', 777, 60], ['free', 'easy', 99, 80], ['month', 'normal', 12345, 20], ['year', 'hard', 5, 120, true]];
 for (const [scen, diff, seed, days, fast] of CASES) {
-  const A = start(FILE, 6000, false, scen, diff, seed, fast), B = start(FILE, 6000, true, scen, diff, seed, fast);
+  const A = load(FILE, store()); setProfile(A, 6000, true, fast); A.xOn(false); A.newGame(scen, diff, seed); A.xOn(true);
+  const B = start(FILE, 6000, true, scen, diff, seed, fast);
   const n = [A.G.extra.length, B.G.extra.length], hA = histSnap(A.G), hB = histSnap(B.G);
   const a = play(A, days), b = play(B, days), ok = same(a, b, 'main') && hA.main === hB.main;
   result(ok && n[0] === 0 && n[1] === NX, `${scen}/${diff}/${seed}${fast ? '（ファストON・梅山あり）' : ''} ${a.length}日  追加銘柄 ${n[0]}→${n[1]}社  過去60日${hA.main === hB.main ? '同じ' : 'ちがう'}  ${ok ? '全日同じ' : `${firstDiff(a, b, 'main') + 1}日目からズレ`}`);
@@ -119,15 +120,17 @@ console.log('\n4. 追加銘柄より前のセーブ（30銘柄）の読み込み
 }
 
 // ---------- 5. ランクと銘柄数 ----------
-console.log('\n5. ランク7の前と後の銘柄数、「R7到達済み」の立ち方');
+console.log('\n5. ランク7の前と後の銘柄数（追加銘柄はいつも持ち、ランク7まで隠す）、「R7到達済み」の立ち方');
 {
-  const count = K => Object.keys(K.G._map).length;
+  const count = K => Object.keys(K.G._map).length, shown = K => K.unlockedCodes().filter(c => K.G.extra.some(s => s.code === c)).length;
   const A = start(FILE, 3000, false, 'free', 'normal', 1);
-  result(count(A) === 30 && A.G.extra.length === 0, `ランク6（R7未到達）の新規ゲーム：${count(A)}銘柄`);
+  result(count(A) === 30 + NX && A.G.extra.length === NX && shown(A) === 0, `ランク6の新規ゲーム：${count(A)}銘柄を持ち、追加銘柄の表示 ${shown(A)}社`);
   const B = start(FILE, 6000, true, 'free', 'normal', 1);
-  result(count(B) === 30 + NX && B.G.extra.length === NX, `R7到達後の新規ゲーム：${count(B)}銘柄（30＋追加${B.G.extra.length}）`);
-  const C = load(FILE, store()); setProfile(C, 6000, true); C.newGame('real', 'normal', 1, 0, 'real');
-  if (C.G.mode === 'real') result(C.G.extra.length === 0, `R7到達後のリアル相場：追加銘柄 ${C.G.extra.length}社`);
+  result(count(B) === 30 + NX && B.G.extra.length === NX && shown(B) > 0, `ランク7の新規ゲーム：${count(B)}銘柄（30＋追加${B.G.extra.length}）、追加銘柄の表示 ${shown(B)}社（新規上場は上場まで隠す）`);
+  A.addXP(3000, 'テスト');
+  result(shown(A) === shown(B), `ランク6のゲームの途中でランク7に上がる → 追加銘柄の表示 ${shown(A)}社`);
+  const C = load(FILE, store()); setProfile(C, 3000, false); C.newGame('real', 'normal', 1, 0, 'real');
+  if (C.G.mode === 'real') { const n0 = shown(C); C.addXP(3000, 'テスト'); result(C.G.extra.length > 0 && n0 === 0 && shown(C) > 0, `ランク6のリアル相場：追加銘柄 ${C.G.extra.length}社を持ち、表示 ${n0}社 → ランク7で ${shown(C)}社`); }
   // (a) 読み込んだプロフィールがすでにR7以上
   const st = store(); st.setItem('kabutore.profile', JSON.stringify({ xp: 6500, missions: {} }));
   const D = load(FILE, st);

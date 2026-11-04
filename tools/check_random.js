@@ -60,6 +60,7 @@ function load(file, storage) {
 
 function fingerprint(file) {
   const K = load(file), out = {};
+  K.xOn?.(false);   // 追加銘柄（ランク7まで隠して持つ）は作らない。30銘柄の相場だけを比べる
   for (const [scen, diff, seed] of CASES) {
     K.newGame(scen, diff, seed);
     for (let d = 0; d < DAYS && !K.G.ended; d++) { K.runDay(); K.closeModal(); if (!K.G.ended) K.nextDay(); }

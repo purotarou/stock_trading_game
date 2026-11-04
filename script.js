@@ -75,7 +75,7 @@ const DEFS = [
   ['K604','パワーエッグス','growth',1620,45,0,[],4,1.0,'大型の蓄電池を開発するベンチャー。'],
   ['K605','メルカル','growth',288,120,0,[],4,.9,'フリマアプリを運営。'],
 ];
-// 追加銘柄（ランダム相場だけ）。ランク7に到達したあとに始めたゲームから出る（profile.r7）。G.stocks には入れず G.extra に持ち、
+// 追加銘柄（ランダム相場）。新しく始めたゲームはランクに関係なく最初から持ち、ランク7になるまで隠す（isOpen。途中でランク7になれば、その場で出る）。G.stocks には入れず G.extra に持ち、
 // 乱数は銘柄ごとの専用のもの（s.r）だけを使う。市場・業種の動きは30銘柄で引いた値を読むだけなので、30銘柄・指数・ニュースは変わらない
 // shares = 発行済株式数(百万株)、dy = 配当利回り、rec = 権利確定月、sm = 値動きの倍率、kind = 種類（KINDS）
 // p = 種類の既定値（KINDS[kind].p）を、この銘柄だけ上書きするもの（loss = 赤字、per = PER の基準値も使える）、perk = 株主優待 { m: 権利確定月, yen: 1回の現金相当（100株以上の現物）, text: 内容 }
@@ -165,7 +165,7 @@ const RANKS = [
   { n: '中級トレーダー', xp: 700, unlock: '30銘柄・決算カレンダー・RSI・1年チャレンジ' },
   { n: '上級トレーダー', xp: 1500, unlock: '本格モード・リアル相場チャレンジ' },
   { n: 'プロトレーダー', xp: 3000, unlock: '信用取引' },
-  { n: '伝説の相場師', xp: 6000, unlock: `追加の${XDEFS.length}銘柄（このランクになったあとに始めたランダム相場から）・称号` },
+  { n: '伝説の相場師', xp: 6000, unlock: `追加の${XDEFS.length}銘柄・称号` },
 ];
 // ランクに上がるまで画面に出さない。ランクが足りないうちは達成にもならない
 const MISSIONS = [
@@ -516,9 +516,9 @@ function newGame(scen, diff, seed, cash, mode) {
     else if (diff === 'hard' && scen !== 'month' && RNG.next() < 0.7) G.crashDay = 50 + Math.floor(RNG.next() * 150);
     for (const s of G.stocks) s.consensus = (s.eps / 4) * (1 + s.mu / 4 + RNG.normal() * 0.02);
     if (isFast()) G.ume = makeUme(seed);   // G.stocks には入れない（ほかの30銘柄と指数の乱数の順番を変えない）
-    if (profile.r7) G.extra = XDEFS.map((x, k) => makeExtra(x, k, seed));   // 追加銘柄も G.stocks には入れない
+    if (X_ON) G.extra = XDEFS.map((x, k) => makeExtra(x, k, seed));   // 追加銘柄も G.stocks には入れない。ランク7まで隠す（isOpen）
   }
-  if (real && profile.r7) G.extra = [...(REAL_XDEF || []), ...REAL_IDEF].map(makeRealExtra);   // リアル相場（2026年版・コロナショック版）の追加18社と新規上場2社。G.stocks には入れない
+  if (real && X_ON) G.extra = [...(REAL_XDEF || []), ...REAL_IDEF].map(makeRealExtra);   // リアル相場（2026年版・コロナショック版）の追加18社と新規上場2社。G.stocks には入れない。ランク7まで隠す（isOpen）
   afterLoad();
   if (real) realStart(); else genHistory();
   G.player.startIdx = G.market.idx;
@@ -527,7 +527,7 @@ function newGame(scen, diff, seed, cash, mode) {
 }
 function afterLoad() {
   if (G.mode === 'real') useReal(realKeyOf(G));   // 保存データ・練習からの復元でも、そのシナリオのデータに切り替える
-  G.extra ||= [];   // 追加銘柄より前のセーブには extra がない（30銘柄のまま続ける）
+  G.extra ||= [];   // 追加銘柄より前のセーブには extra がない（30銘柄のまま続ける。途中から作ると、それまでの日の値動きを再現できない）
   G.dlog ||= [];    // 上場廃止の記録（倒産より前のセーブにはない。日程 s.dl のない銘柄は倒産しない）
   for (const s of G.extra) rngOn(s.r);
   G._map = Object.fromEntries(allStocks().map(s => [s.code, s])); G.player.mpos ||= {};   // 信用取引より前のセーブには mpos がない
@@ -1154,14 +1154,17 @@ function isOpen(s, r = rank()) {
   if (s.delisted) return false;   // 上場廃止（データは残す。閲覧だけできる）
   if (preIpo(s)) return false;     // 上場前
   if (s.ume) return umeListed();
+  if (xHidden(s, r)) return false;   // 追加銘柄はランク7まで隠す（ファスト ON でも）
   if (isReal()) return !isFast() || r >= SCEN.real.rank || FAST_CODES.real.includes(s.code);
   return s.unlock <= r || (isFast() && FAST_CODES.random.includes(s.code));
 }
+let X_ON = true;   // 確認用（__kabutore.xOn(false)）：新しいゲームに追加銘柄を作らない
+function xHidden(s, r = rank()) { return !!s.extra && r < XRANK; }
 function openRank(s) { for (let r = rank(); r <= RANKS.length; r++) if (isOpen(s, r)) return r; return RANKS.length; }
 function unlockedStocks() { const r = rank(); return [...allStocks(), ...(G.ume ? [G.ume] : [])].filter(s => isOpen(s, r)); }
 // 取引できない銘柄・業種だけの話は見せない（まだ関係がないので）。市場全体や社会のニュースは常に見せる
 function newsVisible(n) {
-  if (n.codes?.length) return n.codes.some(c => { const s = byCode(c); return s && (isOpen(s) || s.delisted || !!s.ipo); });   // 上場廃止の銘柄の過去のお知らせ、上場前の承認のお知らせも見せる
+  if (n.codes?.length) return n.codes.some(c => { const s = byCode(c); return s && (isOpen(s) || ((s.delisted || !!s.ipo) && !xHidden(s))); });   // 上場廃止の銘柄の過去のお知らせ、上場前の承認のお知らせも見せる（ランク7まで隠す追加銘柄は除く）
   if (n.sector) return G.stocks.some(s => s.sector === n.sector && isOpen(s));   // 30銘柄だけで決める（追加銘柄で、社会のニュースへの置き換えが変わらないように）
   return true;
 }
@@ -1171,7 +1174,7 @@ function worldNews(mode) {
   pushNews({ day: G.dayIndex, time: mode === 'gap' ? '夜間' : minLabel(G.minute), type: 'world', stars: 3, codes: [], sector: null, text, hint: '市場への影響は小さい', flash: false });
 }
 const newsKeep = () => (isReal() ? NEWS_KEEP_REAL : G.extra?.length ? 200 : 120);
-const newsShow = () => (isReal() ? NEWS_KEEP_REAL : G.extra?.length ? 80 : 50);   // 画面の一覧に出す件数
+const newsShow = () => (isReal() ? NEWS_KEEP_REAL : G.extra?.length && rank() >= XRANK ? 80 : 50);   // 画面の一覧に出す件数（追加銘柄を隠しているあいだは30銘柄と同じ）
 function pushNews(item) {
   // リアル相場は1年分（約200件）の当時のニュースを全部残す。ランダム相場は120件、追加銘柄のある50銘柄のゲームは200件
   item.id = ++G.newsId; G.news.push(item); if (G.news.length > newsKeep()) G.news.shift();
@@ -2427,7 +2430,7 @@ function renderCalReal(el) {
   const EV = realEv();
   if (!EV) { el.innerHTML = `<section class="panel"><h2>決算・配当</h2><p class="muted">決算・配当・株主優待のデータ（${REAL_SETS[REAL_KEY].eventsFile}）がないため、このシナリオでは扱いません（tools/fetch_events.py で作成）。</p></section>`; return; }
   const P = G.player, di = G.dayIndex, D = REAL.dates, day = i => `${mdLabel(D[i])}${i === di ? ' 今日' : ''}`;
-  const ss = allStocks().filter(s => live(s) && EV[s.code]), own = s => (P.pos[s.code] ? '●' : '');
+  const ss = allStocks().filter(s => live(s) && !xHidden(s) && EV[s.code]), own = s => (P.pos[s.code] ? '●' : '');
   const up = ss.flatMap(s => EV[s.code].earn.filter(e => e.k === 'k' && e.di >= di && e.di - di <= 25).map(e => ({ s, e }))).sort((a, b) => a.e.di - b.e.di);
   const divs = ss.map(s => {
     const ev = EV[s.code], next = Math.min(...ev.divs.filter(v => v.di >= di).map(v => v.di), ...ev.skip.filter(v => v.di >= di).map(v => v.di));
@@ -2452,9 +2455,9 @@ function renderCal() {
   if (rank() < 4) { el.innerHTML = `<section class="panel"><div class="locked"><b>ランク4で解放</b><p>決算発表の予定日と、配当の権利確定日がわかるカレンダーです。</p></div></section>`; return; }
   if (isReal()) { renderCalReal(el); return; }
   const P = G.player;
-  const up = allStocks().filter(s => live(s) && !['fail', 'seiri'].includes(dlStage(s)) && s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
-  const divs = allStocks().filter(s => s.div && live(s));
-  const perks = allStocks().filter(s => s.perk);
+  const up = allStocks().filter(s => live(s) && !xHidden(s) && !['fail', 'seiri'].includes(dlStage(s)) && s.nextEarn - G.dayIndex <= 25 && s.nextEarn >= G.dayIndex).sort((a, b) => a.nextEarn - b.nextEarn);
+  const divs = allStocks().filter(s => s.div && live(s) && !xHidden(s));
+  const perks = allStocks().filter(s => s.perk && !xHidden(s));
   const recDate = (s, months = s.rec) => { let best = null; for (let k = 0; k < 270 && !best; k++) { const d = addTD(G.date, k); if (months.includes(monthOf(d)) && lastTradingDayOfMonth(d)) best = d; } return best; };
   el.innerHTML = `<section class="panel"><h2>決算発表の予定（25営業日先まで）</h2><p class="muted small">決算は大引け後（15:30）に発表され、翌日の寄り付きで株価に反映されます。</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>発表日</th><th>銘柄</th><th>業種</th><th class="r">${term('市場予想')}（1株利益）</th><th>保有</th></tr></thead><tbody>
@@ -3124,7 +3127,7 @@ function showTitle() {
   if (!anyReal() || realLock) pick.mode = 'random';
   const real = pick.mode === 'real';
   if (scenOff(pick.scen, r) || !!SCEN[pick.scen].real !== real) pick.scen = real ? (Object.keys(SCEN).find(k => SCEN[k].real && !scenOff(k, r)) || 'real') : 'month'; if (DIFF[pick.diff].rank > r) pick.diff = 'easy';
-  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の30銘柄と、追加の18社・新規上場2社。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
+  const modes = [['random', 'ランダム相場', `架空の${profile.r7 ? 30 + XDEFS.length : 30}社。シードごとに毎回ちがう相場になる。`], ['real', 'リアル相場チャレンジ', anyReal() ? (profile.r7 ? '実在の50社。過去の現実の相場になる。' : '実在の30銘柄。過去の現実の相場になる。ランク7で、追加の銘柄が出る。') : `${Object.values(REAL_SETS).map(S => S.file).join(' か ')} がないため遊べません（tools/fetch_prices.py で作成）。`]];
   el.innerHTML = `<div class="title-card">
     <div class="hero"><div><p class="tagline">ほんものと同じルールで、失敗しても痛くない株デビュー</p><h1 id="t-logo">カブトレ<span class="bang">！</span></h1>
       <p>${real ? '過去の東京証券取引所の株価で、実在の30社を売買して、資産を増やそう。' : `架空の取引所「NTX」で、実在の企業をもじった${profile.r7 ? DEFS.length + XDEFS.length : 30}社を売買して、資産を増やそう。`}100株単位、成行と指値、板、ストップ高・安、決算、配当、税金まで本物と同じ。</p></div>
@@ -3364,7 +3367,7 @@ function start(data) {
   requestAnimationFrame(loop);
 }
 window.claude?.hot?.snapshot?.(() => (G && !titleOpen && !G.ended ? { save: JSON.stringify(G, (k, v) => (k === '_map' ? undefined : v)), view: UI.view } : {}));
-window.__kabutore = { get G() { return G; }, newGame, tick, asset, rank, profile: () => profile, runDay: () => { while (G.phase !== 'closed') tick(); }, nextDay, closeModal, saveText, resume: str => resume(JSON.parse(str)), placeOrder, addXP, legendTap, render, switchView, book, availCash, marginStat, marginRoom: c => marginRoom(c && G._map[c]), dlPlan, dlStage: c => dlStage(G._map[c]), dlWarn: c => dlWarn(G._map[c]), unlockedCodes: () => unlockedStocks().map(s => s.code), sellMissions, onGame,
+window.__kabutore = { get G() { return G; }, xOn: v => (X_ON = !!v), newGame, tick, asset, rank, profile: () => profile, runDay: () => { while (G.phase !== 'closed') tick(); }, nextDay, closeModal, saveText, resume: str => resume(JSON.parse(str)), placeOrder, addXP, legendTap, render, switchView, book, availCash, marginStat, marginRoom: c => marginRoom(c && G._map[c]), dlPlan, dlStage: c => dlStage(G._map[c]), dlWarn: c => dlWarn(G._map[c]), unlockedCodes: () => unlockedStocks().map(s => s.code), sellMissions, onGame,
   // 動作確認用：code の銘柄（追加銘柄）で、days 営業日後の朝に前兆が始まるように日程を作り直す。戻り値は新しい日程
   finalReport, practiceStart, practiceEnd, xnFx: v => (XN_FX = v), xnSkip: c => (XN_SKIP = c), xnForce(c, chg) { XN_FORCE = chg; xNews(G._map[c], G.phase === 'open' ? 'live' : 'gap'); render(); }, xnPlan: c => xnPlan(G._map[c]), xnOK: c => xnOK(G._map[c]), ipoStage: c => ipoStage(G._map[c]), ipoSchedule, netAsset, assetOld: () => { const P = G.player; let v = P.cash; for (const c in P.pos) v += P.pos[c].qty * G._map[c].price; if (Object.keys(P.mpos).length) { const m = marginStat(); v += m.u - m.cost; } return v; },
   // 動作確認用：新規上場の銘柄を、days 営業日後に上場するように日程を作り直す（承認のお知らせは翌朝）。戻り値は s.ipo

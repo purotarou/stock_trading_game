@@ -18,6 +18,7 @@ const hash = x => crypto.createHash('sha256').update(JSON.stringify(x)).digest('
 
 function run(file) {
   const K = load(file), out = {};
+  K.xOn?.(false);   // 追加銘柄（ランク7まで隠して持つ）は作らない。30銘柄の相場だけを比べる（隠したまま同じかは check_extra の1）
   K.realEv?.(false);   // 当時の決算・配当・優待（ニュースと入金だけで、値動きは変えない）は比べない。値動きと当時のニュースだけを比べる
   for (const seed of SEEDS) {
     K.newGame('real', 'normal', seed, 0, 'real');
